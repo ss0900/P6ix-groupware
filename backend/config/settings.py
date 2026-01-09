@@ -21,25 +21,27 @@ env = environ.Env(
     DJANGO_DEBUG=(bool, False),
 )
 
-# ✅ .env를 backend/config/.env에서 읽기
-environ.Env.read_env(os.path.join(BASE_DIR, "config", ".env"))
+# ✅ .env 로드: backend/config/.env 우선, 없으면 backend/.env
+_env_path_candidates = [
+    os.path.join(BASE_DIR, "config", ".env"),
+    os.path.join(BASE_DIR, ".env"),
+]
+for _p in _env_path_candidates:
+    if os.path.exists(_p):
+        environ.Env.read_env(_p)
+        break
 
-# ✅ .env 값으로 덮어쓰기 (없으면 기본값 사용)
+# ✅ .env 값 사용(없으면 기본값)
 SECRET_KEY = env("SECRET_KEY", default="dev-secret-key")
-DEBUG = env("DJANGO_DEBUG", default=True)
-
+DEBUG = env("DJANGO_DEBUG", default=False)
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-_*nxvkl^5ogf@c@@qrpxj%wj%alpiy_bx#05%lkf4v89=c)gk*"
+# ✅ 아래 하드코딩된 SECRET_KEY/DEBUG는 .env 값을 덮어쓰므로 제거
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-
-ALLOWED_HOSTS = []
-
+# 개발 기본 호스트 허용(운영은 .env에서 지정)
+ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["127.0.0.1", "localhost"])
 
 # Application definition
 
@@ -50,11 +52,14 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "rest_framework",
+    "corsheaders",
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -92,8 +97,8 @@ DATABASES = {
         'USER': env("DB_USER"),
         'PASSWORD': env("DB_PASSWORD"),
         'HOST': env("DB_HOST"),
-        # 'PORT': env("DB_PORT")
-        'PORT': env("LOCAL_PORT"),
+        # DB_PORT가 있으면 우선 사용, 없으면 LOCAL_PORT(SSH 터널용 등) fallback
+        'PORT': env("DB_PORT", default=env("LOCAL_PORT", default="5432")),
         'CONN_MAX_AGE': 5,
         "OPTIONS": {
             "options": "-c lc_messages=C -c client_encoding=UTF8",
@@ -137,3 +142,36 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = "static/"
+
+# -----------------------------
+# DRF / JWT (SimpleJWT)
+# -----------------------------
+REST_FRAMEWORK = {
+    # API는 기본적으로 JWT로 보호
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        # admin(세션 로그인)도 같이 쓰고 싶으면 아래 줄 유지
+        "rest_framework.authentication.SessionAuthentication",
+    ),
+    "DEFAULT_PERMISSION_CLASSES": (
+        "rest_framework.permissions.IsAuthenticated",
+    ),
+}
+
+# (선택) 토큰 유효기간 기본값 그대로 써도 되지만,
+# 나중에 운영 정책에 맞게 조절할 수 있도록 블록만 만들어둠
+from datetime import timedelta
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+}
+
+# -----------------------------
+# CORS (프론트 개발 서버 허용)
+# -----------------------------
+# .env에서 콤마로 구분해서 넣으면 됨:
+# CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+CORS_ALLOWED_ORIGINS = env.list(
+    "CORS_ALLOWED_ORIGINS",
+    default=["http://localhost:3000", "http://127.0.0.1:3000"],
+)
