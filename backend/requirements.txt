@@ -4,6 +4,11 @@ django-environ==0.12.0
 djangorestframework==3.16.1
 django-cors-headers==4.6.0
 djangorestframework-simplejwt==5.5.0
+channels==4.1.0
+daphne==4.1.2
+pillow==10.4.0
+# (선택) 운영에서 Redis로 채널 레이어 쓸 거면
+# channels-redis==4.2.0
 psycopg2-binary==2.9.11
 python-dotenv==1.2.1
 sqlparse==0.5.5
