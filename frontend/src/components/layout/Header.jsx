@@ -48,8 +48,8 @@ function Header({ onMenuClick }) {
 
   return (
     <>
-      <header className="sticky top-0 z-50 bg-slate-800 shadow-md">
-        <div className="px-4 py-3 flex items-center justify-between">
+      <header className="sticky top-0 z-50 bg-[#1e1e2f] shadow-md">
+        <div className="w-full px-6 py-3 flex items-center justify-between">
           {/* Left Section */}
           <div className="flex items-center gap-4">
             <button
