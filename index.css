@@ -1,0 +1,405 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0 !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
+    "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
+    monospace;
+}
+
+@layer components {
+  .a4-page {
+    width: 210mm;
+    height: 297mm;
+    position: absolute;
+    background: white;
+    overflow: hidden;
+    page-break-after: always;
+  }
+
+  .print-root {
+    display: flex;
+    justify-content: center;
+  }
+
+  @media print {
+    .print-root {
+      display: block !important; /* 🔥 flex 제거 */
+      min-height: auto !important;
+      height: auto !important;
+    }
+  }
+
+  .btn-blue {
+    @apply bg-yellow-300;
+  }
+
+  .btn-alternative {
+    @apply py-2.5 px-5 me-2 mb-2 text-sm font-medium text-gray-900 focus:outline-none bg-white rounded-lg border border-gray-200 hover:bg-gray-100 hover:text-blue-700 focus:z-10 focus:ring-4 focus:ring-gray-100;
+  }
+
+  .btn-search-icon {
+    @apply w-4 h-4 me-2;
+  }
+
+  .input-search {
+    @apply bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full ps-10 p-2.5;
+  }
+
+  /* ✅ 부드러운 전환 애니메이션 */
+  .transition-all {
+    transition: all 0.4s ease-in-out;
+  }
+
+  /* ============================
+     BUTTONS (버튼)
+  ============================ */
+
+  /* 등록 버튼 */
+  .btn-create,
+  .btn-edit,
+  .btn-save {
+    @apply hover:bg-blue-100 text-blue-700 bg-white border border-blue-400 text-sm px-4 py-1.5 rounded-lg border;
+  }
+
+  /* 업로드 버튼 */
+  .btn-upload {
+    @apply px-4 py-1.5 rounded-lg border text-sm bg-white hover:bg-slate-50
+           disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed;
+  }
+
+  /* 소형 업로드 버튼 */
+  .btn-upload-sm {
+    @apply px-2.5 py-1.5 rounded-lg border text-xs bg-white hover:bg-slate-50 mt-1;
+  }
+
+  /* 파일 선택 버튼 */
+  .btn-file-select {
+    @apply px-4 py-1.5 rounded-lg border text-sm bg-white hover:bg-slate-50;
+  }
+
+  /* 저장 버튼 */
+  /* .btn-search {
+    @apply hover:bg-blue-700 hover:text-white
+           rounded-lg border bg-blue-100 text-blue-700 text-sm px-3 py-2;
+  } */
+
+  /* 소형 저장 버튼 */
+  .btn-save-sm,
+  .btn-create-sm,
+  .btn-edit-sm {
+    @apply hover:bg-blue-100 rounded-lg border text-blue-700 bg-white border border-blue-400 text-xs px-2.5 py-1.5 mt-1;
+  }
+
+  /* 수정 버튼 */
+  /* .btn-edit {
+    @apply text-gray-700 bg-white border border-gray-300
+         rounded-lg text-sm px-4 py-2
+         hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700
+         transition-colors;
+  } */
+
+  /* 소형 수정 버튼 */
+  /* .btn-edit-sm {
+    @apply text-gray-700 bg-white border border-gray-300
+         rounded-lg text-xs px-2.5 py-1.5
+         hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700
+         transition-colors mt-1;
+  } */
+
+  /* 삭제 버튼 */
+  .btn-delete {
+    @apply text-red-600 border border-red-400 rounded-lg text-sm px-4 py-1.5 hover:bg-red-100 hover:border-red-400 hover:text-red-600 transition-colors;
+  }
+
+  /* 소형 삭제 버튼 */
+  .btn-delete-sm {
+    @apply text-red-600 border border-red-400 rounded-lg text-xs px-2.5 py-1.5 hover:bg-red-100 hover:border-red-400 hover:text-red-600 transition-colors mt-1;
+  }
+
+  /* 취소 버튼 */
+  .btn-cancel,
+  .btn-search,
+  .btn-basic {
+    @apply bg-white border border-gray-300 rounded-lg text-sm px-4 py-1.5 hover:bg-gray-200 hover:border-gray-400 hover:text-gray-900 transition-colors;
+  }
+
+  /* 소형 취소 버튼 */
+  .btn-cancel-sm,
+  .btn-basic-sm {
+    @apply bg-white border border-gray-300 rounded-lg text-xs px-2.5 py-1.5 hover:bg-gray-200 hover:border-gray-400 hover:text-gray-900 transition-colors mt-1;
+  }
+
+  /* 수량 · 단가 · 공급가 · 세액 · 합계 — 숫자열 고정폭 */
+  .col-number {
+    width: 110px;
+    min-width: 110px;
+    max-width: 110px;
+  }
+
+  /* 입력칸 크기 통일 */
+  .table-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 4px 6px;
+  }
+
+  /* 삭제 버튼 칸 고정폭 */
+  .col-delete {
+    width: 60px;
+    min-width: 60px;
+    max-width: 60px;
+  }
+
+  /* ============================
+     TEXTS (글씨)
+  ============================ */
+
+  /* 제목 (H1) */
+  .text-title {
+    @apply text-black font-bold text-2xl mb-2;
+  }
+
+  /* 소제목 (H2) */
+  .text-subtitle {
+    @apply text-black font-semibold text-lg;
+  }
+
+  /* 본문 내용 */
+  .text-body-bold {
+    @apply text-black text-xs font-semibold leading-relaxed;
+  }
+
+  /* 본문 내용 */
+  .text-body {
+    @apply text-black text-xs;
+  }
+
+  /* 내용 강조 */
+  .text-highlight {
+    @apply text-black text-sm font-semibold;
+  }
+
+  /* DNS(굵은 진한 회색) */
+  .text-gray-medium {
+    @apply text-gray-600 font-medium text-xs mb-4;
+  }
+
+  /* 회색(설명, 데이터 없음 등) */
+  .text-muted-sm {
+    @apply text-gray-500 text-sm;
+  }
+
+  .text-muted {
+    @apply text-gray-500 text-xs;
+  }
+
+  /* 위젯 title */
+  .wgt-title {
+    @apply text-sm font-semibold text-slate-700 mb-4;
+  }
+
+  /* ============================
+     테이블 (등록/조회 공통)
+  ============================ */
+
+  /* 제목 셀: 가로·세로 정중앙 정렬 (등록/조회 공통) */
+  .tbl-label-bg {
+    @apply border border-black bg-gray-100 px-3 py-2 font-medium text-xs
+           align-middle;
+  }
+
+  /* 값 셀도 라벨과 동일하게 세로 가운데 정렬 */
+  .tbl-value-bg {
+    @apply border border-black bg-white px-3 py-2 align-middle text-xs;
+  }
+
+  /* 보드테이블 안의 input/select/textarea 높이 통일 */
+  .tbl-value-bg input[type="text"],
+  .tbl-value-bg select,
+  .tbl-value-bg textarea {
+    @apply h-9 py-1 text-sm;
+  }
+
+  /* 입력 필드 기본 스타일 (등록/조회 공통) */
+  .input-base {
+    @apply w-full border px-2 py-1 rounded;
+  }
+
+  /* 공통 테이블 헤더 스타일 */
+  .doc-thead {
+    @apply bg-gray-100 border-b border-black font-medium text-xs;
+  }
+
+  .doc-th {
+    @apply px-2 py-1 border-r border-black font-medium text-xs;
+  }
+  .doc-th-end {
+    @apply px-2 py-1 border-black font-medium text-xs;
+  }
+  .doc-td {
+    @apply px-3 py-2 text-center border border-black text-xs;
+  }
+
+  .doc-table {
+    @apply border-collapse border border-black;
+  }
+
+  /* tbody td */
+  .doc-td {
+    @apply border border-black px-1 py-0.5 align-middle;
+  }
+
+  .input-sm {
+    @apply w-full px-0.5 py-0.5 border rounded;
+  }
+  .doc-del {
+    @apply text-red-500 hover:underline text-sm;
+  }
+}
+
+.doc-th-result {
+  @apply border border-black px-1 py-0.5 text-[10px] font-normal text-center leading-tight;
+}
+
+/* ============================
+   LOGIN TITLE
+============================ */
+.login-title {
+  @apply text-xl font-semibold tracking-wide text-gray-800 mb-4 select-none;
+
+  /* 부드러운 등장 애니메이션 */
+  animation: fadeUp 0.5s ease forwards;
+}
+
+@keyframes fadeUp {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.btn-login {
+  @apply w-full py-3 rounded-2xl bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold tracking-wide shadow-md hover:shadow-lg transition-all;
+}
+
+/* 스크롤바 숨기기 */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none; /* IE, Edge */
+  scrollbar-width: none; /* Firefox */
+}
+
+/* 페이지 공통 레이아웃 (등록/조회 공통) */
+@layer components {
+  .page-box {
+    @apply bg-white border rounded-xl p-6;
+  }
+
+  .section-header {
+    @apply bg-[#1e1e2f] text-white px-4 py-2 text-base;
+  }
+
+  .section-body {
+    @apply mt-4 mb-8;
+  }
+}
+
+/* 슬라이드 업 */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInSlide {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInRow {
+  from {
+    opacity: 0;
+    transform: translateX(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes flashSelect {
+  0% {
+    background-color: #dbeafe;
+  }
+
+  50% {
+    background-color: #bfdbfe;
+  }
+
+  100% {
+    background-color: #dbeafe;
+  }
+}
+
+@keyframes toast-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes toast-leave {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+}
+
+.toast-enter {
+  animation: toast-enter 0.25s ease-out forwards;
+}
+
+.toast-leave {
+  animation: toast-leave 0.2s ease-in forwards;
+}
+.react-hot-toast {
+  transform: none !important;
+}

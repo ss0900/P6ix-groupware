@@ -115,3 +115,125 @@ class PositionViewSet(viewsets.ModelViewSet):
     #             usermembership__company__project_participations__project_id=project_id
     #         ).distinct()
     #     return qs
+
+
+# 사용자 관리
+from core.models import CustomUser
+from rest_framework import serializers as drf_serializers
+
+class UserListSerializer(drf_serializers.ModelSerializer):
+    company = drf_serializers.SerializerMethodField()
+    department = drf_serializers.SerializerMethodField()
+    position = drf_serializers.SerializerMethodField()
+    company_id = drf_serializers.SerializerMethodField()
+    department_id = drf_serializers.SerializerMethodField()
+    position_id = drf_serializers.SerializerMethodField()
+
+    class Meta:
+        model = CustomUser
+        fields = [
+            "id", "username", "email", "first_name", "last_name", "phone_number",
+            "is_active", "is_staff", "is_superuser",
+            "company", "company_id", "department", "department_id", "position", "position_id"
+        ]
+
+    def _get_primary_membership(self, obj):
+        return obj.memberships.filter(is_primary=True).select_related("company", "department", "position").first()
+
+    def get_company(self, obj):
+        m = self._get_primary_membership(obj)
+        return {"id": m.company.id, "name": m.company.name} if m and m.company else None
+    
+    def get_company_id(self, obj):
+        m = self._get_primary_membership(obj)
+        return m.company.id if m and m.company else None
+
+    def get_department(self, obj):
+        m = self._get_primary_membership(obj)
+        return {"id": m.department.id, "name": m.department.name} if m and m.department else None
+
+    def get_department_id(self, obj):
+        m = self._get_primary_membership(obj)
+        return m.department.id if m and m.department else None
+
+    def get_position(self, obj):
+        m = self._get_primary_membership(obj)
+        return {"id": m.position.id, "name": m.position.name} if m and m.position else None
+
+    def get_position_id(self, obj):
+        m = self._get_primary_membership(obj)
+        return m.position.id if m and m.position else None
+
+
+class UserViewSet(viewsets.ModelViewSet):
+    queryset = CustomUser.objects.prefetch_related("memberships").all().order_by("-date_joined")
+    serializer_class = UserListSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        search = self.request.query_params.get("search")
+        if search:
+            qs = qs.filter(
+                Q(username__icontains=search) |
+                Q(email__icontains=search) |
+                Q(first_name__icontains=search) |
+                Q(last_name__icontains=search)
+            )
+        return qs
+
+    @transaction.atomic
+    def create(self, request, *args, **kwargs):
+        data = request.data
+        user = CustomUser.objects.create_user(
+            username=data.get("username"),
+            email=data.get("email"),
+            password=data.get("password"),
+            first_name=data.get("first_name", ""),
+            last_name=data.get("last_name", ""),
+            phone_number=data.get("phone_number", ""),
+            is_staff=data.get("is_staff", False),
+            is_active=data.get("is_active", True),
+        )
+        
+        # 소속 생성
+        company_id = data.get("company")
+        if company_id:
+            UserMembership.objects.create(
+                user=user,
+                company_id=company_id,
+                department_id=data.get("department") or None,
+                position_id=data.get("position") or None,
+                is_primary=True
+            )
+        
+        return Response(UserListSerializer(user).data, status=status.HTTP_201_CREATED)
+
+    @transaction.atomic
+    def partial_update(self, request, *args, **kwargs):
+        user = self.get_object()
+        data = request.data
+
+        # 기본 정보 업데이트
+        for field in ["email", "first_name", "last_name", "phone_number", "is_staff", "is_active"]:
+            if field in data:
+                setattr(user, field, data[field])
+        
+        if data.get("password"):
+            user.set_password(data["password"])
+        
+        user.save()
+
+        # 소속 업데이트
+        company_id = data.get("company")
+        if company_id:
+            membership, _ = UserMembership.objects.get_or_create(
+                user=user, is_primary=True,
+                defaults={"company_id": company_id}
+            )
+            membership.company_id = company_id
+            membership.department_id = data.get("department") or None
+            membership.position_id = data.get("position") or None
+            membership.save()
+
+        return Response(UserListSerializer(user).data)

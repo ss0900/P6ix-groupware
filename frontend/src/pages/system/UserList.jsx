@@ -128,7 +128,7 @@ export default function UserList() {
 
         <button
           className="px-4 py-2 bg-blue-600 text-white rounded-lg"
-          onClick={() => navigate(`/system/user/add`)}
+          onClick={() => navigate(`/admin/users/add`)}
         >
           사용자 등록
         </button>
@@ -190,7 +190,7 @@ export default function UserList() {
         loading={loading}
         keyField="id"
         emptyText="등록된 사용자가 없습니다."
-        onRowClick={(row) => navigate(`/system/user/detail/${row.id}`)}
+        onRowClick={(row) => navigate(`/admin/users/${row.id}`)}
       />
     </div>
   );

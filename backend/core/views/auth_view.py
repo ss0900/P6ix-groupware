@@ -10,9 +10,21 @@ from core.serializers import (
 )
 from core.models import UserMembership
 
+
+# 사용자 정보 조회 (프론트엔드 /api/users/me/ 엔드포인트용)
+class UserMeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        serializer = UserSerializer(request.user, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
 # 로그인 (JWT 토큰 발급)
 class CustomLoginView(APIView):
     permission_classes = [AllowAny]
+    authentication_classes = []  # 🔥 Disable Session Auth for Login to avoid CSRF
+
     def post(self, request, *args, **kwargs):
         serializer = LoginSerializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)

@@ -21,16 +21,31 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 from rest_framework_simplejwt.views import (
+    TokenObtainPairView,
     TokenRefreshView,
+    TokenBlacklistView,
 )
+from core.views.auth_view import UserMeView
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     
+    # JWT 인증
+    path("api/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+    path("api/token/blacklist/", TokenBlacklistView.as_view(), name="token_blacklist"),
+    
+    # 사용자 정보
+    path("api/users/me/", UserMeView.as_view(), name="user_me"),
 
     # 모듈별
-    path("api/core/", include("core.urls"))
+    path("api/core/", include("core.urls")),
+    path("api/approval/", include("approval.urls")),
+    path("api/board/", include("board.urls")),
+    path("api/meeting/", include("meeting.urls")),
+    path("api/resources/", include("resources.urls")),
+    path("api/operation/", include("operation.urls")),
+    path("api/chat/", include("chat.urls")),
 ]
 
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

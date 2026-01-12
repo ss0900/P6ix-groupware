@@ -11,6 +11,14 @@ urlpatterns = [
     path("membership/me/", auth_view.UserMembershipMeView.as_view(), name="membership-me"),
 ]
 
+# Users
+urlpatterns += [
+    path("users/", belong_view.UserViewSet.as_view({"get": "list", "post": "create"}), name="users-list"),
+    path("users/<int:pk>/", belong_view.UserViewSet.as_view({
+        "get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"
+    }), name="users-detail"),
+]
+
 # 소속 belonging
 urlpatterns += [
     path("companies/", belong_view.CompanyViewSet.as_view({"get": "list", "post": "create"}), name="companies-list"),

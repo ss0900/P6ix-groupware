@@ -1,147 +1,154 @@
-import React, { useState, useEffect } from "react";
+// src/pages/Login.jsx
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { login } from "../api/auth";
-import loginBg from "../assets/images/login_sc.png";
-import safetyMo from "../assets/images/safety_mo.png";
-import p6ixLogo from "../assets/icons/p6ix_logo.png";
+import { useAuth } from "../context/AuthContext";
+import { Eye, EyeOff, LogIn, AlertCircle } from "lucide-react";
 
 function Login() {
   const navigate = useNavigate();
+  const { login } = useAuth();
+  
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [errorMsg, setErrorMsg] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  // ✅ 페이지 로드 시 이미 로그인 되어 있으면 안내
-  useEffect(() => {
-    const access = localStorage.getItem("access");
-    const user = localStorage.getItem("user");
-
-    if (access && user) {
-      alert("이미 로그인되어 있습니다.");
-      navigate("/system/user/list");
-    }
-  }, [navigate]);
-
-  const handleLogin = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setErrorMsg("");
+    setError("");
+    setLoading(true);
 
     try {
-      const res = await login(username, password);
-      console.log("로그인 성공:", res.data);
-      const { access, refresh, user } = res.data;
-
-      localStorage.setItem("access", access);
-      localStorage.setItem("refresh", refresh);
-      localStorage.setItem("user", JSON.stringify(user));
-      //   localStorage.setItem("projects", JSON.stringify(projects));
-
-      const redirectTo = localStorage.getItem("redirectTo");
-      if (redirectTo) {
-        navigate(redirectTo);
-        localStorage.removeItem("redirectTo");
-        return;
-      }
-
-      navigate("/system/user/list");
+      await login(username, password);
+      navigate("/");
     } catch (err) {
-      console.error("로그인 실패:", err);
-      alert("아이디 또는 비밀번호가 잘못되었습니다.");
+      console.error("Login failed:", err);
+      if (err.response?.status === 401) {
+        setError("아이디 또는 비밀번호가 올바르지 않습니다.");
+      } else {
+        setError("로그인 중 오류가 발생했습니다. 다시 시도해주세요.");
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div
-      style={{
-        width: "100%",
-        minHeight: "100vh",
-        backgroundImage: `url(${loginBg})`,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        position: "relative",
-        padding: "20px",
-      }}
-    >
-      {/* ======================= 상단 타이틀 ======================= */}
-      <div
-        className="absolute top-6 left-6 select-none pointer-events-none"
-        style={{ lineHeight: 1 }}
-      >
-        <div
-          className="
-    text-[120px] md:text-[220px]
-    font-extrabold leading-none select-none
-    text-white mix-blend-overlay
-  "
-          style={{
-            opacity: 0.2, // 배경과 자연스럽게 섞이게
-            letterSpacing: "-4px",
-          }}
-        >
-          PMIS
-        </div>
-      </div>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800">
+      {/* Background Pattern */}
+      <div className="absolute inset-0 bg-slate-900 opacity-50"></div>
 
-      {/* ======================= 로그인 박스 ======================= */}
-      <div
-        style={{
-          maxWidth: 400,
-          width: "100%",
-          padding: "30px",
-          borderRadius: "12px",
-          background: "rgba(255,255,255,0.85)",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
-          textAlign: "center",
-        }}
-      >
-        <div className="flex flex-col items-center">
-          <img src={safetyMo} alt="안전한하루되세요" className="h-5 mb-1" />
-          <h2 className="login-title">로그인</h2>
-        </div>
-        <form onSubmit={handleLogin}>
-          <input
-            type="text"
-            placeholder="아이디"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            className="w-full p-2.5 mb-3 border rounded-lg text-sm"
-          />
-          <input
-            type="password"
-            placeholder="비밀번호"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full p-2.5 mb-4 border rounded-lg text-sm"
-          />
-          <button type="submit" className="btn-login">
-            로그인
-          </button>
-          {errorMsg && (
-            <p style={{ color: "red", marginTop: "10px" }}>{errorMsg}</p>
+      <div className="relative w-full max-w-md px-6">
+        {/* Login Card */}
+        <div className="bg-white rounded-2xl shadow-2xl p-8 animate-[fadeUp_0.5s_ease_forwards]">
+          {/* Logo */}
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-slate-800 mb-2">
+              P6ix Groupware
+            </h1>
+            <p className="text-gray-500 text-sm">업무 협업 시스템에 로그인하세요</p>
+          </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
+              <AlertCircle size={20} className="text-red-500 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
           )}
-        </form>
-      </div>
 
-      {/* ======================= 하단 저작권 ======================= */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: "25px",
-          width: "100%",
-          textAlign: "center",
-          color: "rgba(255,255,255,0.7)",
-          fontSize: "12px",
-          placeItems: "center",
-        }}
-      >
-        <img src={p6ixLogo} alt="P6ixConsulting" style={{ height: "5vh" }} />
-        <span>
-          Copyright ⓒ by <b>P6ix S</b>mart <b>C</b>onstruction Co., Ltd. ALL
-          RIGHTS RESERVED
-        </span>
+          {/* Login Form */}
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Username */}
+            <div>
+              <label
+                htmlFor="username"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
+                아이디
+              </label>
+              <input
+                id="username"
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="아이디를 입력하세요"
+                required
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+              />
+            </div>
+
+            {/* Password */}
+            <div>
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
+                비밀번호
+              </label>
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="비밀번호를 입력하세요"
+                  required
+                  className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Remember Me & Forgot Password */}
+            <div className="flex items-center justify-between text-sm">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-gray-600">로그인 상태 유지</span>
+              </label>
+              <button
+                type="button"
+                className="text-blue-600 hover:text-blue-700 font-medium"
+              >
+                비밀번호 찾기
+              </button>
+            </div>
+
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={loading || !username || !password}
+              className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center justify-center gap-2 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+            >
+              {loading ? (
+                <>
+                  <span className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></span>
+                  로그인 중...
+                </>
+              ) : (
+                <>
+                  <LogIn size={20} />
+                  로그인
+                </>
+              )}
+            </button>
+          </form>
+        </div>
+
+        {/* Footer */}
+        <p className="text-center mt-6 text-gray-400 text-sm">
+          © 2026 P6ix Groupware. All rights reserved.
+        </p>
       </div>
     </div>
   );
