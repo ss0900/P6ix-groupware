@@ -84,10 +84,12 @@ class SalesOpportunityViewSet(viewsets.ModelViewSet):
         )
         
         # 파이프라인
-        pipeline = qs.exclude(status__in=["won", "lost"]).aggregate(
-            total=Sum("expected_amount"),
-            weighted=Sum("expected_amount") * 0.5  # 가중 평균 근사
-        )
+        pipeline_qs = qs.exclude(status__in=["won", "lost"])
+        pipeline_total = pipeline_qs.aggregate(total=Sum("expected_amount"))
+        pipeline = {
+            "total": pipeline_total.get("total") or 0,
+            "weighted": (pipeline_total.get("total") or 0) * 0.5  # 가중 평균 근사
+        }
         
         # 이번 달 수주
         this_month = timezone.now().replace(day=1)

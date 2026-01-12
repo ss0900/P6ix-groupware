@@ -112,6 +112,11 @@ function Dashboard() {
     totalUsers: 0,
   });
   const [loading, setLoading] = useState(true);
+  
+  // 위젯 데이터 상태
+  const [pendingApprovals, setPendingApprovals] = useState([]);
+  const [notices, setNotices] = useState([]);
+  const [todaySchedule, setTodaySchedule] = useState([]);
 
   // 현재 날짜/시간
   const today = new Date();
@@ -122,50 +127,127 @@ function Dashboard() {
     weekday: 'long' 
   });
 
-  // 통계 데이터 로드
+  // 통계 및 데이터 로드
   useEffect(() => {
-    const loadStats = async () => {
+    const loadDashboardData = async () => {
       setLoading(true);
       try {
-        // 사용자 수 조회
-        const usersRes = await api.get("core/users/");
-        const users = usersRes.data?.results ?? usersRes.data ?? [];
+        // 병렬로 API 호출
+        const [
+          usersRes,
+          approvalStatsRes,
+          notificationCountRes,
+          todayScheduleRes,
+          salesStatsRes,
+          pendingDocsRes,
+          noticesRes
+        ] = await Promise.allSettled([
+          api.get("core/users/"),
+          api.get("approval/documents/stats/"),
+          api.get("chat/notifications/unread_count/"),
+          api.get("meeting/schedules/today/"),
+          api.get("operation/opportunities/stats/"),
+          api.get("approval/documents/?filter=pending"),
+          api.get("board/posts/?board=notice")
+        ]);
+
+        // 사용자 수
+        const users = usersRes.status === 'fulfilled' 
+          ? (usersRes.value.data?.results ?? usersRes.value.data ?? [])
+          : [];
         
+        // 결재 대기 수
+        const pendingCount = approvalStatsRes.status === 'fulfilled'
+          ? (approvalStatsRes.value.data?.pending ?? 0)
+          : 0;
+        
+        // 읽지 않은 알림 수
+        const unreadNotifications = notificationCountRes.status === 'fulfilled'
+          ? (notificationCountRes.value.data?.count ?? 0)
+          : 0;
+        
+        // 오늘 일정
+        const todayScheduleData = todayScheduleRes.status === 'fulfilled'
+          ? (todayScheduleRes.value.data ?? [])
+          : [];
+        
+        // 진행 중인 영업 (파이프라인에서 won, lost 제외한 건수)
+        let activeDealsCount = 0;
+        if (salesStatsRes.status === 'fulfilled') {
+          const byStatus = salesStatsRes.value.data?.by_status ?? [];
+          activeDealsCount = byStatus
+            .filter(item => !['won', 'lost'].includes(item.status))
+            .reduce((sum, item) => sum + (item.count || 0), 0);
+        }
+        
+        // 결재 대기 문서 목록
+        const pendingDocs = pendingDocsRes.status === 'fulfilled'
+          ? (pendingDocsRes.value.data?.results ?? pendingDocsRes.value.data ?? [])
+          : [];
+        
+        // 공지사항 목록
+        const noticeList = noticesRes.status === 'fulfilled'
+          ? (noticesRes.value.data?.results ?? noticesRes.value.data ?? [])
+          : [];
+
+        // 통계 설정
         setStats({
-          pendingApprovals: 5, // TODO: 실제 결재 API 연동
-          newNotifications: 12, // TODO: 실제 알림 API 연동
-          todaySchedules: 3, // TODO: 실제 일정 API 연동
-          activeDeals: 8, // TODO: 실제 영업 API 연동
+          pendingApprovals: pendingCount,
+          newNotifications: unreadNotifications,
+          todaySchedules: todayScheduleData.length,
+          activeDeals: activeDealsCount,
           totalUsers: users.length,
         });
+        
+        // 위젯 데이터 설정
+        setPendingApprovals(pendingDocs.slice(0, 5).map(doc => ({
+          id: doc.id,
+          title: doc.title,
+          requester: doc.author_name || doc.author?.username || '알 수 없음',
+          date: doc.created_at?.split('T')[0] || '',
+          type: doc.template_name || doc.template?.name || '일반'
+        })));
+        
+        setNotices(noticeList.slice(0, 5).map(post => ({
+          id: post.id,
+          title: post.title,
+          date: post.created_at?.split('T')[0] || '',
+          isNew: isWithinDays(post.created_at, 3)
+        })));
+        
+        setTodaySchedule(todayScheduleData.slice(0, 5).map(schedule => ({
+          id: schedule.id,
+          title: schedule.title,
+          time: formatTime(schedule.start_time),
+          location: schedule.location || schedule.meeting_room_name || '미정'
+        })));
+        
       } catch (err) {
-        console.error("Failed to load stats:", err);
+        console.error("Failed to load dashboard data:", err);
       } finally {
         setLoading(false);
       }
     };
+    
+    // 유틸리티 함수: 날짜가 N일 이내인지 확인
+    const isWithinDays = (dateStr, days) => {
+      if (!dateStr) return false;
+      const date = new Date(dateStr);
+      const now = new Date();
+      const diffTime = now - date;
+      const diffDays = diffTime / (1000 * 60 * 60 * 24);
+      return diffDays <= days;
+    };
+    
+    // 유틸리티 함수: 시간 포맷
+    const formatTime = (dateTimeStr) => {
+      if (!dateTimeStr) return '';
+      const date = new Date(dateTimeStr);
+      return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
+    };
 
-    loadStats();
+    loadDashboardData();
   }, []);
-
-  // Mock data (추후 API 연동)
-  const pendingApprovals = [
-    { id: 1, title: "휴가 신청서", requester: "김철수", date: "2026-01-12", type: "휴가" },
-    { id: 2, title: "출장 신청서", requester: "이영희", date: "2026-01-11", type: "출장" },
-    { id: 3, title: "지출 결의서", requester: "박민수", date: "2026-01-10", type: "경비" },
-  ];
-
-  const notices = [
-    { id: 1, title: "2026년 신년 업무 계획 안내", date: "2026-01-10", isNew: true },
-    { id: 2, title: "시스템 점검 공지 (1/15)", date: "2026-01-09", isNew: true },
-    { id: 3, title: "연말 결산 관련 협조 요청", date: "2026-01-08", isNew: false },
-  ];
-
-  const todaySchedule = [
-    { id: 1, title: "주간 회의", time: "10:00", location: "회의실 A" },
-    { id: 2, title: "고객사 미팅", time: "14:00", location: "본사 접견실" },
-    { id: 3, title: "프로젝트 리뷰", time: "16:00", location: "온라인" },
-  ];
 
   // 빠른 메뉴 액션
   const quickActions = [
