@@ -12,6 +12,7 @@ import {
   ChevronDown,
   ChevronRight,
   Building,
+  History,
 } from "lucide-react";
 
 const menuItems = [
@@ -20,6 +21,12 @@ const menuItems = [
     label: "대시보드",
     icon: LayoutDashboard,
     path: "/",
+  },
+  {
+    id: "timeline",
+    label: "타임라인",
+    icon: History,
+    path: "/timeline",
   },
   {
     id: "approval",

@@ -46,6 +46,9 @@ import ContractForm from "./pages/sales/ContractForm";
 // Help
 import HelpCenter from "./pages/help/HelpCenter";
 
+// Timeline
+import Timeline from "./pages/timeline/Timeline";
+
 // Protected Route Wrapper
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
@@ -171,6 +174,9 @@ function AppRouter() {
           <Route path="organization" element={<OrganizationChart />} />
           <Route path="positions" element={<PositionManagement />} />
         </Route>
+
+        {/* 타임라인 */}
+        <Route path="timeline" element={<Timeline />} />
 
         {/* 도움말 */}
         <Route path="help" element={<HelpCenter />} />
