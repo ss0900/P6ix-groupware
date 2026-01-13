@@ -8,6 +8,16 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import MainLayout from "./components/layout/MainLayout";
 
+// Module Layouts
+import DashboardLayout from "./pages/dashboard/DashboardLayout";
+import TimelineLayout from "./pages/timeline/TimelineLayout";
+import ApprovalLayout from "./pages/approval/ApprovalLayout";
+import BoardLayout from "./pages/board/BoardLayout";
+import ScheduleLayout from "./pages/schedule/ScheduleLayout";
+import ArchiveLayout from "./pages/archive/ArchiveLayout";
+import SalesLayout from "./pages/sales/SalesLayout";
+import AdminLayout from "./pages/admin/AdminLayout";
+
 // Admin
 import UserList from "./pages/system/UserList";
 import UserForm from "./pages/admin/UserForm";
@@ -109,11 +119,13 @@ function AppRouter() {
           </ProtectedRoute>
         }
       >
-        {/* Dashboard */}
-        <Route index element={<Dashboard />} />
+        {/* Dashboard - with sidebar layout */}
+        <Route path="" element={<DashboardLayout />}>
+          <Route index element={<Dashboard />} />
+        </Route>
 
-        {/* 전자결재 */}
-        <Route path="approval">
+        {/* 전자결재 - with sidebar layout */}
+        <Route path="approval" element={<ApprovalLayout />}>
           <Route index element={<ApprovalList />} />
           <Route path="new" element={<ApprovalForm />} />
           <Route path=":id" element={<ApprovalDetail />} />
@@ -122,8 +134,8 @@ function AppRouter() {
           <Route path="settings" element={<div className="p-6">결재 설정 (준비 중)</div>} />
         </Route>
 
-        {/* 게시판 */}
-        <Route path="board">
+        {/* 게시판 - with sidebar layout */}
+        <Route path="board" element={<BoardLayout />}>
           <Route index element={<BoardList />} />
           <Route path="new" element={<PostForm />} />
           <Route path=":id" element={<PostDetail />} />
@@ -131,8 +143,8 @@ function AppRouter() {
           <Route path="notice" element={<BoardList />} />
         </Route>
 
-        {/* 회의/일정 */}
-        <Route path="schedule">
+        {/* 회의/일정 - with sidebar layout */}
+        <Route path="schedule" element={<ScheduleLayout />}>
           <Route index element={<ScheduleCalendar />} />
           <Route path="new" element={<ScheduleForm />} />
           <Route path=":id" element={<ScheduleDetail />} />
@@ -141,13 +153,13 @@ function AppRouter() {
           <Route path="room" element={<div className="p-6">회의실 관리 (준비 중)</div>} />
         </Route>
 
-        {/* 자료실 */}
-        <Route path="archive">
+        {/* 자료실 - with sidebar layout */}
+        <Route path="archive" element={<ArchiveLayout />}>
           <Route index element={<ArchiveList />} />
         </Route>
 
-        {/* 영업관리 */}
-        <Route path="sales">
+        {/* 영업관리 - with sidebar layout */}
+        <Route path="sales" element={<SalesLayout />}>
           <Route index element={<SalesDashboard />} />
           <Route path="opportunities" element={<OpportunityList />} />
           <Route path="opportunities/new" element={<OpportunityForm />} />
@@ -165,8 +177,8 @@ function AppRouter() {
           <Route path="contracts/:id" element={<ContractForm />} />
         </Route>
 
-        {/* 관리자 */}
-        <Route path="admin">
+        {/* 관리자 - with sidebar layout */}
+        <Route path="admin" element={<AdminLayout />}>
           <Route index element={<div className="p-6">관리자 대시보드 (준비 중)</div>} />
           <Route path="users" element={<UserList />} />
           <Route path="users/add" element={<UserForm />} />
@@ -175,8 +187,10 @@ function AppRouter() {
           <Route path="positions" element={<PositionManagement />} />
         </Route>
 
-        {/* 타임라인 */}
-        <Route path="timeline" element={<Timeline />} />
+        {/* 타임라인 - with sidebar layout */}
+        <Route path="timeline" element={<TimelineLayout />}>
+          <Route index element={<Timeline />} />
+        </Route>
 
         {/* 도움말 */}
         <Route path="help" element={<HelpCenter />} />

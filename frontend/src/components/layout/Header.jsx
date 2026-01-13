@@ -1,13 +1,14 @@
 // src/components/layout/Header.jsx
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Menu, Bell, MessageSquare, HelpCircle, User, LogOut, ChevronDown } from "lucide-react";
+import { Menu as MenuIcon, Bell, MessageSquare, HelpCircle, User, LogOut, ChevronDown } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import api from "../../api/axios";
 
 // 컴포넌트
 import ChatPanel from "../chat/ChatPanel";
 import NotificationPanel from "../notification/NotificationPanel";
+import Menu from "./Menu";
 
 function Header({ onMenuClick }) {
   const navigate = useNavigate();
@@ -49,22 +50,27 @@ function Header({ onMenuClick }) {
   return (
     <>
       <header className="sticky top-0 z-50 bg-[#1e1e2f] shadow-md">
-        <div className="w-full px-6 py-3 flex items-center justify-between">
-          {/* Left Section */}
-          <div className="flex items-center gap-4">
+        <div className="w-full px-6 py-3 flex items-center">
+          {/* Left Section - Logo */}
+          <div className="flex items-center gap-4 shrink-0">
             <button
               onClick={onMenuClick}
-              className="p-2 rounded-lg hover:bg-slate-700 text-white transition-colors"
+              className="p-2 rounded-lg hover:bg-slate-700 text-white transition-colors lg:hidden"
             >
-              <Menu size={20} />
+              <MenuIcon size={20} />
             </button>
 
             <button
               onClick={goDashboard}
-              className="text-white font-bold text-xl hover:opacity-90 transition-opacity"
+              className="text-white font-bold text-xl hover:opacity-90 transition-opacity whitespace-nowrap"
             >
               P6ix Groupware
             </button>
+          </div>
+
+          {/* Center Section - Top Menu */}
+          <div className="flex-1 flex justify-center px-8 hidden lg:flex">
+            <Menu />
           </div>
 
           {/* Right Section */}

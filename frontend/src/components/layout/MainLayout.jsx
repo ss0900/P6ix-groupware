@@ -5,7 +5,7 @@ import Header from "./Header";
 import Sidebar from "./Sidebar";
 
 function MainLayout() {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
@@ -13,26 +13,19 @@ function MainLayout() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
+      {/* Header with Top Menu */}
       <Header onMenuClick={toggleSidebar} />
 
-      <div className="flex">
-        {/* Sidebar */}
-        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      {/* Mobile Sidebar (only visible on small screens when toggled) */}
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-        {/* Main Content */}
-        <main
-          className={`flex-1 transition-all duration-300 ${
-            sidebarOpen ? "ml-64" : "ml-0"
-          }`}
-        >
-          <div className="p-6">
-            <Outlet />
-          </div>
-        </main>
-      </div>
+      {/* Main Content - no left margin on desktop since we use top menu */}
+      <main className="lg:ml-0">
+        <Outlet />
+      </main>
     </div>
   );
 }
 
 export default MainLayout;
+
