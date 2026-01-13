@@ -64,6 +64,7 @@ INSTALLED_APPS = [
     "operation",
     "chat",
     "timeline",
+    "contact",
     "rest_framework",
     "corsheaders",
     "rest_framework_simplejwt.token_blacklist",

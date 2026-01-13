@@ -59,6 +59,12 @@ import HelpCenter from "./pages/help/HelpCenter";
 // Timeline
 import Timeline from "./pages/timeline/Timeline";
 
+// Contact
+import ContactLayout from "./pages/contact/ContactLayout";
+import ContactList from "./pages/contact/ContactList";
+import ContactDetail from "./pages/contact/ContactDetail";
+import ContactForm from "./pages/contact/ContactForm";
+
 // Protected Route Wrapper
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
@@ -126,7 +132,8 @@ function AppRouter() {
 
         {/* 전자결재 - with sidebar layout */}
         <Route path="approval" element={<ApprovalLayout />}>
-          <Route index element={<ApprovalList />} />
+          <Route index element={<Navigate to="pending" replace />} />
+          <Route path="pending" element={<ApprovalList />} />
           <Route path="new" element={<ApprovalForm />} />
           <Route path=":id" element={<ApprovalDetail />} />
           <Route path=":id/edit" element={<ApprovalForm />} />
@@ -136,7 +143,8 @@ function AppRouter() {
 
         {/* 게시판 - with sidebar layout */}
         <Route path="board" element={<BoardLayout />}>
-          <Route index element={<BoardList />} />
+          <Route index element={<Navigate to="all" replace />} />
+          <Route path="all" element={<BoardList />} />
           <Route path="new" element={<PostForm />} />
           <Route path=":id" element={<PostDetail />} />
           <Route path=":id/edit" element={<PostForm />} />
@@ -145,7 +153,8 @@ function AppRouter() {
 
         {/* 회의/일정 - with sidebar layout */}
         <Route path="schedule" element={<ScheduleLayout />}>
-          <Route index element={<ScheduleCalendar />} />
+          <Route index element={<Navigate to="calendar" replace />} />
+          <Route path="calendar" element={<ScheduleCalendar />} />
           <Route path="new" element={<ScheduleForm />} />
           <Route path=":id" element={<ScheduleDetail />} />
           <Route path=":id/edit" element={<ScheduleForm />} />
@@ -155,12 +164,14 @@ function AppRouter() {
 
         {/* 자료실 - with sidebar layout */}
         <Route path="archive" element={<ArchiveLayout />}>
-          <Route index element={<ArchiveList />} />
+          <Route index element={<Navigate to="main" replace />} />
+          <Route path="main" element={<ArchiveList />} />
         </Route>
 
         {/* 영업관리 - with sidebar layout */}
         <Route path="sales" element={<SalesLayout />}>
-          <Route index element={<SalesDashboard />} />
+          <Route index element={<Navigate to="dashboard" replace />} />
+          <Route path="dashboard" element={<SalesDashboard />} />
           <Route path="opportunities" element={<OpportunityList />} />
           <Route path="opportunities/new" element={<OpportunityForm />} />
           <Route path="opportunities/:id" element={<OpportunityForm />} />
@@ -179,7 +190,7 @@ function AppRouter() {
 
         {/* 관리자 - with sidebar layout */}
         <Route path="admin" element={<AdminLayout />}>
-          <Route index element={<div className="p-6">관리자 대시보드 (준비 중)</div>} />
+          <Route index element={<Navigate to="users" replace />} />
           <Route path="users" element={<UserList />} />
           <Route path="users/add" element={<UserForm />} />
           <Route path="users/:id" element={<UserForm />} />
@@ -189,7 +200,22 @@ function AppRouter() {
 
         {/* 타임라인 - with sidebar layout */}
         <Route path="timeline" element={<TimelineLayout />}>
-          <Route index element={<Timeline />} />
+          <Route index element={<Navigate to="main" replace />} />
+          <Route path="main" element={<Timeline />} />
+        </Route>
+
+        {/* 업무연락 - with sidebar layout */}
+        <Route path="contact" element={<ContactLayout />}>
+          <Route index element={<Navigate to="all" replace />} />
+          <Route path="all" element={<ContactList />} />
+          <Route path="received" element={<ContactList />} />
+          <Route path="sent" element={<ContactList />} />
+          <Route path="draft" element={<ContactList />} />
+          <Route path="self" element={<ContactList />} />
+          <Route path="trash" element={<ContactList />} />
+          <Route path="new" element={<ContactForm />} />
+          <Route path=":id" element={<ContactDetail />} />
+          <Route path=":id/edit" element={<ContactForm />} />
         </Route>
 
         {/* 도움말 */}

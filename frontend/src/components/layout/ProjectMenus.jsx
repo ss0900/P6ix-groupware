@@ -17,11 +17,12 @@ export const projectMenus = {
   timeline: {
     title: "타임라인",
     base: "/timeline",
+    baseClick: "main",
     sections: [
       {
         title: "타임라인",
         items: [
-          { to: "", label: "타임라인", end: true },
+          { to: "main", label: "타임라인" },
         ],
       },
     ],
@@ -29,12 +30,12 @@ export const projectMenus = {
   approval: {
     title: "전자결재",
     base: "/approval",
-    baseClick: "",
+    baseClick: "pending",
     sections: [
       {
         title: "결재함",
         items: [
-          { to: "", label: "결재 대기", end: true },
+          { to: "pending", label: "결재 대기" },
           { to: "draft", label: "기안함" },
         ],
       },
@@ -49,12 +50,12 @@ export const projectMenus = {
   board: {
     title: "게시판",
     base: "/board",
-    baseClick: "",
+    baseClick: "all",
     sections: [
       {
         title: "게시판",
         items: [
-          { to: "", label: "전체 게시판", end: true },
+          { to: "all", label: "전체 게시판" },
           { to: "notice", label: "공지사항" },
         ],
       },
@@ -63,12 +64,12 @@ export const projectMenus = {
   schedule: {
     title: "회의∙일정",
     base: "/schedule",
-    baseClick: "",
+    baseClick: "calendar",
     sections: [
       {
         title: "일정 관리",
         items: [
-          { to: "", label: "일정 캘린더", end: true },
+          { to: "calendar", label: "일정 캘린더" },
           { to: "meeting", label: "회의 관리" },
           { to: "room", label: "회의실 관리" },
         ],
@@ -78,11 +79,12 @@ export const projectMenus = {
   archive: {
     title: "자료실",
     base: "/archive",
+    baseClick: "main",
     sections: [
       {
         title: "자료실",
         items: [
-          { to: "", label: "자료실", end: true },
+          { to: "main", label: "자료실" },
         ],
       },
     ],
@@ -90,12 +92,12 @@ export const projectMenus = {
   sales: {
     title: "영업관리",
     base: "/sales",
-    baseClick: "",
+    baseClick: "dashboard",
     sections: [
       {
         title: "영업관리",
         items: [
-          { to: "", label: "대시보드", end: true },
+          { to: "dashboard", label: "대시보드" },
           { to: "opportunities", label: "영업 정보" },
           { to: "estimates", label: "견적 현황" },
           { to: "contracts", label: "계약 관리" },
@@ -124,12 +126,31 @@ export const projectMenus = {
       },
     ],
   },
+  contact: {
+    title: "업무연락",
+    base: "/contact",
+    baseClick: "all",
+    sections: [
+      {
+        title: "업무연락",
+        items: [
+          { to: "all", label: "전체함" },
+          { to: "received", label: "수신함" },
+          { to: "sent", label: "송신함" },
+          { to: "draft", label: "임시보관함" },
+          { to: "self", label: "내게 쓴 글" },
+          { to: "trash", label: "휴지통" },
+        ],
+      },
+    ],
+  },
 };
 
 // 상단 메뉴 순서
 export const menuOrder = [
   "dashboard",
   "timeline",
+  "contact",
   "approval",
   "board",
   "schedule",
