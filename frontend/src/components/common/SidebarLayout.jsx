@@ -80,15 +80,33 @@ function RecursiveItem({ item, basePath, linkCls, depth = 0 }) {
     );
   }
 
+  if (item.onClick) {
+    return (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          item.onClick(e);
+        }}
+        className={`${linkCls(false)} flex items-center gap-2 min-w-0 w-full text-left ${item.className || ""}`}
+        style={{ paddingLeft: `${indent}px` }}
+      >
+        {item.icon && <item.icon size={16} />}
+        <span className="truncate">{item.label}</span>
+      </button>
+    );
+  }
+
   return (
     <NavLink
       to={buildTo(item.to)}
       end={item.end}
       className={({ isActive }) =>
-        linkCls(isActive) + " flex items-center gap-2 min-w-0"
+        linkCls(isActive) + ` flex items-center gap-2 min-w-0 ${item.className || ""}`
       }
       style={{ paddingLeft: `${indent}px` }}
     >
+      {item.icon && <item.icon size={16} />}
       <span className="truncate">{item.label}</span>
     </NavLink>
   );

@@ -1,14 +1,26 @@
 # backend/approval/models.py
 from django.db import models
 from django.conf import settings
+from django.utils import timezone
+import datetime
 
 
 class DocumentTemplate(models.Model):
     """결재 문서 양식"""
+    CATEGORY_CHOICES = [
+        ("general", "일반"),
+        ("leave", "휴가"),
+        ("expense", "지출"),
+        ("official", "공문"),
+        ("report", "보고"),
+        ("etc", "기타"),
+    ]
+    
     name = models.CharField("양식명", max_length=100)
     description = models.TextField("설명", blank=True)
-    category = models.CharField("분류", max_length=50, default="일반")
+    category = models.CharField("분류", max_length=50, choices=CATEGORY_CHOICES, default="general")
     content_template = models.TextField("내용 템플릿", blank=True, help_text="HTML 또는 Markdown 형식")
+    form_fields = models.JSONField("양식 필드", default=dict, blank=True, help_text="동적 양식 필드 정의")
     is_active = models.BooleanField("활성화", default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -19,7 +31,7 @@ class DocumentTemplate(models.Model):
         ordering = ["category", "name"]
 
     def __str__(self):
-        return f"[{self.category}] {self.name}"
+        return f"[{self.get_category_display()}] {self.name}"
 
 
 class Document(models.Model):
@@ -36,15 +48,27 @@ class Document(models.Model):
         ("urgent", "긴급"),
         ("important", "중요"),
     ]
+    PRESERVATION_CHOICES = [
+        (1, "1년"),
+        (3, "3년"),
+        (5, "5년"),
+        (10, "10년"),
+        (0, "영구"),
+    ]
 
+    # 문서 번호 (자동 생성)
+    document_number = models.CharField("문서번호", max_length=50, blank=True, unique=True, null=True)
+    
     template = models.ForeignKey(
         DocumentTemplate, on_delete=models.SET_NULL, null=True, blank=True,
         related_name="documents", verbose_name="양식"
     )
     title = models.CharField("제목", max_length=200)
     content = models.TextField("내용", blank=True)
+    form_data = models.JSONField("양식 데이터", default=dict, blank=True, help_text="양식 필드 값")
     status = models.CharField("상태", max_length=20, choices=STATUS_CHOICES, default="draft")
     priority = models.CharField("우선순위", max_length=20, choices=PRIORITY_CHOICES, default="normal")
+    preservation_period = models.IntegerField("보존기간", choices=PRESERVATION_CHOICES, default=5)
     
     # 작성자
     author = models.ForeignKey(
@@ -52,8 +76,8 @@ class Document(models.Model):
         related_name="authored_documents", verbose_name="기안자"
     )
     
-    # 첨부파일 (추후 FileField로 확장 가능)
-    attachment_count = models.PositiveIntegerField("첨부파일 수", default=0)
+    # 읽음 상태
+    is_read = models.BooleanField("읽음 여부", default=False)
     
     # 날짜
     drafted_at = models.DateTimeField("기안일", auto_now_add=True)
@@ -72,11 +96,41 @@ class Document(models.Model):
     def __str__(self):
         return f"[{self.get_status_display()}] {self.title}"
 
+    def save(self, *args, **kwargs):
+        # 문서번호 자동 생성 (제출 시)
+        if self.status == "pending" and not self.document_number:
+            today = timezone.now()
+            prefix = f"DOC-{today.strftime('%Y%m%d')}"
+            last_doc = Document.objects.filter(
+                document_number__startswith=prefix
+            ).order_by('-document_number').first()
+            
+            if last_doc and last_doc.document_number:
+                last_num = int(last_doc.document_number.split('-')[-1])
+                new_num = last_num + 1
+            else:
+                new_num = 1
+            
+            self.document_number = f"{prefix}-{new_num:04d}"
+        
+        super().save(*args, **kwargs)
+
     @property
     def current_approver(self):
         """현재 결재 차례인 사람"""
         pending = self.approval_lines.filter(status="pending").order_by("order").first()
         return pending.approver if pending else None
+
+    @property
+    def final_approver(self):
+        """최종 결재자"""
+        last = self.approval_lines.filter(approval_type="approval").order_by("-order").first()
+        return last.approver if last else None
+
+    @property
+    def attachment_count(self):
+        """첨부파일 수"""
+        return self.attachments.count()
 
 
 class ApprovalLine(models.Model):
@@ -108,6 +162,8 @@ class ApprovalLine(models.Model):
     
     comment = models.TextField("의견", blank=True)
     acted_at = models.DateTimeField("처리일", null=True, blank=True)
+    is_read = models.BooleanField("열람 여부", default=False)
+    read_at = models.DateTimeField("열람일", null=True, blank=True)
     
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -115,7 +171,7 @@ class ApprovalLine(models.Model):
         verbose_name = "결재선"
         verbose_name_plural = "결재선"
         ordering = ["document", "order"]
-        unique_together = ["document", "order"]
+        unique_together = [["document", "order"]]
 
     def __str__(self):
         return f"{self.document.title} - {self.order}. {self.approver}"
@@ -151,3 +207,27 @@ class ApprovalAction(models.Model):
 
     def __str__(self):
         return f"{self.document.title} - {self.get_action_display()} by {self.actor}"
+
+
+class Attachment(models.Model):
+    """결재 문서 첨부파일"""
+    document = models.ForeignKey(
+        Document, on_delete=models.CASCADE,
+        related_name="attachments", verbose_name="문서"
+    )
+    file = models.FileField("첨부파일", upload_to="approval/attachments/%Y/%m/")
+    filename = models.CharField("원본 파일명", max_length=255)
+    file_size = models.PositiveIntegerField("파일 크기(bytes)", default=0)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True,
+        related_name="uploaded_attachments", verbose_name="업로더"
+    )
+    uploaded_at = models.DateTimeField("업로드일", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "첨부파일"
+        verbose_name_plural = "첨부파일"
+        ordering = ["uploaded_at"]
+
+    def __str__(self):
+        return self.filename

@@ -1,15 +1,14 @@
 # backend/board/urls.py
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from . import views
+from .views import BoardViewSet, PostViewSet
 
 app_name = "board"
 
 router = DefaultRouter()
-router.register("boards", views.BoardViewSet, basename="board")
-router.register("posts", views.PostViewSet, basename="post")
-router.register("comments", views.CommentViewSet, basename="comment")
+router.register(r'boards', BoardViewSet, basename='board')
+router.register(r'posts', PostViewSet, basename='post')
 
 urlpatterns = [
-    path("", include(router.urls)),
+    path('', include(router.urls)),
 ]

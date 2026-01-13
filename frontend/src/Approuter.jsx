@@ -25,14 +25,16 @@ import OrganizationChart from "./pages/admin/OrganizationChart";
 import PositionManagement from "./pages/admin/PositionManagement";
 
 // Approval
+import ApprovalHome from "./pages/approval/ApprovalHome";
 import ApprovalList from "./pages/approval/ApprovalList";
 import ApprovalForm from "./pages/approval/ApprovalForm";
 import ApprovalDetail from "./pages/approval/ApprovalDetail";
+import ApprovalTemplateList from "./pages/approval/ApprovalTemplateList";
 
 // Board
-import BoardList from "./pages/board/BoardList";
-import PostForm from "./pages/board/PostForm";
-import PostDetail from "./pages/board/PostDetail";
+import BoardAll from "./pages/board/BoardAll";
+import BoardView from "./pages/board/BoardView";
+import BoardWrite from "./pages/board/BoardWrite";
 
 // Schedule
 import ScheduleCalendar from "./pages/schedule/ScheduleCalendar";
@@ -132,23 +134,31 @@ function AppRouter() {
 
         {/* 전자결재 - with sidebar layout */}
         <Route path="approval" element={<ApprovalLayout />}>
-          <Route index element={<Navigate to="pending" replace />} />
-          <Route path="pending" element={<ApprovalList />} />
+          <Route index element={<Navigate to="home" replace />} />
+          <Route path="home" element={<ApprovalHome />} />
+          <Route path="draft" element={<ApprovalList />} />
+          <Route path="in-progress" element={<ApprovalList />} />
+          <Route path="completed" element={<ApprovalList />} />
+          <Route path="reference" element={<ApprovalList />} />
+          <Route path="sent" element={<ApprovalList />} />
+          <Route path="all" element={<ApprovalList />} />
+          <Route path="templates" element={<ApprovalTemplateList />} />
+          <Route path="public" element={<ApprovalList />} />
           <Route path="new" element={<ApprovalForm />} />
           <Route path=":id" element={<ApprovalDetail />} />
           <Route path=":id/edit" element={<ApprovalForm />} />
-          <Route path="draft" element={<ApprovalList />} />
-          <Route path="settings" element={<div className="p-6">결재 설정 (준비 중)</div>} />
         </Route>
 
         {/* 게시판 - with sidebar layout */}
         <Route path="board" element={<BoardLayout />}>
           <Route index element={<Navigate to="all" replace />} />
-          <Route path="all" element={<BoardList />} />
-          <Route path="new" element={<PostForm />} />
-          <Route path=":id" element={<PostDetail />} />
-          <Route path=":id/edit" element={<PostForm />} />
-          <Route path="notice" element={<BoardList />} />
+          <Route path="all" element={<BoardAll />} />
+          <Route path="my" element={<BoardAll isMyPosts />} />
+          <Route path="free" element={<BoardAll isFreeBoard />} />
+          <Route path="work-all" element={<BoardAll isWorkBoard />} />
+          <Route path="new" element={<BoardWrite />} />
+          <Route path="view/:postId" element={<BoardView />} />
+          <Route path=":boardId" element={<BoardAll />} />
         </Route>
 
         {/* 회의/일정 - with sidebar layout */}

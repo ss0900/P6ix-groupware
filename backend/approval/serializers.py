@@ -1,30 +1,53 @@
 # backend/approval/serializers.py
 from rest_framework import serializers
 from django.utils import timezone
-from .models import DocumentTemplate, Document, ApprovalLine, ApprovalAction
+from .models import DocumentTemplate, Document, ApprovalLine, ApprovalAction, Attachment
 
 
 class DocumentTemplateSerializer(serializers.ModelSerializer):
+    category_display = serializers.CharField(source="get_category_display", read_only=True)
+    
     class Meta:
         model = DocumentTemplate
         fields = [
-            "id", "name", "description", "category", 
-            "content_template", "is_active", "created_at", "updated_at"
+            "id", "name", "description", "category", "category_display",
+            "content_template", "form_fields", "is_active", "created_at", "updated_at"
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class AttachmentSerializer(serializers.ModelSerializer):
+    uploaded_by_name = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Attachment
+        fields = [
+            "id", "file", "filename", "file_size", 
+            "uploaded_by", "uploaded_by_name", "uploaded_at"
+        ]
+        read_only_fields = ["id", "uploaded_at"]
+    
+    def get_uploaded_by_name(self, obj):
+        if obj.uploaded_by:
+            return f"{obj.uploaded_by.last_name}{obj.uploaded_by.first_name}"
+        return ""
 
 
 class ApprovalLineSerializer(serializers.ModelSerializer):
     approver_name = serializers.SerializerMethodField()
     approver_position = serializers.SerializerMethodField()
+    approver_department = serializers.SerializerMethodField()
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+    type_display = serializers.CharField(source="get_approval_type_display", read_only=True)
 
     class Meta:
         model = ApprovalLine
         fields = [
-            "id", "approver", "approver_name", "approver_position",
-            "order", "approval_type", "status", "comment", "acted_at"
+            "id", "approver", "approver_name", "approver_position", "approver_department",
+            "order", "approval_type", "type_display", "status", "status_display",
+            "comment", "acted_at", "is_read", "read_at"
         ]
-        read_only_fields = ["id", "acted_at"]
+        read_only_fields = ["id", "acted_at", "read_at"]
 
     def get_approver_name(self, obj):
         return f"{obj.approver.last_name}{obj.approver.first_name}" if obj.approver else ""
@@ -36,42 +59,77 @@ class ApprovalLineSerializer(serializers.ModelSerializer):
             return membership.position.name
         return ""
 
+    def get_approver_department(self, obj):
+        # 사용자의 주 소속에서 부서 가져오기
+        membership = obj.approver.memberships.filter(is_primary=True).first()
+        if membership and membership.department:
+            return membership.department.name
+        return ""
+
 
 class ApprovalActionSerializer(serializers.ModelSerializer):
     actor_name = serializers.SerializerMethodField()
+    actor_position = serializers.SerializerMethodField()
+    action_display = serializers.CharField(source="get_action_display", read_only=True)
 
     class Meta:
         model = ApprovalAction
-        fields = ["id", "actor", "actor_name", "action", "comment", "created_at"]
+        fields = ["id", "actor", "actor_name", "actor_position", "action", "action_display", "comment", "created_at"]
         read_only_fields = ["id", "created_at"]
 
     def get_actor_name(self, obj):
         return f"{obj.actor.last_name}{obj.actor.first_name}" if obj.actor else ""
 
+    def get_actor_position(self, obj):
+        membership = obj.actor.memberships.filter(is_primary=True).first()
+        if membership and membership.position:
+            return membership.position.name
+        return ""
+
 
 class DocumentListSerializer(serializers.ModelSerializer):
     """문서 목록용 시리얼라이저"""
     author_name = serializers.SerializerMethodField()
+    author_position = serializers.SerializerMethodField()
     template_name = serializers.CharField(source="template.name", read_only=True)
+    template_category = serializers.CharField(source="template.category", read_only=True)
     status_display = serializers.CharField(source="get_status_display", read_only=True)
     priority_display = serializers.CharField(source="get_priority_display", read_only=True)
     current_approver_name = serializers.SerializerMethodField()
+    final_approver_name = serializers.SerializerMethodField()
+    approval_lines = ApprovalLineSerializer(many=True, read_only=True)
+    attachment_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Document
         fields = [
-            "id", "title", "status", "status_display", 
+            "id", "document_number", "title", "status", "status_display", 
             "priority", "priority_display",
-            "template", "template_name",
-            "author", "author_name", "current_approver_name",
-            "drafted_at", "submitted_at", "completed_at"
+            "template", "template_name", "template_category",
+            "author", "author_name", "author_position",
+            "current_approver_name", "final_approver_name",
+            "attachment_count", "is_read",
+            "drafted_at", "submitted_at", "completed_at",
+            "approval_lines"
         ]
 
     def get_author_name(self, obj):
         return f"{obj.author.last_name}{obj.author.first_name}" if obj.author else ""
 
+    def get_author_position(self, obj):
+        membership = obj.author.memberships.filter(is_primary=True).first()
+        if membership and membership.position:
+            return membership.position.name
+        return ""
+
     def get_current_approver_name(self, obj):
         approver = obj.current_approver
+        if approver:
+            return f"{approver.last_name}{approver.first_name}"
+        return ""
+
+    def get_final_approver_name(self, obj):
+        approver = obj.final_approver
         if approver:
             return f"{approver.last_name}{approver.first_name}"
         return ""
@@ -80,27 +138,61 @@ class DocumentListSerializer(serializers.ModelSerializer):
 class DocumentDetailSerializer(serializers.ModelSerializer):
     """문서 상세용 시리얼라이저"""
     author_name = serializers.SerializerMethodField()
+    author_position = serializers.SerializerMethodField()
+    author_department = serializers.SerializerMethodField()
     template_name = serializers.CharField(source="template.name", read_only=True)
+    template_category = serializers.CharField(source="template.category", read_only=True)
     status_display = serializers.CharField(source="get_status_display", read_only=True)
     priority_display = serializers.CharField(source="get_priority_display", read_only=True)
+    preservation_display = serializers.CharField(source="get_preservation_period_display", read_only=True)
     approval_lines = ApprovalLineSerializer(many=True, read_only=True)
     actions = ApprovalActionSerializer(many=True, read_only=True)
+    attachments = AttachmentSerializer(many=True, read_only=True)
+    current_approver_name = serializers.SerializerMethodField()
+    final_approver_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Document
         fields = [
-            "id", "title", "content", "status", "status_display",
+            "id", "document_number", "title", "content", "form_data",
+            "status", "status_display",
             "priority", "priority_display",
-            "template", "template_name",
-            "author", "author_name",
-            "attachment_count",
+            "preservation_period", "preservation_display",
+            "template", "template_name", "template_category",
+            "author", "author_name", "author_position", "author_department",
+            "current_approver_name", "final_approver_name",
+            "is_read",
             "drafted_at", "submitted_at", "completed_at",
-            "approval_lines", "actions",
+            "approval_lines", "actions", "attachments",
             "created_at", "updated_at"
         ]
 
     def get_author_name(self, obj):
         return f"{obj.author.last_name}{obj.author.first_name}" if obj.author else ""
+
+    def get_author_position(self, obj):
+        membership = obj.author.memberships.filter(is_primary=True).first()
+        if membership and membership.position:
+            return membership.position.name
+        return ""
+
+    def get_author_department(self, obj):
+        membership = obj.author.memberships.filter(is_primary=True).first()
+        if membership and membership.department:
+            return membership.department.name
+        return ""
+
+    def get_current_approver_name(self, obj):
+        approver = obj.current_approver
+        if approver:
+            return f"{approver.last_name}{approver.first_name}"
+        return ""
+
+    def get_final_approver_name(self, obj):
+        approver = obj.final_approver
+        if approver:
+            return f"{approver.last_name}{approver.first_name}"
+        return ""
 
 
 class DocumentCreateSerializer(serializers.ModelSerializer):
@@ -108,15 +200,20 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
     approval_lines = serializers.ListField(
         child=serializers.DictField(), write_only=True, required=False
     )
+    attachments = serializers.ListField(
+        child=serializers.FileField(), write_only=True, required=False
+    )
 
     class Meta:
         model = Document
         fields = [
-            "id", "title", "content", "priority", "template", "approval_lines"
+            "id", "title", "content", "form_data", "priority", 
+            "preservation_period", "template", "approval_lines", "attachments"
         ]
 
     def create(self, validated_data):
         approval_lines_data = validated_data.pop("approval_lines", [])
+        attachments_data = validated_data.pop("attachments", [])
         document = Document.objects.create(**validated_data)
 
         # 결재선 생성
@@ -127,6 +224,17 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
                 order=idx,
                 approval_type=line_data.get("approval_type", "approval"),
                 status="waiting" if idx > 0 else "pending"
+            )
+
+        # 첨부파일 저장
+        user = self.context.get("request").user if self.context.get("request") else None
+        for file in attachments_data:
+            Attachment.objects.create(
+                document=document,
+                file=file,
+                filename=file.name,
+                file_size=file.size,
+                uploaded_by=user
             )
 
         return document
@@ -207,3 +315,10 @@ class ApprovalDecisionSerializer(serializers.Serializer):
             instance.save()
 
         return instance
+
+
+class BulkDecisionSerializer(serializers.Serializer):
+    """일괄 결재 결정용 시리얼라이저"""
+    document_ids = serializers.ListField(child=serializers.IntegerField())
+    action = serializers.ChoiceField(choices=["approve", "reject"])
+    comment = serializers.CharField(required=False, allow_blank=True, default="")

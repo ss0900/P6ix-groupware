@@ -8,9 +8,7 @@ export const projectMenus = {
     sections: [
       {
         title: "대시보드",
-        items: [
-          { to: "", label: "대시보드", end: true },
-        ],
+        items: [{ to: "", label: "대시보드", end: true }],
       },
     ],
   },
@@ -21,28 +19,40 @@ export const projectMenus = {
     sections: [
       {
         title: "타임라인",
-        items: [
-          { to: "main", label: "타임라인" },
-        ],
+        items: [{ to: "main", label: "타임라인" }],
       },
     ],
   },
   approval: {
     title: "전자결재",
     base: "/approval",
-    baseClick: "pending",
+    baseClick: "home",
     sections: [
       {
         title: "결재함",
         items: [
-          { to: "pending", label: "결재 대기" },
-          { to: "draft", label: "기안함" },
+          { to: "home", label: "결재 현황" },
+          { to: "draft", label: "임시보관함" },
         ],
       },
       {
-        title: "결재 설정",
+        title: "개인문서함",
         items: [
-          { to: "settings", label: "환경설정" },
+          { to: "in-progress", label: "진행중" },
+          { to: "completed", label: "완료" },
+          { to: "reference", label: "참조" },
+          { to: "sent", label: "기안" },
+        ],
+      },
+      {
+        title: "전체보기",
+        items: [{ to: "all", label: "전체보기" }],
+      },
+      {
+        title: "공문문서함",
+        items: [
+          { to: "templates", label: "공문 양식" },
+          { to: "public", label: "내 공문" },
         ],
       },
     ],
@@ -56,7 +66,14 @@ export const projectMenus = {
         title: "게시판",
         items: [
           { to: "all", label: "전체 게시판" },
-          { to: "notice", label: "공지사항" },
+          { to: "my", label: "내가 쓴 글" },
+        ],
+      },
+      {
+        title: "카테고리별 게시판",
+        items: [
+          { to: "free", label: "자유 게시판" },
+          // 업무 게시판은 BoardLayout에서 동적으로 추가됨
         ],
       },
     ],
@@ -83,9 +100,7 @@ export const projectMenus = {
     sections: [
       {
         title: "자료실",
-        items: [
-          { to: "main", label: "자료실" },
-        ],
+        items: [{ to: "main", label: "자료실" }],
       },
     ],
   },
@@ -105,9 +120,7 @@ export const projectMenus = {
       },
       {
         title: "고객 관리",
-        items: [
-          { to: "clients", label: "고객 목록" },
-        ],
+        items: [{ to: "clients", label: "고객 목록" }],
       },
     ],
   },
