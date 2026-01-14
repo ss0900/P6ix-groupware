@@ -2,8 +2,79 @@
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
-from datetime import date
+from datetime import date, timedelta
 
+
+# ==============================================
+# 파이프라인/단계 (Multi-Pipeline Support)
+# ==============================================
+
+class SalesPipeline(models.Model):
+    """영업 파이프라인 (업무 유형별)"""
+    name = models.CharField("파이프라인명", max_length=100)
+    description = models.TextField("설명", blank=True)
+    is_active = models.BooleanField("활성화", default=True)
+    is_default = models.BooleanField("기본 파이프라인", default=False)
+    
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, related_name="created_pipelines", verbose_name="생성자"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "영업 파이프라인"
+        verbose_name_plural = "영업 파이프라인"
+        ordering = ["-is_default", "name"]
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        # 기본 파이프라인은 하나만 유지
+        if self.is_default:
+            SalesPipeline.objects.filter(is_default=True).exclude(pk=self.pk).update(is_default=False)
+        super().save(*args, **kwargs)
+
+
+class SalesStage(models.Model):
+    """영업 단계"""
+    STAGE_TYPE_CHOICES = [
+        ("open", "진행중"),
+        ("won", "수주"),
+        ("lost", "실주"),
+    ]
+    
+    pipeline = models.ForeignKey(
+        SalesPipeline, on_delete=models.CASCADE,
+        related_name="stages", verbose_name="파이프라인"
+    )
+    name = models.CharField("단계명", max_length=100)
+    order = models.PositiveIntegerField("순서", default=0)
+    probability = models.PositiveIntegerField("성공 확률 (%)", default=0)
+    stage_type = models.CharField(
+        "단계 유형", max_length=10,
+        choices=STAGE_TYPE_CHOICES, default="open"
+    )
+    color = models.CharField("색상", max_length=20, default="#6b7280")
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "영업 단계"
+        verbose_name_plural = "영업 단계"
+        ordering = ["pipeline", "order"]
+        unique_together = ["pipeline", "order"]
+
+    def __str__(self):
+        return f"{self.pipeline.name} - {self.name}"
+
+
+# ==============================================
+# 고객 관리
+# ==============================================
 
 class Client(models.Model):
     """거래처/고객사 - 계층 구조 지원 (법인-부서)"""
@@ -69,6 +140,45 @@ class Client(models.Model):
         return Contract.objects.filter(client__in=all_clients)
 
 
+class CustomerContact(models.Model):
+    """고객사 담당자"""
+    company = models.ForeignKey(
+        Client, on_delete=models.CASCADE,
+        related_name="contacts", verbose_name="거래처"
+    )
+    name = models.CharField("이름", max_length=100)
+    position = models.CharField("직책", max_length=50, blank=True)
+    department = models.CharField("부서", max_length=100, blank=True)
+    phone = models.CharField("전화번호", max_length=20, blank=True)
+    mobile = models.CharField("휴대폰", max_length=20, blank=True)
+    email = models.EmailField("이메일", blank=True)
+    is_primary = models.BooleanField("주 담당자", default=False)
+    notes = models.TextField("메모", blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "고객 담당자"
+        verbose_name_plural = "고객 담당자"
+        ordering = ["-is_primary", "name"]
+
+    def __str__(self):
+        return f"{self.company.name} - {self.name}"
+
+    def save(self, *args, **kwargs):
+        # 주 담당자는 거래처당 하나만 유지
+        if self.is_primary:
+            CustomerContact.objects.filter(
+                company=self.company, is_primary=True
+            ).exclude(pk=self.pk).update(is_primary=False)
+        super().save(*args, **kwargs)
+
+
+# ==============================================
+# 영업 기회
+# ==============================================
+
 class SalesOpportunity(models.Model):
     """영업 기회"""
     STATUS_CHOICES = [
@@ -84,6 +194,15 @@ class SalesOpportunity(models.Model):
         ("medium", "보통"),
         ("high", "높음"),
     ]
+    SOURCE_CHOICES = [
+        ("direct", "직접 영업"),
+        ("referral", "소개"),
+        ("website", "웹사이트"),
+        ("exhibition", "전시회"),
+        ("advertisement", "광고"),
+        ("bidding", "입찰"),
+        ("other", "기타"),
+    ]
 
     title = models.CharField("건명", max_length=200)
     client = models.ForeignKey(
@@ -91,8 +210,22 @@ class SalesOpportunity(models.Model):
         related_name="opportunities", verbose_name="거래처"
     )
     
+    # 파이프라인/단계 (신규)
+    pipeline = models.ForeignKey(
+        SalesPipeline, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="opportunities", verbose_name="파이프라인"
+    )
+    stage = models.ForeignKey(
+        SalesStage, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="opportunities", verbose_name="단계"
+    )
+    stage_entered_at = models.DateTimeField("단계 진입 시점", null=True, blank=True)
+    
     status = models.CharField("상태", max_length=20, choices=STATUS_CHOICES, default="lead")
     priority = models.CharField("우선순위", max_length=20, choices=PRIORITY_CHOICES, default="medium")
+    
+    # 유입 경로 (신규)
+    source = models.CharField("유입 경로", max_length=20, choices=SOURCE_CHOICES, default="direct", blank=True)
     
     # 금액
     expected_amount = models.DecimalField("예상 금액", max_digits=15, decimal_places=0, default=0)
@@ -100,11 +233,22 @@ class SalesOpportunity(models.Model):
     
     # 일정
     expected_close_date = models.DateField("예상 마감일", null=True, blank=True)
+    last_contacted_at = models.DateField("최근 접촉일", null=True, blank=True)
     
     # 담당
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
         null=True, related_name="opportunities", verbose_name="담당자"
+    )
+    assignees = models.ManyToManyField(
+        settings.AUTH_USER_MODEL, blank=True,
+        related_name="assigned_opportunities", verbose_name="협업자"
+    )
+    
+    # 고객 담당자 (신규)
+    customer_contact = models.ForeignKey(
+        CustomerContact, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="opportunities", verbose_name="고객 담당자"
     )
     
     description = models.TextField("설명", blank=True)
@@ -112,6 +256,9 @@ class SalesOpportunity(models.Model):
     # Next Step (정체 상태 판단용)
     next_step = models.TextField("다음 단계", blank=True)
     next_step_date = models.DateField("다음 단계 예정일", null=True, blank=True)
+    
+    # 실주 사유 (신규)
+    lost_reason = models.TextField("실주 사유", blank=True)
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -135,7 +282,145 @@ class SalesOpportunity(models.Model):
         if self.status in ["won", "lost"]:
             return False
         return not self.next_step.strip()
+    
+    @property
+    def stalled_days(self):
+        """단계 정체 일수 (stage_entered_at 기준)"""
+        if not self.stage_entered_at or self.status in ["won", "lost"]:
+            return 0
+        delta = timezone.now() - self.stage_entered_at
+        return delta.days
+    
+    @property
+    def stage_name(self):
+        """단계명"""
+        return self.stage.name if self.stage else None
+    
+    @property
+    def pipeline_name(self):
+        """파이프라인명"""
+        return self.pipeline.name if self.pipeline else None
 
+
+# ==============================================
+# 활동 히스토리 / TODO / 파일
+# ==============================================
+
+class LeadActivity(models.Model):
+    """영업 기회 활동 히스토리"""
+    ACTIVITY_TYPE_CHOICES = [
+        ("call", "전화"),
+        ("meeting", "미팅"),
+        ("email", "이메일"),
+        ("note", "메모"),
+        ("stage_change", "단계 변경"),
+        ("file_add", "파일 추가"),
+        ("quote_sent", "견적 발송"),
+        ("task_done", "태스크 완료"),
+        ("created", "생성"),
+        ("other", "기타"),
+    ]
+    
+    lead = models.ForeignKey(
+        SalesOpportunity, on_delete=models.CASCADE,
+        related_name="activities", verbose_name="영업 기회"
+    )
+    activity_type = models.CharField(
+        "활동 유형", max_length=20,
+        choices=ACTIVITY_TYPE_CHOICES, default="note"
+    )
+    title = models.CharField("제목", max_length=200)
+    content = models.TextField("내용", blank=True)
+    
+    # 시스템 자동 or 사용자 수동
+    is_system = models.BooleanField("시스템 자동 생성", default=False)
+    
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, related_name="lead_activities", verbose_name="작성자"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "영업 활동"
+        verbose_name_plural = "영업 활동"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.lead.title} - {self.title}"
+
+
+class LeadTask(models.Model):
+    """영업 기회 TODO"""
+    lead = models.ForeignKey(
+        SalesOpportunity, on_delete=models.CASCADE,
+        related_name="tasks", verbose_name="영업 기회"
+    )
+    title = models.CharField("제목", max_length=200)
+    description = models.TextField("설명", blank=True)
+    due_date = models.DateField("기한", null=True, blank=True)
+    
+    assignee = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="assigned_tasks", verbose_name="담당자"
+    )
+    is_completed = models.BooleanField("완료 여부", default=False)
+    completed_at = models.DateTimeField("완료 시점", null=True, blank=True)
+    
+    # 캘린더 표시 여부
+    show_in_calendar = models.BooleanField("캘린더 표시", default=True)
+    
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, related_name="created_lead_tasks", verbose_name="생성자"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "영업 태스크"
+        verbose_name_plural = "영업 태스크"
+        ordering = ["-is_completed", "due_date"]
+
+    def __str__(self):
+        return f"{self.lead.title} - {self.title}"
+
+
+class LeadFile(models.Model):
+    """영업 기회 첨부 파일"""
+    lead = models.ForeignKey(
+        SalesOpportunity, on_delete=models.CASCADE,
+        related_name="files", verbose_name="영업 기회"
+    )
+    file = models.FileField("파일", upload_to="operation/leads/%Y/%m/")
+    filename = models.CharField("파일명", max_length=255)
+    file_size = models.PositiveIntegerField("파일 크기", default=0)
+    
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, related_name="uploaded_lead_files", verbose_name="업로더"
+    )
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "영업 첨부파일"
+        verbose_name_plural = "영업 첨부파일"
+        ordering = ["-uploaded_at"]
+
+    def __str__(self):
+        return self.filename
+
+    def save(self, *args, **kwargs):
+        if self.file and not self.filename:
+            self.filename = self.file.name
+        if self.file:
+            self.file_size = self.file.size
+        super().save(*args, **kwargs)
+
+
+# ==============================================
+# 견적 관련
+# ==============================================
 
 class QuoteTemplate(models.Model):
     """견적서 템플릿"""

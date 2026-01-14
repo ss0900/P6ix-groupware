@@ -5,6 +5,72 @@ import api from "./axios";
 const BASE_URL = "operation";
 
 // =========================================
+// 파이프라인 (Pipelines)
+// =========================================
+export const pipelineApi = {
+  // 목록 조회
+  getList: (params = {}) => api.get(`${BASE_URL}/pipelines/`, { params }),
+  
+  // 상세 조회 (단계 포함)
+  getDetail: (id) => api.get(`${BASE_URL}/pipelines/${id}/`),
+  
+  // 생성
+  create: (data) => api.post(`${BASE_URL}/pipelines/`, data),
+  
+  // 수정
+  update: (id, data) => api.patch(`${BASE_URL}/pipelines/${id}/`, data),
+  
+  // 삭제
+  delete: (id) => api.delete(`${BASE_URL}/pipelines/${id}/`),
+  
+  // 기본 파이프라인 설정
+  setDefault: (id) => api.post(`${BASE_URL}/pipelines/${id}/set_default/`),
+};
+
+// =========================================
+// 단계 (Stages)
+// =========================================
+export const stageApi = {
+  // 목록 조회 (파이프라인별)
+  getList: (params = {}) => api.get(`${BASE_URL}/stages/`, { params }),
+  
+  // 상세 조회
+  getDetail: (id) => api.get(`${BASE_URL}/stages/${id}/`),
+  
+  // 생성
+  create: (data) => api.post(`${BASE_URL}/stages/`, data),
+  
+  // 수정
+  update: (id, data) => api.patch(`${BASE_URL}/stages/${id}/`, data),
+  
+  // 삭제
+  delete: (id) => api.delete(`${BASE_URL}/stages/${id}/`),
+  
+  // 순서 변경
+  reorder: (orders) => api.post(`${BASE_URL}/stages/reorder/`, { orders }),
+};
+
+// =========================================
+// 고객 담당자 (Contacts)
+// =========================================
+export const contactApi = {
+  // 목록 조회
+  getList: (params = {}) => api.get(`${BASE_URL}/contacts/`, { params }),
+  
+  // 상세 조회
+  getDetail: (id) => api.get(`${BASE_URL}/contacts/${id}/`),
+  
+  // 생성
+  create: (data) => api.post(`${BASE_URL}/contacts/`, data),
+  
+  // 수정
+  update: (id, data) => api.patch(`${BASE_URL}/contacts/${id}/`, data),
+  
+  // 삭제
+  delete: (id) => api.delete(`${BASE_URL}/contacts/${id}/`),
+};
+
+// =========================================
 // 거래처 (Clients)
 // =========================================
 export const clientApi = {
@@ -54,6 +120,42 @@ export const opportunityApi = {
   
   // 트렌드 분석
   getTrend: (params = {}) => api.get(`${BASE_URL}/opportunities/trend/`, { params }),
+  
+  // 칸반 보드 데이터
+  getKanban: (pipelineId = null) => {
+    const params = pipelineId ? { pipeline: pipelineId } : {};
+    return api.get(`${BASE_URL}/opportunities/kanban/`, { params });
+  },
+  
+  // 단계 이동 (칸반 DnD)
+  moveStage: (id, stageId) => api.post(`${BASE_URL}/opportunities/${id}/move_stage/`, { stage_id: stageId }),
+  
+  // 활동 목록
+  getActivities: (id) => api.get(`${BASE_URL}/opportunities/${id}/activities/`),
+  
+  // 활동 추가
+  addActivity: (id, data) => api.post(`${BASE_URL}/opportunities/${id}/activities/`, data),
+  
+  // 태스크 목록
+  getTasks: (id) => api.get(`${BASE_URL}/opportunities/${id}/tasks/`),
+  
+  // 태스크 추가
+  addTask: (id, data) => api.post(`${BASE_URL}/opportunities/${id}/tasks/`, data),
+  
+  // 태스크 완료
+  completeTask: (id, taskId) => api.post(`${BASE_URL}/opportunities/${id}/tasks/${taskId}/complete/`),
+  
+  // 파일 목록
+  getFiles: (id) => api.get(`${BASE_URL}/opportunities/${id}/files/`),
+  
+  // 파일 업로드
+  uploadFile: (id, file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post(`${BASE_URL}/opportunities/${id}/files/`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
 };
 
 // =========================================
@@ -208,8 +310,19 @@ export const dashboardApi = {
   getSummary: () => api.get(`${BASE_URL}/dashboard/summary/`),
 };
 
+// =========================================
+// 캘린더 (Calendar)
+// =========================================
+export const calendarApi = {
+  // 이벤트 조회
+  getEvents: (params = {}) => api.get(`${BASE_URL}/calendar/`, { params }),
+};
+
 // 기본 export
 export default {
+  pipeline: pipelineApi,
+  stage: stageApi,
+  contact: contactApi,
   client: clientApi,
   opportunity: opportunityApi,
   quoteTemplate: quoteTemplateApi,
@@ -219,4 +332,5 @@ export default {
   invoice: invoiceApi,
   payment: paymentApi,
   dashboard: dashboardApi,
+  calendar: calendarApi,
 };

@@ -2,9 +2,43 @@
 from django.contrib import admin
 from .models import (
     Client, SalesOpportunity, QuoteTemplate, Estimate, EstimateItem,
-    Contract, BillingSchedule, Invoice, Payment
+    Contract, BillingSchedule, Invoice, Payment,
+    SalesPipeline, SalesStage, CustomerContact, LeadActivity, LeadTask, LeadFile
 )
 
+
+# ==============================================
+# 파이프라인/단계
+# ==============================================
+
+class SalesStageInline(admin.TabularInline):
+    model = SalesStage
+    extra = 1
+    ordering = ["order"]
+
+
+@admin.register(SalesPipeline)
+class SalesPipelineAdmin(admin.ModelAdmin):
+    list_display = ["name", "is_active", "is_default", "stage_count", "created_by", "created_at"]
+    list_filter = ["is_active", "is_default"]
+    search_fields = ["name"]
+    inlines = [SalesStageInline]
+    
+    def stage_count(self, obj):
+        return obj.stages.count()
+    stage_count.short_description = "단계 수"
+
+
+@admin.register(SalesStage)
+class SalesStageAdmin(admin.ModelAdmin):
+    list_display = ["name", "pipeline", "order", "probability", "stage_type", "color"]
+    list_filter = ["pipeline", "stage_type"]
+    ordering = ["pipeline", "order"]
+
+
+# ==============================================
+# 고객 관리
+# ==============================================
 
 @admin.register(Client)
 class ClientAdmin(admin.ModelAdmin):
@@ -14,13 +48,67 @@ class ClientAdmin(admin.ModelAdmin):
     raw_id_fields = ["parent", "created_by"]
 
 
+@admin.register(CustomerContact)
+class CustomerContactAdmin(admin.ModelAdmin):
+    list_display = ["name", "company", "position", "department", "phone", "email", "is_primary"]
+    list_filter = ["is_primary", "created_at"]
+    search_fields = ["name", "company__name", "email"]
+    raw_id_fields = ["company"]
+
+
+# ==============================================
+# 영업 기회
+# ==============================================
+
+class LeadActivityInline(admin.TabularInline):
+    model = LeadActivity
+    extra = 0
+    readonly_fields = ["activity_type", "title", "is_system", "created_by", "created_at"]
+    can_delete = False
+
+
+class LeadTaskInline(admin.TabularInline):
+    model = LeadTask
+    extra = 0
+
+
 @admin.register(SalesOpportunity)
 class SalesOpportunityAdmin(admin.ModelAdmin):
-    list_display = ["title", "client", "status", "priority", "expected_amount", "probability", "owner"]
-    list_filter = ["status", "priority", "created_at"]
+    list_display = ["title", "client", "pipeline", "stage", "status", "priority", "expected_amount", "owner"]
+    list_filter = ["status", "priority", "pipeline", "stage", "created_at"]
     search_fields = ["title", "client__name"]
-    raw_id_fields = ["client", "owner"]
+    raw_id_fields = ["client", "owner", "pipeline", "stage", "customer_contact"]
+    filter_horizontal = ["assignees"]
+    inlines = [LeadTaskInline, LeadActivityInline]
 
+
+@admin.register(LeadActivity)
+class LeadActivityAdmin(admin.ModelAdmin):
+    list_display = ["title", "lead", "activity_type", "is_system", "created_by", "created_at"]
+    list_filter = ["activity_type", "is_system", "created_at"]
+    search_fields = ["title", "lead__title"]
+    raw_id_fields = ["lead", "created_by"]
+
+
+@admin.register(LeadTask)
+class LeadTaskAdmin(admin.ModelAdmin):
+    list_display = ["title", "lead", "due_date", "assignee", "is_completed", "show_in_calendar"]
+    list_filter = ["is_completed", "show_in_calendar", "due_date"]
+    search_fields = ["title", "lead__title"]
+    raw_id_fields = ["lead", "assignee", "created_by"]
+
+
+@admin.register(LeadFile)
+class LeadFileAdmin(admin.ModelAdmin):
+    list_display = ["filename", "lead", "file_size", "uploaded_by", "uploaded_at"]
+    list_filter = ["uploaded_at"]
+    search_fields = ["filename", "lead__title"]
+    raw_id_fields = ["lead", "uploaded_by"]
+
+
+# ==============================================
+# 견적/계약/청구
+# ==============================================
 
 @admin.register(QuoteTemplate)
 class QuoteTemplateAdmin(admin.ModelAdmin):

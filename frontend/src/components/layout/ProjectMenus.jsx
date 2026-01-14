@@ -113,7 +113,14 @@ export const projectMenus = {
         title: "영업관리",
         items: [
           { to: "dashboard", label: "대시보드" },
+          { to: "pipeline", label: "파이프라인" },
           { to: "opportunities", label: "영업 기회" },
+          { to: "calendar", label: "TODO 캘린더" },
+        ],
+      },
+      {
+        title: "견적/계약",
+        items: [
           { to: "estimates", label: "견적 관리" },
           { to: "contracts", label: "계약 관리" },
         ],

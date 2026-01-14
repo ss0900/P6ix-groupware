@@ -46,8 +46,10 @@ import ArchiveList from "./pages/archive/ArchiveList";
 
 // Sales
 import SalesDashboard from "./pages/sales/SalesDashboard";
+import Pipeline from "./pages/sales/Pipeline";
 import OpportunityList from "./pages/sales/OpportunityList";
 import OpportunityForm from "./pages/sales/OpportunityForm";
+import OpportunityDetail from "./pages/sales/OpportunityDetail";
 import ClientList from "./pages/sales/ClientList";
 import ClientForm from "./pages/sales/ClientForm";
 import EstimateList from "./pages/sales/EstimateList";
@@ -57,6 +59,8 @@ import ContractList from "./pages/sales/ContractList";
 import ContractForm from "./pages/sales/ContractForm";
 import InvoiceList from "./pages/sales/InvoiceList";
 import PaymentList from "./pages/sales/PaymentList";
+import TodoCalendar from "./pages/sales/TodoCalendar";
+import PipelineSettings from "./pages/sales/PipelineSettings";
 
 // Help
 import HelpCenter from "./pages/help/HelpCenter";
@@ -185,11 +189,16 @@ function AppRouter() {
         <Route path="sales" element={<SalesLayout />}>
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<SalesDashboard />} />
+          {/* 파이프라인 (칸반) */}
+          <Route path="pipeline" element={<Pipeline />} />
+          <Route path="pipeline/settings" element={<PipelineSettings />} />
           {/* 영업 기회 */}
           <Route path="opportunities" element={<OpportunityList />} />
           <Route path="opportunities/new" element={<OpportunityForm />} />
-          <Route path="opportunities/:id" element={<OpportunityForm />} />
+          <Route path="opportunities/:id" element={<OpportunityDetail />} />
           <Route path="opportunities/:id/edit" element={<OpportunityForm />} />
+          {/* TODO 캘린더 */}
+          <Route path="calendar" element={<TodoCalendar />} />
           {/* 거래처 */}
           <Route path="clients" element={<ClientList />} />
           <Route path="clients/new" element={<ClientForm />} />

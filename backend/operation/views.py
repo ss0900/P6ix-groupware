@@ -3,26 +3,34 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import MultiPartParser, FormParser
 from django.db.models import Sum, Count, Q, F
 from django.db.models.functions import TruncMonth, TruncYear, ExtractYear
 from django.utils import timezone
-from datetime import timedelta
+from datetime import timedelta, date
 from dateutil.relativedelta import relativedelta
 
 from .models import (
     Client, SalesOpportunity, Estimate, EstimateItem,
-    Contract, QuoteTemplate, BillingSchedule, Invoice, Payment
+    Contract, QuoteTemplate, BillingSchedule, Invoice, Payment,
+    SalesPipeline, SalesStage, CustomerContact,
+    LeadActivity, LeadTask, LeadFile
 )
 from .serializers import (
     ClientListSerializer, ClientDetailSerializer, ClientHierarchySerializer,
     SalesOpportunityListSerializer, SalesOpportunityDetailSerializer,
+    SalesOpportunityKanbanSerializer,
     EstimateListSerializer, EstimateDetailSerializer, EstimateItemSerializer,
     ContractListSerializer, ContractDetailSerializer,
     QuoteTemplateSerializer,
     BillingScheduleSerializer,
     InvoiceListSerializer, InvoiceDetailSerializer,
-    PaymentSerializer
+    PaymentSerializer,
+    SalesPipelineSerializer, SalesPipelineListSerializer, SalesStageSerializer,
+    CustomerContactSerializer, CustomerContactListSerializer,
+    LeadActivitySerializer, LeadTaskSerializer, LeadFileSerializer
 )
+from .services.lead_service import LeadService
 
 
 class ClientViewSet(viewsets.ModelViewSet):
@@ -99,12 +107,23 @@ class SalesOpportunityViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        qs = SalesOpportunity.objects.select_related("client", "owner")
+        qs = SalesOpportunity.objects.select_related(
+            "client", "owner", "pipeline", "stage", "customer_contact"
+        ).prefetch_related("assignees")
         
         # 상태 필터
         status_filter = self.request.query_params.get("status")
         if status_filter:
             qs = qs.filter(status=status_filter)
+        
+        # 파이프라인/단계 필터 (신규)
+        pipeline = self.request.query_params.get("pipeline")
+        if pipeline:
+            qs = qs.filter(pipeline_id=pipeline)
+        
+        stage = self.request.query_params.get("stage")
+        if stage:
+            qs = qs.filter(stage_id=stage)
         
         # 정체 상태 필터
         stagnant = self.request.query_params.get("stagnant")
@@ -145,10 +164,21 @@ class SalesOpportunityViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action == "list":
             return SalesOpportunityListSerializer
+        if self.action == "kanban":
+            return SalesOpportunityKanbanSerializer
         return SalesOpportunityDetailSerializer
 
     def perform_create(self, serializer):
-        serializer.save(owner=self.request.user)
+        lead = serializer.save(owner=self.request.user)
+        # 생성 활동 기록
+        LeadActivity.objects.create(
+            lead=lead,
+            activity_type="created",
+            title="영업 기회 생성",
+            content=f"'{lead.title}' 영업 기회가 생성되었습니다.",
+            is_system=True,
+            created_by=self.request.user
+        )
 
     @action(detail=False, methods=["get"])
     def stats(self, request):
@@ -251,6 +281,281 @@ class SalesOpportunityViewSet(viewsets.ModelViewSet):
                 "change_percent": round(yoy_change, 2)
             }
         })
+
+    @action(detail=False, methods=["get"])
+    def kanban(self, request):
+        """칸반 보드용 데이터"""
+        pipeline_id = request.query_params.get("pipeline")
+        if not pipeline_id:
+            # 기본 파이프라인
+            default_pipeline = SalesPipeline.objects.filter(is_default=True).first()
+            if not default_pipeline:
+                default_pipeline = SalesPipeline.objects.first()
+            if not default_pipeline:
+                return Response({"error": "파이프라인이 없습니다."}, status=400)
+            pipeline_id = default_pipeline.id
+        
+        pipeline = SalesPipeline.objects.prefetch_related("stages").get(pk=pipeline_id)
+        stages = pipeline.stages.order_by("order")
+        
+        result = {
+            "pipeline": SalesPipelineListSerializer(pipeline).data,
+            "columns": []
+        }
+        
+        for stage in stages:
+            opportunities = SalesOpportunity.objects.filter(
+                stage=stage
+            ).select_related("client", "owner").order_by("-expected_amount")
+            
+            result["columns"].append({
+                "stage": SalesStageSerializer(stage).data,
+                "opportunities": SalesOpportunityKanbanSerializer(opportunities, many=True).data
+            })
+        
+        return Response(result)
+
+    @action(detail=True, methods=["post"])
+    def move_stage(self, request, pk=None):
+        """단계 이동 (칸반 드래그앤드롭)"""
+        lead = self.get_object()
+        stage_id = request.data.get("stage_id")
+        
+        if not stage_id:
+            return Response({"error": "stage_id가 필요합니다."}, status=400)
+        
+        try:
+            new_stage = SalesStage.objects.get(pk=stage_id)
+        except SalesStage.DoesNotExist:
+            return Response({"error": "단계를 찾을 수 없습니다."}, status=404)
+        
+        # 서비스 레이어를 통한 단계 이동 (활동 자동 기록)
+        activity = LeadService.move_stage(lead, new_stage, request.user)
+        
+        return Response({
+            "status": "success",
+            "lead": SalesOpportunityListSerializer(lead).data,
+            "activity": LeadActivitySerializer(activity).data
+        })
+
+    @action(detail=True, methods=["get", "post"])
+    def activities(self, request, pk=None):
+        """활동 히스토리"""
+        lead = self.get_object()
+        
+        if request.method == "GET":
+            activities = lead.activities.all()
+            return Response(LeadActivitySerializer(activities, many=True).data)
+        
+        # POST: 활동 추가
+        serializer = LeadActivitySerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        activity = LeadService.add_activity(
+            lead=lead,
+            activity_type=serializer.validated_data.get("activity_type", "note"),
+            title=serializer.validated_data["title"],
+            content=serializer.validated_data.get("content", ""),
+            user=request.user,
+            is_system=False
+        )
+        
+        return Response(LeadActivitySerializer(activity).data, status=201)
+
+    @action(detail=True, methods=["get", "post"])
+    def tasks(self, request, pk=None):
+        """태스크 목록"""
+        lead = self.get_object()
+        
+        if request.method == "GET":
+            tasks = lead.tasks.all()
+            return Response(LeadTaskSerializer(tasks, many=True).data)
+        
+        # POST: 태스크 추가
+        serializer = LeadTaskSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(lead=lead, created_by=request.user)
+        
+        return Response(serializer.data, status=201)
+
+    @action(detail=True, methods=["post"], url_path="tasks/(?P<task_id>[^/.]+)/complete")
+    def complete_task(self, request, pk=None, task_id=None):
+        """태스크 완료"""
+        lead = self.get_object()
+        try:
+            task = lead.tasks.get(pk=task_id)
+        except LeadTask.DoesNotExist:
+            return Response({"error": "태스크를 찾을 수 없습니다."}, status=404)
+        
+        activity = LeadService.complete_task(task, request.user)
+        
+        return Response({
+            "task": LeadTaskSerializer(task).data,
+            "activity": LeadActivitySerializer(activity).data
+        })
+
+    @action(detail=True, methods=["get", "post"], parser_classes=[MultiPartParser, FormParser])
+    def files(self, request, pk=None):
+        """파일 목록/업로드"""
+        lead = self.get_object()
+        
+        if request.method == "GET":
+            files = lead.files.all()
+            return Response(LeadFileSerializer(files, many=True, context={"request": request}).data)
+        
+        # POST: 파일 업로드
+        file = request.FILES.get("file")
+        if not file:
+            return Response({"error": "파일이 필요합니다."}, status=400)
+        
+        lead_file, activity = LeadService.add_file(lead, file, request.user)
+        
+        return Response({
+            "file": LeadFileSerializer(lead_file, context={"request": request}).data,
+            "activity": LeadActivitySerializer(activity).data
+        }, status=201)
+
+
+# ==============================================
+# 파이프라인/단계 ViewSets
+# ==============================================
+
+class SalesPipelineViewSet(viewsets.ModelViewSet):
+    """영업 파이프라인 ViewSet"""
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        qs = SalesPipeline.objects.prefetch_related("stages").select_related("created_by")
+        is_active = self.request.query_params.get("is_active")
+        if is_active == "true":
+            qs = qs.filter(is_active=True)
+        return qs
+    
+    def get_serializer_class(self):
+        if self.action == "list":
+            return SalesPipelineListSerializer
+        return SalesPipelineSerializer
+    
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+    
+    @action(detail=True, methods=["post"])
+    def set_default(self, request, pk=None):
+        """기본 파이프라인으로 설정"""
+        pipeline = self.get_object()
+        SalesPipeline.objects.filter(is_default=True).update(is_default=False)
+        pipeline.is_default = True
+        pipeline.save()
+        return Response({"status": "success"})
+
+
+class SalesStageViewSet(viewsets.ModelViewSet):
+    """영업 단계 ViewSet"""
+    queryset = SalesStage.objects.select_related("pipeline").order_by("pipeline", "order")
+    serializer_class = SalesStageSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        qs = super().get_queryset()
+        pipeline = self.request.query_params.get("pipeline")
+        if pipeline:
+            qs = qs.filter(pipeline_id=pipeline)
+        return qs
+    
+    @action(detail=False, methods=["post"])
+    def reorder(self, request):
+        """단계 순서 변경"""
+        orders = request.data.get("orders", [])
+        for item in orders:
+            SalesStage.objects.filter(pk=item["id"]).update(order=item["order"])
+        return Response({"status": "success"})
+
+
+# ==============================================
+# 고객 담당자 ViewSet
+# ==============================================
+
+class CustomerContactViewSet(viewsets.ModelViewSet):
+    """고객 담당자 ViewSet"""
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        qs = CustomerContact.objects.select_related("company")
+        company = self.request.query_params.get("company")
+        if company:
+            qs = qs.filter(company_id=company)
+        search = self.request.query_params.get("search")
+        if search:
+            qs = qs.filter(
+                Q(name__icontains=search) |
+                Q(email__icontains=search) |
+                Q(company__name__icontains=search)
+            )
+        return qs
+    
+    def get_serializer_class(self):
+        if self.action == "list":
+            return CustomerContactListSerializer
+        return CustomerContactSerializer
+
+
+# ==============================================
+# 캘린더 ViewSet
+# ==============================================
+
+class CalendarViewSet(viewsets.ViewSet):
+    """통합 캘린더 API"""
+    permission_classes = [IsAuthenticated]
+    
+    def list(self, request):
+        """캘린더 이벤트 조회"""
+        start_date = request.query_params.get("start")
+        end_date = request.query_params.get("end")
+        
+        events = []
+        
+        # LeadTask 이벤트
+        tasks_qs = LeadTask.objects.filter(show_in_calendar=True).select_related("lead", "assignee")
+        if start_date:
+            tasks_qs = tasks_qs.filter(due_date__gte=start_date)
+        if end_date:
+            tasks_qs = tasks_qs.filter(due_date__lte=end_date)
+        
+        for task in tasks_qs:
+            events.append({
+                "id": f"task_{task.id}",
+                "type": "task",
+                "title": task.title,
+                "date": task.due_date.isoformat() if task.due_date else None,
+                "lead_id": task.lead_id,
+                "lead_title": task.lead.title,
+                "is_completed": task.is_completed,
+                "assignee": f"{task.assignee.last_name}{task.assignee.first_name}" if task.assignee else None
+            })
+        
+        # SalesOpportunity expected_close_date 이벤트
+        leads_qs = SalesOpportunity.objects.exclude(
+            status__in=["won", "lost"]
+        ).exclude(expected_close_date__isnull=True).select_related("client", "owner")
+        
+        if start_date:
+            leads_qs = leads_qs.filter(expected_close_date__gte=start_date)
+        if end_date:
+            leads_qs = leads_qs.filter(expected_close_date__lte=end_date)
+        
+        for lead in leads_qs:
+            events.append({
+                "id": f"lead_{lead.id}",
+                "type": "deadline",
+                "title": f"[마감] {lead.title}",
+                "date": lead.expected_close_date.isoformat(),
+                "lead_id": lead.id,
+                "client_name": lead.client.name,
+                "expected_amount": lead.expected_amount,
+                "owner": f"{lead.owner.last_name}{lead.owner.first_name}" if lead.owner else None
+            })
+        
+        return Response(events)
 
 
 class QuoteTemplateViewSet(viewsets.ModelViewSet):
