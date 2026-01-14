@@ -48,6 +48,7 @@ urlpatterns = [
     path("api/chat/", include("chat.urls")),
     path("api/timeline/", include("timeline.urls")),
     path("api/contact/", include("contact.urls")),
+    path("api/operation/", include("operation.urls")),
 ]
 
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

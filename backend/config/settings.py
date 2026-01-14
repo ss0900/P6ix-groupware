@@ -65,6 +65,8 @@ INSTALLED_APPS = [
     "chat",
     "timeline",
     "contact",
+    "operation",
+    "django_filters",
     "rest_framework",
     "corsheaders",
     "rest_framework_simplejwt.token_blacklist",

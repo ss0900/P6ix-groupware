@@ -1,0 +1,476 @@
+# backend/operation/serializers.py
+"""
+영업관리(Operation) 모듈 - Serializers
+"""
+from rest_framework import serializers
+from django.contrib.auth import get_user_model
+from .models import (
+    CustomerCompany, CustomerContact,
+    SalesPipeline, SalesStage,
+    SalesLead, LeadActivity, LeadTask, LeadFile,
+    Quote, QuoteItem, QuoteTemplate
+)
+
+User = get_user_model()
+
+
+# ============================================================
+# 사용자 (간단 참조용)
+# ============================================================
+class SimpleUserSerializer(serializers.ModelSerializer):
+    """간단한 사용자 정보"""
+    full_name = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'first_name', 'last_name', 'full_name']
+    
+    def get_full_name(self, obj):
+        name = f"{obj.last_name}{obj.first_name}".strip()
+        return name if name else obj.username
+
+
+# ============================================================
+# 고객 관리
+# ============================================================
+class CustomerContactSerializer(serializers.ModelSerializer):
+    """고객 담당자 Serializer"""
+    company_name = serializers.CharField(source='company.name', read_only=True)
+    
+    class Meta:
+        model = CustomerContact
+        fields = [
+            'id', 'company', 'company_name', 'name', 'position', 
+            'department', 'email', 'phone', 'mobile', 
+            'is_primary', 'notes', 'created_at', 'updated_at'
+        ]
+
+
+class CustomerCompanySerializer(serializers.ModelSerializer):
+    """고객사 Serializer"""
+    contacts = CustomerContactSerializer(many=True, read_only=True)
+    contacts_count = serializers.SerializerMethodField()
+    leads_count = serializers.SerializerMethodField()
+    created_by_name = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = CustomerCompany
+        fields = [
+            'id', 'name', 'business_number', 'industry', 
+            'address', 'phone', 'website', 'notes',
+            'contacts', 'contacts_count', 'leads_count',
+            'created_by', 'created_by_name', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_by']
+    
+    def get_contacts_count(self, obj):
+        return obj.contacts.count()
+    
+    def get_leads_count(self, obj):
+        return obj.leads.count()
+    
+    def get_created_by_name(self, obj):
+        if obj.created_by:
+            name = f"{obj.created_by.last_name}{obj.created_by.first_name}".strip()
+            return name if name else obj.created_by.username
+        return ""
+
+
+class CustomerCompanyListSerializer(serializers.ModelSerializer):
+    """고객사 리스트용 Serializer (간략)"""
+    contacts_count = serializers.SerializerMethodField()
+    leads_count = serializers.SerializerMethodField()
+    primary_contact = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = CustomerCompany
+        fields = [
+            'id', 'name', 'business_number', 'industry', 'phone',
+            'contacts_count', 'leads_count', 'primary_contact', 'created_at'
+        ]
+    
+    def get_contacts_count(self, obj):
+        return obj.contacts.count()
+    
+    def get_leads_count(self, obj):
+        return obj.leads.count()
+    
+    def get_primary_contact(self, obj):
+        contact = obj.contacts.filter(is_primary=True).first()
+        if contact:
+            return {'id': contact.id, 'name': contact.name, 'phone': contact.phone}
+        return None
+
+
+# ============================================================
+# 파이프라인 / 단계
+# ============================================================
+class SalesStageSerializer(serializers.ModelSerializer):
+    """영업 단계 Serializer"""
+    leads_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = SalesStage
+        fields = [
+            'id', 'pipeline', 'name', 'order', 
+            'stage_type', 'probability', 'color',
+            'leads_count', 'created_at'
+        ]
+    
+    def get_leads_count(self, obj):
+        return obj.leads.filter(status='active').count()
+
+
+class SalesPipelineSerializer(serializers.ModelSerializer):
+    """파이프라인 Serializer"""
+    stages = SalesStageSerializer(many=True, read_only=True)
+    leads_count = serializers.SerializerMethodField()
+    total_amount = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = SalesPipeline
+        fields = [
+            'id', 'name', 'description', 'is_default', 'is_active',
+            'stages', 'leads_count', 'total_amount',
+            'created_at', 'updated_at'
+        ]
+    
+    def get_leads_count(self, obj):
+        return obj.leads.filter(status='active').count()
+    
+    def get_total_amount(self, obj):
+        from django.db.models import Sum
+        result = obj.leads.filter(status='active').aggregate(
+            total=Sum('expected_amount')
+        )
+        return result['total'] or 0
+
+
+# ============================================================
+# 영업 기회 (Lead)
+# ============================================================
+class LeadActivitySerializer(serializers.ModelSerializer):
+    """활동 로그 Serializer"""
+    activity_type_display = serializers.CharField(
+        source='get_activity_type_display', read_only=True
+    )
+    created_by_name = serializers.SerializerMethodField()
+    from_stage_name = serializers.CharField(source='from_stage.name', read_only=True)
+    to_stage_name = serializers.CharField(source='to_stage.name', read_only=True)
+    
+    class Meta:
+        model = LeadActivity
+        fields = [
+            'id', 'lead', 'activity_type', 'activity_type_display',
+            'title', 'content',
+            'from_stage', 'from_stage_name', 'to_stage', 'to_stage_name',
+            'created_by', 'created_by_name', 'created_at'
+        ]
+        read_only_fields = ['created_by']
+    
+    def get_created_by_name(self, obj):
+        if obj.created_by:
+            name = f"{obj.created_by.last_name}{obj.created_by.first_name}".strip()
+            return name if name else obj.created_by.username
+        return ""
+
+
+class LeadTaskSerializer(serializers.ModelSerializer):
+    """할 일 Serializer"""
+    assignee_name = serializers.SerializerMethodField()
+    priority_display = serializers.CharField(
+        source='get_priority_display', read_only=True
+    )
+    lead_title = serializers.CharField(source='lead.title', read_only=True)
+    is_overdue = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = LeadTask
+        fields = [
+            'id', 'lead', 'lead_title', 'title', 'description',
+            'assignee', 'assignee_name', 'due_date',
+            'priority', 'priority_display',
+            'is_completed', 'completed_at',
+            'show_on_calendar', 'reminder_at', 'is_overdue',
+            'created_by', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_by', 'completed_at']
+    
+    def get_assignee_name(self, obj):
+        if obj.assignee:
+            name = f"{obj.assignee.last_name}{obj.assignee.first_name}".strip()
+            return name if name else obj.assignee.username
+        return ""
+    
+    def get_is_overdue(self, obj):
+        from django.utils import timezone
+        if obj.due_date and not obj.is_completed:
+            return obj.due_date < timezone.now()
+        return False
+
+
+class LeadFileSerializer(serializers.ModelSerializer):
+    """첨부파일 Serializer"""
+    uploaded_by_name = serializers.SerializerMethodField()
+    file_url = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = LeadFile
+        fields = [
+            'id', 'lead', 'file', 'file_url', 'name', 'size',
+            'uploaded_by', 'uploaded_by_name', 'created_at'
+        ]
+        read_only_fields = ['uploaded_by', 'name', 'size']
+    
+    def get_uploaded_by_name(self, obj):
+        if obj.uploaded_by:
+            name = f"{obj.uploaded_by.last_name}{obj.uploaded_by.first_name}".strip()
+            return name if name else obj.uploaded_by.username
+        return ""
+    
+    def get_file_url(self, obj):
+        if obj.file:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.file.url)
+            return obj.file.url
+        return None
+
+
+class SalesLeadListSerializer(serializers.ModelSerializer):
+    """영업기회 리스트용 Serializer"""
+    pipeline_name = serializers.CharField(source='pipeline.name', read_only=True)
+    stage_name = serializers.CharField(source='stage.name', read_only=True)
+    stage_color = serializers.CharField(source='stage.color', read_only=True)
+    company_name = serializers.CharField(source='company.name', read_only=True)
+    contact_name = serializers.CharField(source='contact.name', read_only=True)
+    owner_name = serializers.SerializerMethodField()
+    stalled_days = serializers.IntegerField(read_only=True)
+    is_stalled = serializers.BooleanField(read_only=True)
+    activities_count = serializers.SerializerMethodField()
+    tasks_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = SalesLead
+        fields = [
+            'id', 'title', 'description',
+            'pipeline', 'pipeline_name', 'stage', 'stage_name', 'stage_color',
+            'company', 'company_name', 'contact', 'contact_name',
+            'expected_amount', 'expected_close_date',
+            'owner', 'owner_name', 'status', 'probability',
+            'stalled_days', 'is_stalled',
+            'last_contacted_at', 'next_action_due_at',
+            'activities_count', 'tasks_count',
+            'created_at', 'updated_at'
+        ]
+    
+    def get_owner_name(self, obj):
+        if obj.owner:
+            name = f"{obj.owner.last_name}{obj.owner.first_name}".strip()
+            return name if name else obj.owner.username
+        return ""
+    
+    def get_activities_count(self, obj):
+        return obj.activities.count()
+    
+    def get_tasks_count(self, obj):
+        return obj.tasks.filter(is_completed=False).count()
+
+
+class SalesLeadDetailSerializer(serializers.ModelSerializer):
+    """영업기회 상세용 Serializer"""
+    pipeline_name = serializers.CharField(source='pipeline.name', read_only=True)
+    stage_name = serializers.CharField(source='stage.name', read_only=True)
+    stage_color = serializers.CharField(source='stage.color', read_only=True)
+    stage_type = serializers.CharField(source='stage.stage_type', read_only=True)
+    
+    company_data = CustomerCompanySerializer(source='company', read_only=True)
+    contact_data = CustomerContactSerializer(source='contact', read_only=True)
+    
+    owner_data = SimpleUserSerializer(source='owner', read_only=True)
+    assignees_data = SimpleUserSerializer(source='assignees', many=True, read_only=True)
+    created_by_data = SimpleUserSerializer(source='created_by', read_only=True)
+    
+    # 관련 데이터
+    activities = LeadActivitySerializer(many=True, read_only=True)
+    tasks = LeadTaskSerializer(many=True, read_only=True)
+    files = LeadFileSerializer(many=True, read_only=True)
+    
+    # 계산 필드
+    stalled_days = serializers.IntegerField(read_only=True)
+    is_stalled = serializers.BooleanField(read_only=True)
+    quotes_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = SalesLead
+        fields = [
+            'id', 'title', 'description',
+            'pipeline', 'pipeline_name', 'stage', 'stage_name', 'stage_color', 'stage_type',
+            'company', 'company_data', 'contact', 'contact_data',
+            'expected_amount', 'expected_close_date',
+            'owner', 'owner_data', 'assignees', 'assignees_data',
+            'status', 'probability', 'lost_reason',
+            'stage_entered_at', 'last_contacted_at', 'next_action_due_at',
+            'stalled_days', 'is_stalled',
+            'contract_id', 'project_id', 'source', 'tags',
+            'created_by', 'created_by_data', 'created_at', 'updated_at',
+            'activities', 'tasks', 'files', 'quotes_count'
+        ]
+        read_only_fields = ['created_by', 'stage_entered_at']
+    
+    def get_quotes_count(self, obj):
+        return obj.quotes.count()
+
+
+class SalesLeadCreateSerializer(serializers.ModelSerializer):
+    """영업기회 생성용 Serializer"""
+    
+    class Meta:
+        model = SalesLead
+        fields = [
+            'id', 'title', 'description',
+            'pipeline', 'stage',
+            'company', 'contact',
+            'expected_amount', 'expected_close_date',
+            'owner', 'assignees',
+            'status', 'probability',
+            'next_action_due_at', 'source', 'tags'
+        ]
+    
+    def create(self, validated_data):
+        assignees = validated_data.pop('assignees', [])
+        
+        # 단계의 기본 확률 적용
+        if 'probability' not in validated_data or validated_data['probability'] == 0:
+            stage = validated_data.get('stage')
+            if stage:
+                validated_data['probability'] = stage.probability
+        
+        lead = SalesLead.objects.create(**validated_data)
+        lead.assignees.set(assignees)
+        
+        return lead
+
+
+# ============================================================
+# 견적서
+# ============================================================
+class QuoteTemplateSerializer(serializers.ModelSerializer):
+    """견적 템플릿 Serializer"""
+    created_by_name = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = QuoteTemplate
+        fields = [
+            'id', 'name', 'header_text', 'footer_text', 'terms',
+            'is_default', 'created_by', 'created_by_name',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_by']
+    
+    def get_created_by_name(self, obj):
+        if obj.created_by:
+            name = f"{obj.created_by.last_name}{obj.created_by.first_name}".strip()
+            return name if name else obj.created_by.username
+        return ""
+
+
+class QuoteItemSerializer(serializers.ModelSerializer):
+    """견적 항목 Serializer"""
+    
+    class Meta:
+        model = QuoteItem
+        fields = [
+            'id', 'quote', 'order', 'name', 'description',
+            'specification', 'unit', 'quantity', 'unit_price', 'amount', 'notes'
+        ]
+        read_only_fields = ['amount']
+
+
+class QuoteSerializer(serializers.ModelSerializer):
+    """견적서 Serializer"""
+    items = QuoteItemSerializer(many=True, read_only=True)
+    lead_title = serializers.CharField(source='lead.title', read_only=True)
+    company_name = serializers.CharField(source='company.name', read_only=True)
+    contact_name = serializers.CharField(source='contact.name', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    created_by_name = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Quote
+        fields = [
+            'id', 'lead', 'lead_title', 'company', 'company_name',
+            'contact', 'contact_name',
+            'quote_number', 'title', 'template',
+            'header_text', 'footer_text', 'terms',
+            'subtotal', 'tax_rate', 'tax_amount', 'total_amount',
+            'valid_until', 'status', 'status_display', 'sent_at',
+            'notes', 'items',
+            'created_by', 'created_by_name', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_by', 'quote_number', 'subtotal', 'tax_amount', 'total_amount']
+    
+    def get_created_by_name(self, obj):
+        if obj.created_by:
+            name = f"{obj.created_by.last_name}{obj.created_by.first_name}".strip()
+            return name if name else obj.created_by.username
+        return ""
+
+
+class QuoteCreateSerializer(serializers.ModelSerializer):
+    """견적서 생성 Serializer"""
+    items = QuoteItemSerializer(many=True, required=False)
+    
+    class Meta:
+        model = Quote
+        fields = [
+            'lead', 'company', 'contact', 'title', 'template',
+            'header_text', 'footer_text', 'terms',
+            'tax_rate', 'valid_until', 'notes', 'items'
+        ]
+    
+    def create(self, validated_data):
+        items_data = validated_data.pop('items', [])
+        
+        # 견적번호 자동 생성
+        from django.utils import timezone
+        today = timezone.now().strftime('%Y%m%d')
+        count = Quote.objects.filter(quote_number__startswith=f"Q{today}").count() + 1
+        validated_data['quote_number'] = f"Q{today}-{count:03d}"
+        
+        # 템플릿에서 기본값 로드
+        template = validated_data.get('template')
+        if template:
+            if not validated_data.get('header_text'):
+                validated_data['header_text'] = template.header_text
+            if not validated_data.get('footer_text'):
+                validated_data['footer_text'] = template.footer_text
+            if not validated_data.get('terms'):
+                validated_data['terms'] = template.terms
+        
+        quote = Quote.objects.create(**validated_data)
+        
+        # 견적 항목 생성
+        for idx, item_data in enumerate(items_data):
+            QuoteItem.objects.create(quote=quote, order=idx, **item_data)
+        
+        # 합계 계산
+        quote.calculate_totals()
+        
+        return quote
+
+
+# ============================================================
+# 캘린더 피드용
+# ============================================================
+class CalendarEventSerializer(serializers.Serializer):
+    """캘린더 이벤트 통합 Serializer"""
+    id = serializers.CharField()
+    title = serializers.CharField()
+    start = serializers.DateTimeField()
+    end = serializers.DateTimeField(allow_null=True)
+    event_type = serializers.CharField()  # 'task', 'close_date', 'meeting'
+    lead_id = serializers.IntegerField()
+    lead_title = serializers.CharField()
+    color = serializers.CharField()
+    is_completed = serializers.BooleanField(default=False)

@@ -58,6 +58,21 @@ import ContactList from "./pages/contact/ContactList";
 import ContactDetail from "./pages/contact/ContactDetail";
 import ContactForm from "./pages/contact/ContactForm";
 
+// Operation (영업관리)
+import OperationLayout from "./pages/operation/OperationLayout";
+import LeadList from "./pages/operation/LeadList";
+import LeadDetail from "./pages/operation/LeadDetail";
+import LeadForm from "./pages/operation/LeadForm";
+import PipelineBoard from "./pages/operation/PipelineBoard";
+import Inbox from "./pages/operation/Inbox";
+import TodoCalendar from "./pages/operation/TodoCalendar";
+import CustomerList from "./pages/operation/CustomerList";
+import CustomerDetail from "./pages/operation/CustomerDetail";
+import QuoteList from "./pages/operation/QuoteList";
+import QuoteForm from "./pages/operation/QuoteForm";
+import QuoteTemplateList from "./pages/operation/QuoteTemplateList";
+import PipelineSettings from "./pages/operation/PipelineSettings";
+
 // Protected Route Wrapper
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
@@ -199,6 +214,25 @@ function AppRouter() {
           <Route path="new" element={<ContactForm />} />
           <Route path=":id" element={<ContactDetail />} />
           <Route path=":id/edit" element={<ContactForm />} />
+        </Route>
+
+        {/* 영업관리 - with sidebar layout */}
+        <Route path="operation" element={<OperationLayout />}>
+          <Route index element={<Navigate to="leads" replace />} />
+          <Route path="leads" element={<LeadList />} />
+          <Route path="leads/new" element={<LeadForm />} />
+          <Route path="leads/:id" element={<LeadDetail />} />
+          <Route path="leads/:id/edit" element={<LeadForm />} />
+          <Route path="pipeline" element={<PipelineBoard />} />
+          <Route path="pipeline/settings" element={<PipelineSettings />} />
+          <Route path="inbox" element={<Inbox />} />
+          <Route path="todo" element={<TodoCalendar />} />
+          <Route path="customers" element={<CustomerList />} />
+          <Route path="customers/:id" element={<CustomerDetail />} />
+          <Route path="quotes" element={<QuoteList />} />
+          <Route path="quotes/new" element={<QuoteForm />} />
+          <Route path="quotes/:id" element={<QuoteForm />} />
+          <Route path="templates" element={<QuoteTemplateList />} />
         </Route>
 
         {/* 도움말 */}

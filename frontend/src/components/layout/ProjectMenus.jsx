@@ -104,30 +104,27 @@ export const projectMenus = {
       },
     ],
   },
-  sales: {
+  operation: {
     title: "영업관리",
-    base: "/sales",
-    baseClick: "dashboard",
+    base: "/operation",
+    baseClick: "leads",
     sections: [
       {
         title: "영업관리",
         items: [
-          { to: "dashboard", label: "대시보드" },
-          { to: "opportunities", label: "영업 기회" },
-          { to: "estimates", label: "견적 관리" },
-          { to: "contracts", label: "계약 관리" },
+          { to: "leads", label: "영업기회" },
+          { to: "pipeline", label: "파이프라인" },
+          { to: "inbox", label: "영업접수" },
+          { to: "todo", label: "TODO 캘린더" },
         ],
       },
       {
-        title: "청구/수금",
+        title: "견적/고객",
         items: [
-          { to: "invoices", label: "청구서 관리" },
-          { to: "payments", label: "수금 기록" },
+          { to: "customers", label: "고객관리" },
+          { to: "quotes", label: "견적서" },
+          { to: "templates", label: "견적 템플릿" },
         ],
-      },
-      {
-        title: "고객 관리",
-        items: [{ to: "clients", label: "거래처 목록" }],
       },
     ],
   },
@@ -175,6 +172,6 @@ export const menuOrder = [
   "board",
   "schedule",
   "archive",
-  "sales",
+  "operation",
   "admin",
 ];
