@@ -44,7 +44,7 @@ urlpatterns = [
     path("api/board/", include("board.urls")),
     path("api/meeting/", include("meeting.urls")),
     path("api/resources/", include("resources.urls")),
-    path("api/operation/", include("operation.urls")),
+
     path("api/chat/", include("chat.urls")),
     path("api/timeline/", include("timeline.urls")),
     path("api/contact/", include("contact.urls")),

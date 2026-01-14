@@ -7,7 +7,7 @@ import {
   MessageSquare as Board,
   Calendar,
   FolderOpen,
-  TrendingUp,
+
   Settings,
   ChevronDown,
   ChevronRight,
@@ -63,19 +63,7 @@ const menuItems = [
     icon: FolderOpen,
     path: "/archive",
   },
-  {
-    id: "sales",
-    label: "영업관리",
-    icon: TrendingUp,
-    children: [
-      { id: "sales-dashboard", label: "대시보드", path: "/sales" },
-      { id: "sales-info", label: "영업 정보", path: "/sales/info" },
-      { id: "sales-estimate", label: "견적 현황", path: "/sales/estimate" },
-      { id: "sales-bid", label: "입찰/수주", path: "/sales/bid" },
-      { id: "sales-contract", label: "계약/비용관리", path: "/sales/contract" },
-      { id: "sales-revenue", label: "매출 현황", path: "/sales/revenue" },
-    ],
-  },
+
   {
     id: "admin",
     label: "관리자",
@@ -91,7 +79,7 @@ const menuItems = [
 function Sidebar({ isOpen, onClose }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const [expandedMenus, setExpandedMenus] = useState(["approval", "board", "schedule", "sales", "admin"]);
+  const [expandedMenus, setExpandedMenus] = useState(["approval", "board", "schedule", "admin"]);
 
   const toggleMenu = (menuId) => {
     setExpandedMenus((prev) =>

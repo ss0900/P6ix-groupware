@@ -61,7 +61,7 @@ INSTALLED_APPS = [
     "board",
     "meeting",
     "resources",
-    "operation",
+
     "chat",
     "timeline",
     "contact",
