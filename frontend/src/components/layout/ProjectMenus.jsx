@@ -113,14 +113,21 @@ export const projectMenus = {
         title: "영업관리",
         items: [
           { to: "dashboard", label: "대시보드" },
-          { to: "opportunities", label: "영업 정보" },
-          { to: "estimates", label: "견적 현황" },
+          { to: "opportunities", label: "영업 기회" },
+          { to: "estimates", label: "견적 관리" },
           { to: "contracts", label: "계약 관리" },
         ],
       },
       {
+        title: "청구/수금",
+        items: [
+          { to: "invoices", label: "청구서 관리" },
+          { to: "payments", label: "수금 기록" },
+        ],
+      },
+      {
         title: "고객 관리",
-        items: [{ to: "clients", label: "고객 목록" }],
+        items: [{ to: "clients", label: "거래처 목록" }],
       },
     ],
   },

@@ -52,8 +52,11 @@ import ClientList from "./pages/sales/ClientList";
 import ClientForm from "./pages/sales/ClientForm";
 import EstimateList from "./pages/sales/EstimateList";
 import EstimateForm from "./pages/sales/EstimateForm";
+import EstimatePrint from "./pages/sales/EstimatePrint";
 import ContractList from "./pages/sales/ContractList";
 import ContractForm from "./pages/sales/ContractForm";
+import InvoiceList from "./pages/sales/InvoiceList";
+import PaymentList from "./pages/sales/PaymentList";
 
 // Help
 import HelpCenter from "./pages/help/HelpCenter";
@@ -182,20 +185,32 @@ function AppRouter() {
         <Route path="sales" element={<SalesLayout />}>
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<SalesDashboard />} />
+          {/* 영업 기회 */}
           <Route path="opportunities" element={<OpportunityList />} />
           <Route path="opportunities/new" element={<OpportunityForm />} />
           <Route path="opportunities/:id" element={<OpportunityForm />} />
           <Route path="opportunities/:id/edit" element={<OpportunityForm />} />
+          {/* 거래처 */}
           <Route path="clients" element={<ClientList />} />
           <Route path="clients/new" element={<ClientForm />} />
           <Route path="clients/:id" element={<ClientForm />} />
           <Route path="clients/:id/edit" element={<ClientForm />} />
+          {/* 견적 */}
           <Route path="estimates" element={<EstimateList />} />
           <Route path="estimates/new" element={<EstimateForm />} />
           <Route path="estimates/:id" element={<EstimateForm />} />
+          <Route path="estimates/:id/print" element={<EstimatePrint />} />
+          {/* 계약 */}
           <Route path="contracts" element={<ContractList />} />
           <Route path="contracts/new" element={<ContractForm />} />
           <Route path="contracts/:id" element={<ContractForm />} />
+          {/* 청구서 */}
+          <Route path="invoices" element={<InvoiceList />} />
+          <Route path="invoices/new" element={<div className="p-6">청구서 작성 (준비 중)</div>} />
+          <Route path="invoices/:id" element={<div className="p-6">청구서 상세 (준비 중)</div>} />
+          {/* 수금 기록 */}
+          <Route path="payments" element={<PaymentList />} />
+          <Route path="payments/new" element={<div className="p-6">수금 등록 (준비 중)</div>} />
         </Route>
 
         {/* 관리자 - with sidebar layout */}

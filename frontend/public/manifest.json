@@ -1,6 +1,7 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "P6ix 그룹웨어",
+  "name": "P6ix Groupware - 영업관리 시스템",
+  "description": "P6ix 그룹웨어 - 전자결재, 영업관리, 일정관리 통합 시스템",
   "icons": [
     {
       "src": "favicon.ico",
@@ -10,16 +11,44 @@
     {
       "src": "logo192.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "192x192",
+      "purpose": "any maskable"
     },
     {
       "src": "logo512.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "512x512",
+      "purpose": "any maskable"
     }
   ],
-  "start_url": ".",
+  "start_url": "/",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "orientation": "portrait-primary",
+  "theme_color": "#1e293b",
+  "background_color": "#f5f6fa",
+  "scope": "/",
+  "categories": ["business", "productivity"],
+  "shortcuts": [
+    {
+      "name": "대시보드",
+      "short_name": "대시보드",
+      "description": "메인 대시보드로 이동",
+      "url": "/",
+      "icons": [{ "src": "logo192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "영업관리",
+      "short_name": "영업",
+      "description": "영업관리 대시보드로 이동",
+      "url": "/sales/dashboard",
+      "icons": [{ "src": "logo192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "전자결재",
+      "short_name": "결재",
+      "description": "전자결재로 이동",
+      "url": "/approval/home",
+      "icons": [{ "src": "logo192.png", "sizes": "192x192" }]
+    }
+  ]
 }
