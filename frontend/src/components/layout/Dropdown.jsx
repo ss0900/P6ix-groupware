@@ -19,7 +19,7 @@ export default function Dropdown({
     if (menu.path) {
       navigate(menu.path);
     } else if (menu.baseClick) {
-      navigate(`${base}/${menu.baseClick}`);
+      navigate(`${base}/${menu.baseClick}`.replace(/\/+/g, "/"));
     } else {
       navigate(base);
     }
@@ -29,16 +29,16 @@ export default function Dropdown({
   // 현재 경로가 이 메뉴에 해당하는지 체크
   const isActive = () => {
     const path = location.pathname;
-    
+
     // 대시보드는 "/" 또는 "/main"만 매칭
     if (base === "/" || base === "") {
       return path === "/" || path === "/main";
     }
-    
+
     if (menu.path) {
       return path.startsWith(menu.path);
     }
-    
+
     return base && path.startsWith(base);
   };
 
@@ -51,7 +51,9 @@ export default function Dropdown({
       {/* 상단 메뉴 탭 */}
       <span
         className={`menu-trigger cursor-pointer transition-colors ${
-          isActive() ? "text-blue-400 font-semibold" : "text-white hover:text-blue-300"
+          isActive()
+            ? "text-blue-400 font-semibold"
+            : "text-white hover:text-blue-300"
         }`}
         onClick={handleBaseClick}
       >
@@ -60,16 +62,15 @@ export default function Dropdown({
 
       {/* 드롭다운 패널 */}
       {openMenu === menuKey && sections.length > 0 && (
-        <div
-          className="menu-panel absolute top-full bg-white border border-gray-200 shadow-lg min-w-40 text-black z-50 py-2 left-1/2 -translate-x-1/2"
-        >
+        <div className="menu-panel absolute top-full bg-white border border-gray-200 shadow-lg min-w-40 text-black z-50 py-2 left-1/2 -translate-x-1/2">
           {sections.map((section, idx) => {
             const firstItem = section.items?.[0];
             if (!firstItem) return null;
 
-            const to = typeof firstItem.to === "string"
-              ? `${base}/${firstItem.to}`.replace(/\/+/g, "/")
-              : base;
+            const to =
+              typeof firstItem.to === "string"
+                ? `${base}/${firstItem.to}`.replace(/\/+/g, "/")
+                : base;
 
             return (
               <div

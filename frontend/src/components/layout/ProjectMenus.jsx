@@ -107,23 +107,23 @@ export const projectMenus = {
   operation: {
     title: "영업관리",
     base: "/operation",
-    baseClick: "leads",
+    baseClick: "sales/leads",
     sections: [
       {
         title: "영업관리",
         items: [
-          { to: "leads", label: "영업기회" },
-          { to: "pipeline", label: "파이프라인" },
-          { to: "inbox", label: "영업접수" },
-          { to: "todo", label: "TODO 캘린더" },
+          { to: "sales/leads", label: "영업기회" },
+          { to: "sales/pipeline", label: "파이프라인" },
+          { to: "sales/inbox", label: "영업접수" },
+          { to: "sales/todo", label: "TODO 캘린더" },
         ],
       },
       {
         title: "견적/고객",
         items: [
-          { to: "customers", label: "고객관리" },
-          { to: "quotes", label: "견적서" },
-          { to: "templates", label: "견적 템플릿" },
+          { to: "sales/customers", label: "고객관리" },
+          { to: "sales/quotes", label: "견적서" },
+          { to: "sales/templates", label: "견적 템플릿" },
         ],
       },
     ],
