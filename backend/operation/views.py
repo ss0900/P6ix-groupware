@@ -27,7 +27,7 @@ from .serializers import (
     SalesLeadListSerializer, SalesLeadDetailSerializer, SalesLeadCreateSerializer,
     LeadActivitySerializer, LeadTaskSerializer, LeadFileSerializer,
     QuoteSerializer, QuoteCreateSerializer, QuoteItemSerializer, QuoteTemplateSerializer,
-    CalendarEventSerializer
+    CalendarEventSerializer, InboxAcceptSerializer
 )
 from .filters import (
     CustomerCompanyFilter, CustomerContactFilter,
@@ -225,6 +225,47 @@ class SalesLeadViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
                 'success': False,
                 'message': 'Already in this stage'
             })
+    
+    @action(detail=True, methods=['post'])
+    def accept_inbox(self, request, pk=None):
+        """
+        접수 처리:
+        - (기본) owner가 없으면 현재 user를 owner로 지정
+        - (옵션) stage 이동
+        - (옵션) 다음 액션 TODO 생성
+        - (자동) 활동 로그 남김
+        """
+        lead = self.get_object()
+
+        serializer = InboxAcceptSerializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        v = serializer.validated_data
+
+        result = LeadService.accept_inbox(
+            lead=lead,
+            user=request.user,
+            workspace=self.workspace,
+            owner_id=v.get('owner_id'),
+            stage_id=v.get('stage_id'),
+            note=v.get('note', ''),
+            create_task=v.get('create_task', False),
+            task_title=v.get('task_title', ''),
+            task_due_date=v.get('task_due_date'),
+            task_priority=v.get('task_priority', 'medium'),
+            task_assignee_id=v.get('task_assignee_id'),
+        )
+
+        payload = {
+            "lead": SalesLeadDetailSerializer(result["lead"]).data,
+        }
+        if result.get("stage_activity"):
+            payload["stage_activity"] = LeadActivitySerializer(result["stage_activity"]).data
+        if result.get("accept_activity"):
+            payload["accept_activity"] = LeadActivitySerializer(result["accept_activity"]).data
+        if result.get("task"):
+            payload["task"] = LeadTaskSerializer(result["task"]).data
+
+        return Response(payload, status=status.HTTP_200_OK)
     
     @action(detail=True, methods=['get', 'post'])
     def activities(self, request, pk=None):
@@ -474,6 +515,7 @@ class CalendarFeedView(APIView):
         # 1. LeadTask (할 일)
         tasks = LeadTask.objects.filter(
             show_on_calendar=True,
+            lead__workspace=workspace,
             due_date__gte=start_date,
             due_date__lte=end_date
         ).select_related('lead').filter(lead__workspace=workspace)
@@ -495,6 +537,7 @@ class CalendarFeedView(APIView):
         
         # 2. SalesLead expected_close_date
         leads = SalesLead.objects.filter(
+            workspace=workspace,
             expected_close_date__gte=start_date.date(),
             expected_close_date__lte=end_date.date(),
             status='active'

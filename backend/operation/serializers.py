@@ -3,6 +3,7 @@
 영업관리(Operation) 모듈 - Serializers
 """
 from rest_framework import serializers
+from django.utils.dateparse import parse_datetime
 from django.contrib.auth import get_user_model
 from .models import (
     CustomerCompany, CustomerContact,
@@ -528,6 +529,33 @@ class QuoteCreateSerializer(serializers.ModelSerializer):
         quote.calculate_totals()
         
         return quote
+
+
+class InboxAcceptSerializer(serializers.Serializer):
+    """
+    인박스 접수 처리:
+      - owner 지정
+      - stage 이동
+      - next action TODO 생성(옵션)
+    """
+    owner_id = serializers.IntegerField(required=False, allow_null=True)
+    stage_id = serializers.IntegerField(required=False, allow_null=True)
+    note = serializers.CharField(required=False, allow_blank=True, default="")
+
+    create_task = serializers.BooleanField(required=False, default=False)
+    task_title = serializers.CharField(required=False, allow_blank=True, default="")
+    task_due_date = serializers.DateTimeField(required=False, allow_null=True)
+    task_priority = serializers.ChoiceField(
+        required=False, default="medium",
+        choices=[("low","low"),("medium","medium"),("high","high")]
+    )
+    task_assignee_id = serializers.IntegerField(required=False, allow_null=True)
+
+    def validate(self, attrs):
+        if attrs.get("create_task"):
+            if not attrs.get("task_title"):
+                raise serializers.ValidationError({"task_title": "TODO 제목이 필요합니다."})
+        return attrs
 
 
 # ============================================================

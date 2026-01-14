@@ -32,6 +32,17 @@ function LeadDetail() {
   const [activeTab, setActiveTab] = useState("activities");
   const [stages, setStages] = useState([]);
 
+  // 접수 처리 모달
+  const [acceptOpen, setAcceptOpen] = useState(false);
+  const [acceptForm, setAcceptForm] = useState({
+    stage_id: "",
+    note: "",
+    create_task: true,
+    task_title: "다음 액션",
+    task_due_date: "",
+    task_priority: "medium",
+  });
+
   // 모달 상태
   const [activityModal, setActivityModal] = useState(false);
   const [taskModal, setTaskModal] = useState(false);
@@ -67,6 +78,31 @@ function LeadDetail() {
   useEffect(() => {
     fetchLead();
   }, [fetchLead]);
+
+  const isInboxLike = () => {
+    // owner가 없거나, stage가 첫 단계인 경우(상세 serializer에 stage_data가 있으면 더 정확히 가능)
+    if (!lead) return false;
+    if (!lead.owner) return true;
+    // stage_data.order가 없을 수 있어 보수적으로 처리
+    return false;
+  };
+
+  const submitAccept = async (e) => {
+    e.preventDefault();
+    try {
+      const payload = {
+        ...acceptForm,
+        stage_id: acceptForm.stage_id || null,
+      };
+      await SalesService.acceptInbox(id, payload);
+      setAcceptOpen(false);
+      setAcceptForm((p) => ({ ...p, stage_id: "", note: "" }));
+      fetchLead();
+    } catch (err) {
+      console.error(err);
+      alert("접수 처리 중 오류가 발생했습니다.");
+    }
+  };
 
   const handleStageChange = async (stageId) => {
     try {
@@ -196,6 +232,14 @@ function LeadDetail() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {isInboxLike() && (
+            <button
+              onClick={() => setAcceptOpen(true)}
+              className="btn-primary"
+            >
+              접수 처리
+            </button>
+          )}
           <button
             onClick={() => navigate(`/operation/sales/leads/${id}/edit`)}
             className="btn-edit flex items-center gap-2"
@@ -237,6 +281,103 @@ function LeadDetail() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Accept Modal */}
+        <Modal
+          isOpen={acceptOpen}
+          onClose={() => setAcceptOpen(false)}
+          title="접수 처리"
+          size="md"
+        >
+          <form onSubmit={submitAccept} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                이동할 단계 (선택)
+              </label>
+              <select
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                value={acceptForm.stage_id}
+                onChange={(e) =>
+                  setAcceptForm((p) => ({ ...p, stage_id: e.target.value }))
+                }
+              >
+                <option value="">(미선택 시 다음 단계 자동)</option>
+                {stages.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                메모 (선택)
+              </label>
+              <textarea
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                rows={3}
+                value={acceptForm.note}
+                onChange={(e) =>
+                  setAcceptForm((p) => ({ ...p, note: e.target.value }))
+                }
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={acceptForm.create_task}
+                onChange={(e) =>
+                  setAcceptForm((p) => ({ ...p, create_task: e.target.checked }))
+                }
+              />
+              <span className="text-sm text-gray-700">다음 액션 TODO 생성</span>
+            </div>
+
+            {acceptForm.create_task && (
+              <div className="grid grid-cols-1 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    TODO 제목
+                  </label>
+                  <input
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                    value={acceptForm.task_title}
+                    onChange={(e) =>
+                      setAcceptForm((p) => ({ ...p, task_title: e.target.value }))
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    기한
+                  </label>
+                  <input
+                    type="datetime-local"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                    value={acceptForm.task_due_date}
+                    onChange={(e) =>
+                      setAcceptForm((p) => ({ ...p, task_due_date: e.target.value }))
+                    }
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setAcceptOpen(false)}
+                className="btn-secondary"
+              >
+                취소
+              </button>
+              <button type="submit" className="btn-primary">
+                접수 완료
+              </button>
+            </div>
+          </form>
+        </Modal>
         {/* 좌측: 기본 정보 */}
         <div className="lg:col-span-1 space-y-6">
           {/* 기본 정보 카드 */}

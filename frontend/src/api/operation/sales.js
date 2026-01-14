@@ -88,6 +88,15 @@ const SalesService = {
     await api.delete(`/operation/leads/${id}/`);
   },
 
+  // 접수 처리 (Inbox -> 진행 전환)
+  acceptInbox: async (leadId, payload) => {
+    const response = await api.post(
+      `/operation/leads/${leadId}/accept_inbox/`,
+      payload
+    );
+    return response.data;
+  },
+
   // 단계 이동 (칸반 DnD)
   moveStage: async (leadId, stageId, note = "") => {
     const response = await api.post(`/operation/leads/${leadId}/move_stage/`, {

@@ -5,7 +5,8 @@
 """
 from django.utils import timezone
 from django.db import transaction
-
+from django.core.exceptions import PermissionDenied
+from django.db.models import Q
 
 class LeadService:
     """영업기회 관련 비즈니스 로직"""
@@ -257,10 +258,120 @@ class LeadService:
             status='active',
             workspace=workspace,
         ).filter(
-            models.Q(stage_id__in=first_stages) |
-            models.Q(owner__isnull=True)
+            Q(stage_id__in=first_stages) |
+            Q(owner__isnull=True)
         ).order_by('-created_at')
 
 
-# Django models import for Q filter
-from django.db import models
+    @staticmethod
+    @transaction.atomic
+    def accept_inbox(
+        lead,
+        user,
+        workspace,
+        owner_id=None,
+        stage_id=None,
+        note="",
+        create_task=False,
+        task_title="",
+        task_due_date=None,
+        task_priority="medium",
+        task_assignee_id=None,
+    ):
+        """
+        접수 처리(서버 확정 기록)
+        - owner 지정(기본: lead.owner가 없으면 현재 user)
+        - stage 이동(옵션; 미지정이면 '다음 단계'로 자동 시도)
+        - 다음 액션 TODO 생성(옵션)
+        - accept_activity(노트) 남김 + stage 이동 시 stage_activity는 move_stage가 생성
+        """
+        from operation.models import SalesStage, LeadTask
+        from django.contrib.auth import get_user_model
+
+        if lead.workspace_id != workspace.id:
+            raise ValueError("Workspace mismatch")
+
+        User = get_user_model()
+
+        owner_changed = False
+        stage_activity = None
+
+        # 1) owner 결정
+        if owner_id:
+            owner = User.objects.get(id=owner_id)
+            if lead.owner_id != owner.id:
+                lead.owner = owner
+                owner_changed = True
+        else:
+            if lead.owner_id is None:
+                lead.owner = user
+                owner_changed = True
+
+        if owner_changed:
+            lead.save(update_fields=["owner"])
+
+        # 2) stage 결정 (stage_id 없으면 다음 단계 자동)
+        target_stage = None
+        if stage_id:
+            target_stage = SalesStage.objects.get(id=stage_id, pipeline=lead.pipeline)
+        else:
+            # 다음 단계 자동 (order 기준)
+            target_stage = (
+                SalesStage.objects.filter(pipeline=lead.pipeline, order__gt=lead.stage.order)
+                .order_by("order")
+                .first()
+            )
+
+        if target_stage and target_stage.id != lead.stage_id:
+            stage_activity = LeadService.move_stage(lead, target_stage, user, note=note)
+
+        # 3) TODO 생성(옵션)
+        created_task = None
+        if create_task:
+            assignee = None
+            if task_assignee_id:
+                assignee = User.objects.get(id=task_assignee_id)
+            else:
+                assignee = lead.owner or user
+
+            title = task_title.strip() or "다음 액션"
+
+            created_task = LeadTask.objects.create(
+                lead=lead,
+                title=title,
+                description=note or "",
+                assignee=assignee,
+                due_date=task_due_date,
+                priority=task_priority,
+                show_on_calendar=True,
+                created_by=user,
+            )
+
+            # next_action_due_at 동기화(있으면)
+            if task_due_date:
+                lead.next_action_due_at = task_due_date
+                lead.save(update_fields=["next_action_due_at"])
+
+        # 4) 접수 처리 활동(노트) - owner/할일 생성/단계 이동을 한 번에 요약
+        summary_bits = []
+        if owner_changed:
+            summary_bits.append(f"담당자: {lead.owner.username if lead.owner else '-'}")
+        if target_stage:
+            summary_bits.append(f"단계: {lead.stage.name if lead.stage else '-'}")
+        if created_task:
+            summary_bits.append(f"TODO: {created_task.title}")
+
+        accept_activity = LeadService.create_activity(
+            lead=lead,
+            activity_type="note",
+            title="접수 처리",
+            content=" / ".join(summary_bits) + (f"\n\n{note}" if note else ""),
+            user=user,
+        )
+
+        return {
+            "lead": lead,
+            "stage_activity": stage_activity,
+            "task": created_task,
+            "accept_activity": accept_activity,
+        }

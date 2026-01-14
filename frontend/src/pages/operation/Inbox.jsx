@@ -6,24 +6,37 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { FiInbox, FiUser, FiCalendar, FiArrowRight } from "react-icons/fi";
 import { SalesService } from "../../api/operation";
+import Modal from "../../components/common/ui/Modal";
 
 function Inbox() {
   const navigate = useNavigate();
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [acceptOpen, setAcceptOpen] = useState(false);
+  const [selectedLead, setSelectedLead] = useState(null);
+  const [stageOptions, setStageOptions] = useState([]);
+  const [acceptForm, setAcceptForm] = useState({
+    stage_id: "",
+    note: "",
+    create_task: true,
+    task_title: "다음 액션",
+    task_due_date: "",
+    task_priority: "medium",
+  });
+ 
+  const fetchInbox = async () => {
+    setLoading(true);
+    try {
+      const data = await SalesService.getInbox();
+      setLeads(data);
+    } catch (error) {
+      console.error("Error fetching inbox:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchInbox = async () => {
-      setLoading(true);
-      try {
-        const data = await SalesService.getInbox();
-        setLeads(data);
-      } catch (error) {
-        console.error("Error fetching inbox:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchInbox();
   }, []);
 
@@ -35,6 +48,48 @@ function Inbox() {
   const formatAmount = (amount) => {
     if (!amount) return "-";
     return new Intl.NumberFormat("ko-KR").format(amount) + "원";
+  };
+
+  const openAccept = async (lead, e) => {
+    e?.stopPropagation();
+    setSelectedLead(lead);
+    setAcceptOpen(true);
+    setAcceptForm((prev) => ({
+      ...prev,
+      stage_id: "",
+      note: "",
+    }));
+    try {
+      if (lead.pipeline) {
+        const stages = await SalesService.getStages(lead.pipeline);
+        setStageOptions(stages);
+      } else {
+        setStageOptions([]);
+      }
+    } catch (err) {
+      console.error(err);
+      setStageOptions([]);
+    }
+  };
+
+  const submitAccept = async (e) => {
+    e.preventDefault();
+    if (!selectedLead) return;
+    try {
+      // stage_id가 비어있으면 서버가 "다음 단계" 자동 처리 시도
+      const payload = {
+        ...acceptForm,
+        stage_id: acceptForm.stage_id || null,
+        // owner_id 미전달 -> 서버가 (owner 없으면) 현재 유저로 지정
+      };
+      await SalesService.acceptInbox(selectedLead.id, payload);
+      setAcceptOpen(false);
+      setSelectedLead(null);
+      await fetchInbox();
+    } catch (err) {
+      console.error(err);
+      alert("접수 처리 중 오류가 발생했습니다.");
+    }
   };
 
   return (
@@ -91,6 +146,12 @@ function Inbox() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
+                <button
+                    onClick={(e) => openAccept(lead, e)}
+                    className="px-3 py-1 rounded-lg text-sm border border-gray-200 hover:bg-gray-100"
+                  >
+                    접수 처리
+                  </button>
                   {lead.owner_name ? (
                     <span className="flex items-center gap-1 text-sm text-gray-600">
                       <FiUser className="w-4 h-4" />
@@ -108,6 +169,107 @@ function Inbox() {
           </div>
         )}
       </div>
+      {/* Accept Modal */}
+      <Modal
+        isOpen={acceptOpen}
+        onClose={() => setAcceptOpen(false)}
+        title="접수 처리"
+        size="md"
+      >
+        <form onSubmit={submitAccept} className="space-y-4">
+          <div className="text-sm text-gray-700">
+            <div className="font-medium">{selectedLead?.title}</div>
+            <div className="text-gray-500">{selectedLead?.company_name || "-"}</div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              이동할 단계 (선택)
+            </label>
+            <select
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+              value={acceptForm.stage_id}
+              onChange={(e) =>
+                setAcceptForm((p) => ({ ...p, stage_id: e.target.value }))
+              }
+            >
+              <option value="">(미선택 시 다음 단계 자동)</option>
+              {stageOptions.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              메모 (선택)
+            </label>
+            <textarea
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+              rows={3}
+              value={acceptForm.note}
+              onChange={(e) => setAcceptForm((p) => ({ ...p, note: e.target.value }))}
+              placeholder="접수 메모를 남겨두면 활동 로그에 저장됩니다."
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={acceptForm.create_task}
+              onChange={(e) =>
+                setAcceptForm((p) => ({ ...p, create_task: e.target.checked }))
+              }
+            />
+            <span className="text-sm text-gray-700">다음 액션 TODO 생성</span>
+          </div>
+
+          {acceptForm.create_task && (
+            <div className="grid grid-cols-1 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  TODO 제목
+                </label>
+                <input
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                  value={acceptForm.task_title}
+                  onChange={(e) =>
+                    setAcceptForm((p) => ({ ...p, task_title: e.target.value }))
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  기한
+                </label>
+                <input
+                  type="datetime-local"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                  value={acceptForm.task_due_date}
+                  onChange={(e) =>
+                    setAcceptForm((p) => ({ ...p, task_due_date: e.target.value }))
+                  }
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setAcceptOpen(false)}
+              className="btn-secondary"
+            >
+              취소
+            </button>
+            <button type="submit" className="btn-primary">
+              접수 완료
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }
