@@ -10,15 +10,18 @@ from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser
 from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
-from django.db.models import Q
+from django.db.models import Q, F, ExpressionWrapper, fields
 from django.db.models import Q as DJQ
+from django.db.models.functions import Now, ExtractDay
 from .workspace import get_request_workspace
 
 from .models import (
     CustomerCompany, CustomerContact,
     SalesPipeline, SalesStage,
     SalesLead, LeadActivity, LeadTask, LeadFile,
-    Quote, QuoteItem, QuoteTemplate
+    Quote, QuoteItem, QuoteTemplate,
+    SalesContractLink, Tender, RevenueMilestone, Collection,
+    EmailTemplate, EmailSignature, EmailSendLog
 )
 from .serializers import (
     CustomerCompanySerializer, CustomerCompanyListSerializer, 
@@ -27,11 +30,14 @@ from .serializers import (
     SalesLeadListSerializer, SalesLeadDetailSerializer, SalesLeadCreateSerializer,
     LeadActivitySerializer, LeadTaskSerializer, LeadFileSerializer,
     QuoteSerializer, QuoteCreateSerializer, QuoteItemSerializer, QuoteTemplateSerializer,
+    SalesContractLinkSerializer, TenderSerializer, RevenueMilestoneSerializer, CollectionSerializer,
+    EmailTemplateSerializer, EmailSignatureSerializer, EmailSendLogSerializer,
     CalendarEventSerializer, InboxAcceptSerializer
 )
 from .filters import (
     CustomerCompanyFilter, CustomerContactFilter,
-    SalesLeadFilter, LeadTaskFilter, QuoteFilter
+    SalesLeadFilter, LeadTaskFilter, QuoteFilter,
+    SalesContractLinkFilter, TenderFilter, RevenueMilestoneFilter, CollectionFilter, EmailSendLogFilter
 )
 from .permissions import IsLeadOwnerOrAssignee, IsOwnerOrReadOnly, IsRelatedToLead
 from .services import LeadService
@@ -159,12 +165,17 @@ class SalesLeadViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated, IsLeadOwnerOrAssignee]
     filter_backends = [DjangoFilterBackend, rf_filters.SearchFilter, rf_filters.OrderingFilter]
     filterset_class = SalesLeadFilter
-    search_fields = ['title', 'description', 'company__name', 'contact__name']
-    ordering_fields = ['created_at', 'updated_at', 'expected_close_date', 'expected_amount']
+    search_fields = ['title', 'description', 'company__name', 'contact__name', 'contact__phone', 'contact__email']
+    ordering_fields = ['created_at', 'updated_at', 'expected_close_date', 'expected_amount', 'stalled_days']
     ordering = ['-created_at']
     
     def get_queryset(self):
         queryset = super().get_queryset()
+        duration = ExpressionWrapper(
+            Now() - F("stage_entered_at"),
+            output_field=fields.DurationField()
+        )
+        queryset = queryset.annotate(stalled_days=ExtractDay(duration))
         return queryset.select_related(
             'pipeline', 'stage', 'company', 'contact', 'owner', 'created_by'
         ).prefetch_related('assignees', 'activities', 'tasks', 'files')
@@ -306,8 +317,11 @@ class SalesLeadViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
             'lead': lead.id
         })
         serializer.is_valid(raise_exception=True)
-        serializer.save(created_by=request.user)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        task = serializer.save(created_by=request.user)
+        if task.due_date:
+            lead.next_action_due_at = task.due_date
+            lead.save(update_fields=["next_action_due_at"])
+        return Response(LeadTaskSerializer(task).data, status=status.HTTP_201_CREATED)
     
     @action(detail=True, methods=['get', 'post'], parser_classes=[MultiPartParser, FormParser])
     def files(self, request, pk=None):
@@ -363,7 +377,10 @@ class LeadTaskViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     workspace_field = "lead__workspace"
     
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        task = serializer.save(created_by=self.request.user)
+        if task.due_date:
+            task.lead.next_action_due_at = task.due_date
+            task.lead.save(update_fields=["next_action_due_at"])
     
     @action(detail=True, methods=['post'])
     def complete(self, request, pk=None):
@@ -386,6 +403,9 @@ class LeadTaskViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
         task.is_completed = False
         task.completed_at = None
         task.save()
+        if task.due_date:
+            task.lead.next_action_due_at = task.due_date
+            task.lead.save(update_fields=["next_action_due_at"])
         return Response(LeadTaskSerializer(task).data)
 
 
@@ -421,6 +441,17 @@ class QuoteViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     ordering = ['-created_at']
     workspace_field = "workspace"
     
+    def perform_create(self, serializer):
+        super().perform_create(serializer)
+        quote = serializer.instance
+        LeadService.create_activity(
+            lead=quote.lead,
+            activity_type='quote_created',
+            title=f"견적 생성: {quote.quote_number}",
+            content=f"견적 금액: {quote.total_amount:,}원",
+            user=self.request.user
+        )
+    
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
             return QuoteCreateSerializer
@@ -441,6 +472,59 @@ class QuoteViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
         return Response({
             'quote': QuoteSerializer(quote).data,
             'activity': LeadActivitySerializer(activity).data
+        })
+
+    @action(detail=True, methods=['get'])
+    def render_pdf(self, request, pk=None):
+        """견적서 PDF 렌더링 (1차: URL 반환)"""
+        quote = self.get_object()
+        return Response({
+            'quote_id': quote.id,
+            'quote_number': quote.quote_number,
+            'pdf_url': request.build_absolute_uri(f"/media/quotes/{quote.id}.pdf")
+        })
+
+    @action(detail=True, methods=['post'])
+    def send_email(self, request, pk=None):
+        """견적서 이메일 발송(로그 생성)"""
+        from django.utils.dateparse import parse_datetime
+
+        quote = self.get_object()
+        to = request.data.get("to")
+        subject = request.data.get("subject") or quote.title
+        body_html = request.data.get("body_html") or ""
+        scheduled_at = request.data.get("scheduled_at")
+        scheduled_dt = parse_datetime(scheduled_at) if scheduled_at else None
+
+        if not to:
+            return Response(
+                {'error': 'to is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        log_status = "pending" if scheduled_dt else "sent"
+        sent_at = None if scheduled_dt else timezone.now()
+
+        log = EmailSendLog.objects.create(
+            workspace=self.workspace,
+            lead=quote.lead,
+            to=to,
+            subject=subject,
+            body_snapshot=body_html,
+            status=log_status,
+            scheduled_at=scheduled_dt,
+            sent_at=sent_at,
+            created_by=request.user
+        )
+
+        activity = None
+        if not scheduled_dt:
+            activity = LeadService.send_quote(quote, request.user)
+
+        return Response({
+            'quote': QuoteSerializer(quote).data,
+            'email_log': EmailSendLogSerializer(log).data,
+            'activity': LeadActivitySerializer(activity).data if activity else None
         })
     
     @action(detail=True, methods=['post'])
@@ -482,6 +566,81 @@ class QuoteTemplateViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     queryset = QuoteTemplate.objects.all()
     serializer_class = QuoteTemplateSerializer
     permission_classes = [IsAuthenticated]
+    workspace_field = "workspace"
+
+
+class SalesContractLinkViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
+    """계약 연결 ViewSet"""
+    queryset = SalesContractLink.objects.all()
+    serializer_class = SalesContractLinkSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = SalesContractLinkFilter
+    workspace_field = "workspace"
+
+
+class TenderViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
+    """입찰 ViewSet"""
+    queryset = Tender.objects.all()
+    serializer_class = TenderSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, rf_filters.SearchFilter, rf_filters.OrderingFilter]
+    filterset_class = TenderFilter
+    search_fields = ['title', 'description']
+    ordering_fields = ['deadline', 'created_at']
+    ordering = ['-created_at']
+    workspace_field = "workspace"
+
+
+class RevenueMilestoneViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
+    """매출 계획 ViewSet"""
+    queryset = RevenueMilestone.objects.all()
+    serializer_class = RevenueMilestoneSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, rf_filters.OrderingFilter]
+    filterset_class = RevenueMilestoneFilter
+    ordering_fields = ['planned_date', 'planned_amount', 'created_at']
+    ordering = ['-planned_date']
+    workspace_field = "workspace"
+
+
+class CollectionViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
+    """수금 ViewSet"""
+    queryset = Collection.objects.all()
+    serializer_class = CollectionSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, rf_filters.OrderingFilter]
+    filterset_class = CollectionFilter
+    ordering_fields = ['due_date', 'amount', 'created_at']
+    ordering = ['-due_date']
+    workspace_field = "workspace"
+
+
+class EmailTemplateViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
+    """이메일 템플릿 ViewSet"""
+    queryset = EmailTemplate.objects.all()
+    serializer_class = EmailTemplateSerializer
+    permission_classes = [IsAuthenticated]
+    workspace_field = "workspace"
+
+
+class EmailSignatureViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
+    """이메일 서명 ViewSet"""
+    queryset = EmailSignature.objects.all()
+    serializer_class = EmailSignatureSerializer
+    permission_classes = [IsAuthenticated]
+    workspace_field = "workspace"
+
+
+class EmailSendLogViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
+    """이메일 발송 로그 ViewSet"""
+    queryset = EmailSendLog.objects.all()
+    serializer_class = EmailSendLogSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, rf_filters.OrderingFilter]
+    filterset_class = EmailSendLogFilter
+    ordering_fields = ['sent_at', 'created_at']
+    ordering = ['-created_at']
     workspace_field = "workspace"
 
 
@@ -559,6 +718,50 @@ class CalendarFeedView(APIView):
                 'color': '#F59E0B',
                 'is_completed': False
             })
+
+        # 3. Quote valid_until
+        quotes = Quote.objects.filter(
+            workspace=workspace,
+            valid_until__gte=start_date.date(),
+            valid_until__lte=end_date.date()
+        ).select_related('lead')
+
+        for quote in quotes:
+            from datetime import datetime as dt
+            valid_datetime = timezone.make_aware(
+                dt.combine(quote.valid_until, dt.min.time())
+            )
+            events.append({
+                'id': f'quote_{quote.id}',
+                'title': f'[견적 유효] {quote.title}',
+                'start': valid_datetime,
+                'end': valid_datetime,
+                'event_type': 'quote_valid_until',
+                'lead_id': quote.lead_id,
+                'lead_title': quote.lead.title if quote.lead else "-",
+                'color': '#6366F1',
+                'is_completed': quote.status in ['accepted', 'rejected', 'expired']
+            })
+
+        # 4. Tender deadline
+        tenders = Tender.objects.filter(
+            workspace=workspace,
+            deadline__gte=start_date,
+            deadline__lte=end_date
+        ).select_related('lead')
+
+        for tender in tenders:
+            events.append({
+                'id': f'tender_{tender.id}',
+                'title': f'[입찰 마감] {tender.title}',
+                'start': tender.deadline,
+                'end': tender.deadline,
+                'event_type': 'tender_deadline',
+                'lead_id': tender.lead_id or 0,
+                'lead_title': tender.lead.title if tender.lead else "-",
+                'color': '#EF4444' if tender.status in ['lost'] else '#14B8A6',
+                'is_completed': tender.status in ['won', 'lost', 'closed']
+            })
         
         serializer = CalendarEventSerializer(events, many=True)
         return Response(serializer.data)
@@ -618,6 +821,49 @@ class SalesDashboardView(APIView):
             expected_close_date__lte=(now + timezone.timedelta(days=7)).date()
         ).count()
         
+        # 단계별 전환/현황
+        stage_counts = {
+            row["stage"]: row["count"]
+            for row in SalesLead.objects.filter(workspace=workspace)
+            .values("stage")
+            .annotate(count=Count("id"))
+        }
+        stage_stats = []
+        pipelines = {}
+        for stage in SalesStage.objects.filter(pipeline__workspace=workspace).order_by("pipeline_id", "order"):
+            pipelines.setdefault(stage.pipeline_id, []).append(stage)
+
+        for pipeline_id, stage_list in pipelines.items():
+            prev_count = None
+            for stage in stage_list:
+                count = stage_counts.get(stage.id, 0)
+                conversion = None
+                if prev_count and prev_count > 0:
+                    conversion = round(count / prev_count * 100, 1)
+                stage_stats.append({
+                    "stage_id": stage.id,
+                    "stage_name": stage.name,
+                    "pipeline_id": pipeline_id,
+                    "pipeline_name": stage.pipeline.name,
+                    "order": stage.order,
+                    "lead_count": count,
+                    "conversion_rate": conversion,
+                })
+                prev_count = count
+
+        # 지연 리드 TOP
+        stalled_leads = leads.filter(status='active').select_related('stage', 'owner').order_by('stage_entered_at')[:5]
+        stalled_list = []
+        for lead in stalled_leads:
+            stalled_list.append({
+                "id": lead.id,
+                "title": lead.title,
+                "stage_name": lead.stage.name if lead.stage else "",
+                "owner_name": lead.owner.username if lead.owner else "",
+                "stalled_days": lead.stalled_days,
+                "expected_amount": lead.expected_amount or 0,
+            })
+
         return Response({
             'total': total,
             'active': active,
@@ -628,4 +874,33 @@ class SalesDashboardView(APIView):
             'this_month_new': this_month.count(),
             'stalled_count': stalled_count,
             'upcoming_closes': upcoming_closes,
+            'stage_stats': stage_stats,
+            'stalled_leads': stalled_list,
+        })
+
+
+class RevenueSummaryView(APIView):
+    """매출/수금 요약"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from django.db.models import Sum
+        workspace = get_request_workspace(request)
+
+        milestones = RevenueMilestone.objects.filter(workspace=workspace)
+        collections = Collection.objects.filter(workspace=workspace)
+
+        planned_total = milestones.filter(status='planned').aggregate(total=Sum('planned_amount'))['total'] or 0
+        invoiced_total = milestones.filter(status='invoiced').aggregate(total=Sum('planned_amount'))['total'] or 0
+        collected_total = milestones.filter(status='collected').aggregate(total=Sum('planned_amount'))['total'] or 0
+
+        received_total = collections.filter(status='received').aggregate(total=Sum('amount'))['total'] or 0
+        outstanding_total = collections.exclude(status='received').aggregate(total=Sum('amount'))['total'] or 0
+
+        return Response({
+            'planned_total': planned_total,
+            'invoiced_total': invoiced_total,
+            'collected_total': collected_total,
+            'received_total': received_total,
+            'outstanding_total': outstanding_total,
         })

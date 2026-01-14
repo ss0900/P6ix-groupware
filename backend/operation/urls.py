@@ -28,6 +28,17 @@ router.register(r'files', views.LeadFileViewSet, basename='file')
 router.register(r'quotes', views.QuoteViewSet, basename='quote')
 router.register(r'quote-templates', views.QuoteTemplateViewSet, basename='quote-template')
 
+# 계약/입찰/매출/수금
+router.register(r'contract-links', views.SalesContractLinkViewSet, basename='contract-link')
+router.register(r'tenders', views.TenderViewSet, basename='tender')
+router.register(r'revenue-milestones', views.RevenueMilestoneViewSet, basename='revenue-milestone')
+router.register(r'collections', views.CollectionViewSet, basename='collection')
+
+# 이메일
+router.register(r'email-templates', views.EmailTemplateViewSet, basename='email-template')
+router.register(r'email-signatures', views.EmailSignatureViewSet, basename='email-signature')
+router.register(r'email-logs', views.EmailSendLogViewSet, basename='email-log')
+
 urlpatterns = [
     # ViewSet 라우터
     path('', include(router.urls)),
@@ -36,4 +47,5 @@ urlpatterns = [
     path('calendar/', views.CalendarFeedView.as_view(), name='calendar-feed'),
     path('inbox/', views.InboxView.as_view(), name='inbox'),
     path('dashboard/', views.SalesDashboardView.as_view(), name='sales-dashboard'),
+    path('revenue/summary/', views.RevenueSummaryView.as_view(), name='revenue-summary'),
 ]

@@ -14,6 +14,12 @@ from core.models import Company  # ✅ workspace 스코프
 # ============================================================
 class CustomerCompany(models.Model):
     """고객사(회사) 마스터"""
+    STATUS_CHOICES = (
+        ("prospect", "잠재"),
+        ("active", "진행"),
+        ("deal", "거래"),
+        ("inactive", "중단"),
+    )
     workspace = models.ForeignKey(
         Company, on_delete=models.PROTECT,
         related_name="operation_customer_companies",
@@ -27,6 +33,16 @@ class CustomerCompany(models.Model):
     phone = models.CharField("대표전화", max_length=20, blank=True)
     website = models.URLField("웹사이트", blank=True)
     notes = models.TextField("메모", blank=True)
+    status = models.CharField(
+        "상태", max_length=20,
+        choices=STATUS_CHOICES, default="prospect"
+    )
+    tags = models.JSONField("태그", default=list, blank=True)
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="owned_customer_companies",
+        verbose_name="담당자"
+    )
     
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
@@ -220,7 +236,8 @@ class SalesLead(models.Model):
     
     # 메타
     source = models.CharField("유입 경로", max_length=100, blank=True)
-    tags = models.CharField("태그", max_length=500, blank=True)  # 콤마 구분
+    utm = models.JSONField("UTM", null=True, blank=True)
+    tags = models.JSONField("태그", default=list, blank=True)
     
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
@@ -267,6 +284,7 @@ class LeadActivity(models.Model):
         ('email', '이메일'),
         ('meeting', '미팅'),
         ('stage_change', '단계변경'),
+        ('quote_created', '견적생성'),
         ('quote_sent', '견적발송'),
         ('file_added', '파일추가'),
         ('task_done', 'TODO완료'),
@@ -558,3 +576,304 @@ class QuoteItem(models.Model):
         # 금액 자동 계산
         self.amount = int(self.quantity * self.unit_price)
         super().save(*args, **kwargs)
+
+
+# ============================================================
+# 계약 연결
+# ============================================================
+class SalesContractLink(models.Model):
+    """영업기회 - 계약 연결"""
+    workspace = models.ForeignKey(
+        Company, on_delete=models.PROTECT,
+        related_name="operation_contract_links",
+        verbose_name="워크스페이스(회사)",
+        null=True, blank=True,
+    )
+    lead = models.ForeignKey(
+        SalesLead, on_delete=models.CASCADE,
+        related_name="contract_links", verbose_name="영업기회"
+    )
+    contract_id = models.IntegerField("계약 ID")
+    notes = models.TextField("비고", blank=True)
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, verbose_name="등록자"
+    )
+    created_at = models.DateTimeField("등록일", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "계약 연결"
+        verbose_name_plural = "계약 연결 목록"
+        ordering = ["-created_at"]
+        unique_together = ["lead", "contract_id"]
+
+    def __str__(self):
+        return f"{self.lead_id} -> {self.contract_id}"
+
+
+# ============================================================
+# 입찰
+# ============================================================
+class Tender(models.Model):
+    """입찰"""
+    STATUS_CHOICES = (
+        ("open", "진행중"),
+        ("submitted", "제출완료"),
+        ("won", "낙찰"),
+        ("lost", "탈락"),
+        ("closed", "마감"),
+    )
+
+    workspace = models.ForeignKey(
+        Company, on_delete=models.PROTECT,
+        related_name="operation_tenders",
+        verbose_name="워크스페이스(회사)",
+        null=True, blank=True,
+    )
+    lead = models.ForeignKey(
+        SalesLead, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="tenders",
+        verbose_name="영업기회"
+    )
+    title = models.CharField("입찰명", max_length=200)
+    description = models.TextField("설명", blank=True)
+    notice_url = models.URLField("공고 URL", blank=True)
+    deadline = models.DateTimeField("마감일", null=True, blank=True)
+    bond_amount = models.DecimalField(
+        "보증금", max_digits=15, decimal_places=0,
+        null=True, blank=True
+    )
+    documents = models.JSONField("제출서류", default=list, blank=True)
+    status = models.CharField(
+        "상태", max_length=20,
+        choices=STATUS_CHOICES, default="open"
+    )
+    submitted_at = models.DateTimeField("제출일", null=True, blank=True)
+    result_note = models.TextField("결과 비고", blank=True)
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, verbose_name="등록자"
+    )
+    created_at = models.DateTimeField("등록일", auto_now_add=True)
+    updated_at = models.DateTimeField("수정일", auto_now=True)
+
+    class Meta:
+        verbose_name = "입찰"
+        verbose_name_plural = "입찰 목록"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["workspace", "deadline"]),
+        ]
+
+    def __str__(self):
+        return self.title
+
+
+# ============================================================
+# 매출 계획 / 수금
+# ============================================================
+class RevenueMilestone(models.Model):
+    """기성/매출 계획"""
+    STATUS_CHOICES = (
+        ("planned", "계획"),
+        ("invoiced", "청구"),
+        ("collected", "수금완료"),
+    )
+
+    workspace = models.ForeignKey(
+        Company, on_delete=models.PROTECT,
+        related_name="operation_revenue_milestones",
+        verbose_name="워크스페이스(회사)",
+        null=True, blank=True,
+    )
+    lead = models.ForeignKey(
+        SalesLead, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="revenue_milestones",
+        verbose_name="영업기회"
+    )
+    contract_id = models.IntegerField("계약 ID", null=True, blank=True)
+    title = models.CharField("항목명", max_length=200)
+    planned_amount = models.DecimalField(
+        "예정금액", max_digits=15, decimal_places=0,
+        null=True, blank=True
+    )
+    planned_date = models.DateField("예정일", null=True, blank=True)
+    status = models.CharField(
+        "상태", max_length=20,
+        choices=STATUS_CHOICES, default="planned"
+    )
+    notes = models.TextField("비고", blank=True)
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, verbose_name="등록자"
+    )
+    created_at = models.DateTimeField("등록일", auto_now_add=True)
+    updated_at = models.DateTimeField("수정일", auto_now=True)
+
+    class Meta:
+        verbose_name = "매출 계획"
+        verbose_name_plural = "매출 계획 목록"
+        ordering = ["-planned_date", "-created_at"]
+
+    def __str__(self):
+        return self.title
+
+
+class Collection(models.Model):
+    """수금/미수"""
+    STATUS_CHOICES = (
+        ("planned", "예정"),
+        ("received", "수금완료"),
+        ("overdue", "미수"),
+    )
+
+    workspace = models.ForeignKey(
+        Company, on_delete=models.PROTECT,
+        related_name="operation_collections",
+        verbose_name="워크스페이스(회사)",
+        null=True, blank=True,
+    )
+    lead = models.ForeignKey(
+        SalesLead, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="collections",
+        verbose_name="영업기회"
+    )
+    milestone = models.ForeignKey(
+        RevenueMilestone, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="collections",
+        verbose_name="매출 계획"
+    )
+    amount = models.DecimalField(
+        "금액", max_digits=15, decimal_places=0,
+        null=True, blank=True
+    )
+    due_date = models.DateField("수금 예정일", null=True, blank=True)
+    received_at = models.DateTimeField("수금일", null=True, blank=True)
+    status = models.CharField(
+        "상태", max_length=20,
+        choices=STATUS_CHOICES, default="planned"
+    )
+    notes = models.TextField("비고", blank=True)
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, verbose_name="등록자"
+    )
+    created_at = models.DateTimeField("등록일", auto_now_add=True)
+    updated_at = models.DateTimeField("수정일", auto_now=True)
+
+    class Meta:
+        verbose_name = "수금"
+        verbose_name_plural = "수금 목록"
+        ordering = ["-due_date", "-created_at"]
+
+    def __str__(self):
+        return f"{self.lead_id or '-'} - {self.amount or 0}"
+
+
+# ============================================================
+# 이메일 템플릿 / 발송 로그
+# ============================================================
+class EmailTemplate(models.Model):
+    """이메일 템플릿"""
+    workspace = models.ForeignKey(
+        Company, on_delete=models.PROTECT,
+        related_name="operation_email_templates",
+        verbose_name="워크스페이스(회사)",
+        null=True, blank=True,
+    )
+    name = models.CharField("템플릿명", max_length=100)
+    subject = models.CharField("제목", max_length=200)
+    body_html = models.TextField("본문(HTML)")
+    variables_schema = models.JSONField("변수 스키마", default=dict, blank=True)
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, verbose_name="등록자"
+    )
+    created_at = models.DateTimeField("등록일", auto_now_add=True)
+    updated_at = models.DateTimeField("수정일", auto_now=True)
+
+    class Meta:
+        verbose_name = "이메일 템플릿"
+        verbose_name_plural = "이메일 템플릿 목록"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return self.name
+
+
+class EmailSignature(models.Model):
+    """이메일 서명"""
+    workspace = models.ForeignKey(
+        Company, on_delete=models.PROTECT,
+        related_name="operation_email_signatures",
+        verbose_name="워크스페이스(회사)",
+        null=True, blank=True,
+    )
+    name = models.CharField("서명명", max_length=100)
+    html = models.TextField("서명 HTML")
+    is_default = models.BooleanField("기본 서명", default=False)
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, verbose_name="등록자"
+    )
+    created_at = models.DateTimeField("등록일", auto_now_add=True)
+    updated_at = models.DateTimeField("수정일", auto_now=True)
+
+    class Meta:
+        verbose_name = "이메일 서명"
+        verbose_name_plural = "이메일 서명 목록"
+        ordering = ["-is_default", "-created_at"]
+
+    def __str__(self):
+        return self.name
+
+
+class EmailSendLog(models.Model):
+    """이메일 발송 로그"""
+    STATUS_CHOICES = (
+        ("pending", "대기"),
+        ("sent", "발송"),
+        ("failed", "실패"),
+    )
+
+    workspace = models.ForeignKey(
+        Company, on_delete=models.PROTECT,
+        related_name="operation_email_logs",
+        verbose_name="워크스페이스(회사)",
+        null=True, blank=True,
+    )
+    lead = models.ForeignKey(
+        SalesLead, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="email_logs",
+        verbose_name="영업기회"
+    )
+    to = models.CharField("수신자", max_length=255)
+    subject = models.CharField("제목", max_length=200)
+    body_snapshot = models.TextField("본문 스냅샷")
+    status = models.CharField(
+        "상태", max_length=20,
+        choices=STATUS_CHOICES, default="pending"
+    )
+    scheduled_at = models.DateTimeField("예약발송일", null=True, blank=True)
+    sent_at = models.DateTimeField("발송일", null=True, blank=True)
+    error_message = models.TextField("오류 메시지", blank=True)
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, verbose_name="등록자"
+    )
+    created_at = models.DateTimeField("등록일", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "이메일 발송 로그"
+        verbose_name_plural = "이메일 발송 로그 목록"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.to} - {self.subject}"

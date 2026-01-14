@@ -37,6 +37,16 @@ const QuoteService = {
     return response.data;
   },
 
+  renderPdf: async (id) => {
+    const response = await api.get(`/operation/quotes/${id}/render_pdf/`);
+    return response.data;
+  },
+
+  sendEmail: async (id, payload) => {
+    const response = await api.post(`/operation/quotes/${id}/send_email/`, payload);
+    return response.data;
+  },
+
   addItem: async (quoteId, itemData) => {
     const response = await api.post(`/operation/quotes/${quoteId}/add_item/`, itemData);
     return response.data;

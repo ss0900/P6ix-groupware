@@ -70,6 +70,11 @@ import QuoteList from "./pages/operation/QuoteList";
 import QuoteForm from "./pages/operation/QuoteForm";
 import QuoteTemplateList from "./pages/operation/QuoteTemplateList";
 import PipelineSettings from "./pages/operation/PipelineSettings";
+import SalesDashboard from "./pages/operation/SalesDashboard";
+import TenderList from "./pages/operation/TenderList";
+import TenderForm from "./pages/operation/TenderForm";
+import RevenueManagement from "./pages/operation/RevenueManagement";
+import EmailCenter from "./pages/operation/EmailCenter";
 
 // Protected Route Wrapper
 const ProtectedRoute = ({ children }) => {
@@ -224,6 +229,7 @@ function AppRouter() {
           <Route path="sales">
             <Route index element={<Navigate to="leads" replace />} />
 
+            <Route path="dashboard" element={<SalesDashboard />} />
             <Route path="leads" element={<LeadList />} />
             <Route path="leads/new" element={<LeadForm />} />
             <Route path="leads/:id" element={<LeadDetail />} />
@@ -243,6 +249,12 @@ function AppRouter() {
             <Route path="quotes/:id" element={<QuoteForm />} />
 
             <Route path="templates" element={<QuoteTemplateList />} />
+            <Route path="tenders" element={<TenderList />} />
+            <Route path="tenders/new" element={<TenderForm />} />
+            <Route path="tenders/:id" element={<TenderForm />} />
+
+            <Route path="revenue" element={<RevenueManagement />} />
+            <Route path="emails" element={<EmailCenter />} />
           </Route>
 
           {/* ✅ Legacy redirect (기존 /operation/* 깨짐 방지) */}
@@ -297,6 +309,26 @@ function AppRouter() {
           <Route
             path="templates"
             element={<Navigate to="sales/templates" replace />}
+          />
+          <Route
+            path="tenders"
+            element={<Navigate to="sales/tenders" replace />}
+          />
+          <Route
+            path="tenders/new"
+            element={<Navigate to="sales/tenders/new" replace />}
+          />
+          <Route
+            path="tenders/:id"
+            element={<Navigate to="../sales/tenders/:id" replace />}
+          />
+          <Route
+            path="revenue"
+            element={<Navigate to="sales/revenue" replace />}
+          />
+          <Route
+            path="emails"
+            element={<Navigate to="sales/emails" replace />}
           />
         </Route>
 

@@ -8,7 +8,8 @@ from django.utils import timezone
 from datetime import timedelta
 from .models import (
     CustomerCompany, CustomerContact,
-    SalesLead, LeadTask, Quote
+    SalesLead, LeadTask, Quote,
+    SalesContractLink, Tender, RevenueMilestone, Collection, EmailSendLog
 )
 
 
@@ -16,10 +17,11 @@ class CustomerCompanyFilter(django_filters.FilterSet):
     """고객사 필터"""
     name = django_filters.CharFilter(lookup_expr='icontains')
     industry = django_filters.CharFilter(lookup_expr='icontains')
+    status = django_filters.CharFilter()
     
     class Meta:
         model = CustomerCompany
-        fields = ['name', 'industry']
+        fields = ['name', 'industry', 'status']
 
 
 class CustomerContactFilter(django_filters.FilterSet):
@@ -42,6 +44,7 @@ class SalesLeadFilter(django_filters.FilterSet):
     
     # 고객 필터
     company = django_filters.NumberFilter()
+    source = django_filters.CharFilter(lookup_expr='icontains')
     
     # 검색
     q = django_filters.CharFilter(method='search_filter')
@@ -80,7 +83,7 @@ class SalesLeadFilter(django_filters.FilterSet):
         model = SalesLead
         fields = [
             'pipeline', 'stage', 'owner', 'status', 'company',
-            'q', 'amount_min', 'amount_max',
+            'source', 'q', 'amount_min', 'amount_max',
             'close_date_from', 'close_date_to',
             'created_from', 'created_to',
             'stalled', 'action_due_before'
@@ -92,7 +95,9 @@ class SalesLeadFilter(django_filters.FilterSet):
             models.Q(title__icontains=value) |
             models.Q(description__icontains=value) |
             models.Q(company__name__icontains=value) |
-            models.Q(contact__name__icontains=value)
+            models.Q(contact__name__icontains=value) |
+            models.Q(contact__phone__icontains=value) |
+            models.Q(contact__email__icontains=value)
         )
     
     def stalled_filter(self, queryset, name, value):
@@ -171,3 +176,62 @@ class QuoteFilter(django_filters.FilterSet):
     class Meta:
         model = Quote
         fields = ['lead', 'company', 'status', 'created_from', 'created_to']
+
+
+class SalesContractLinkFilter(django_filters.FilterSet):
+    """계약 연결 필터"""
+    lead = django_filters.NumberFilter()
+    contract_id = django_filters.NumberFilter()
+
+    class Meta:
+        model = SalesContractLink
+        fields = ['lead', 'contract_id']
+
+
+class TenderFilter(django_filters.FilterSet):
+    """입찰 필터"""
+    lead = django_filters.NumberFilter()
+    status = django_filters.CharFilter()
+    deadline_from = django_filters.DateTimeFilter(field_name='deadline', lookup_expr='gte')
+    deadline_to = django_filters.DateTimeFilter(field_name='deadline', lookup_expr='lte')
+
+    class Meta:
+        model = Tender
+        fields = ['lead', 'status', 'deadline_from', 'deadline_to']
+
+
+class RevenueMilestoneFilter(django_filters.FilterSet):
+    """매출 계획 필터"""
+    lead = django_filters.NumberFilter()
+    status = django_filters.CharFilter()
+    planned_from = django_filters.DateFilter(field_name='planned_date', lookup_expr='gte')
+    planned_to = django_filters.DateFilter(field_name='planned_date', lookup_expr='lte')
+
+    class Meta:
+        model = RevenueMilestone
+        fields = ['lead', 'status', 'planned_from', 'planned_to']
+
+
+class CollectionFilter(django_filters.FilterSet):
+    """수금 필터"""
+    lead = django_filters.NumberFilter()
+    milestone = django_filters.NumberFilter()
+    status = django_filters.CharFilter()
+    due_from = django_filters.DateFilter(field_name='due_date', lookup_expr='gte')
+    due_to = django_filters.DateFilter(field_name='due_date', lookup_expr='lte')
+
+    class Meta:
+        model = Collection
+        fields = ['lead', 'milestone', 'status', 'due_from', 'due_to']
+
+
+class EmailSendLogFilter(django_filters.FilterSet):
+    """이메일 발송 로그 필터"""
+    lead = django_filters.NumberFilter()
+    status = django_filters.CharFilter()
+    sent_from = django_filters.DateTimeFilter(field_name='sent_at', lookup_expr='gte')
+    sent_to = django_filters.DateTimeFilter(field_name='sent_at', lookup_expr='lte')
+
+    class Meta:
+        model = EmailSendLog
+        fields = ['lead', 'status', 'sent_from', 'sent_to']

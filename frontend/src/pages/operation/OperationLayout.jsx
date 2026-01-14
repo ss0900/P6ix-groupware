@@ -12,9 +12,18 @@ import {
   FiCalendar,
   FiFileText,
   FiLayers,
+  FiTrendingUp,
+  FiClipboard,
+  FiDollarSign,
+  FiMail,
 } from "react-icons/fi";
 
 const menuItems = [
+  {
+    path: "/operation/sales/dashboard",
+    label: "대시보드",
+    icon: FiTrendingUp,
+  },
   {
     path: "/operation/sales/leads",
     label: "영업기회",
@@ -49,6 +58,21 @@ const menuItems = [
     path: "/operation/sales/templates",
     label: "견적 템플릿",
     icon: FiLayers,
+  },
+  {
+    path: "/operation/sales/tenders",
+    label: "입찰",
+    icon: FiClipboard,
+  },
+  {
+    path: "/operation/sales/revenue",
+    label: "매출/수금",
+    icon: FiDollarSign,
+  },
+  {
+    path: "/operation/sales/emails",
+    label: "이메일",
+    icon: FiMail,
   },
 ];
 

@@ -20,7 +20,7 @@ import {
   FiUser,
   FiDollarSign,
 } from "react-icons/fi";
-import { SalesService } from "../../api/operation";
+import { SalesService, QuoteService } from "../../api/operation";
 import Modal from "../../components/common/ui/Modal";
 
 function LeadDetail() {
@@ -31,6 +31,7 @@ function LeadDetail() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("activities");
   const [stages, setStages] = useState([]);
+  const [quotes, setQuotes] = useState([]);
 
   // 접수 처리 모달
   const [acceptOpen, setAcceptOpen] = useState(false);
@@ -75,9 +76,22 @@ function LeadDetail() {
     }
   }, [id]);
 
+  const fetchQuotes = useCallback(async () => {
+    try {
+      const data = await QuoteService.getQuotes({ lead: id });
+      setQuotes(data.results || data);
+    } catch (error) {
+      console.error("Error fetching quotes:", error);
+    }
+  }, [id]);
+
   useEffect(() => {
     fetchLead();
   }, [fetchLead]);
+
+  useEffect(() => {
+    fetchQuotes();
+  }, [fetchQuotes]);
 
   const isInboxLike = () => {
     // owner가 없거나, stage가 첫 단계인 경우(상세 serializer에 stage_data가 있으면 더 정확히 가능)
@@ -478,6 +492,12 @@ function LeadDetail() {
                   icon: FiPaperclip,
                   count: lead.files?.length,
                 },
+                {
+                  key: "quotes",
+                  label: "견적",
+                  icon: FiFileText,
+                  count: quotes.length,
+                },
               ].map((tab) => (
                 <button
                   key={tab.key}
@@ -662,6 +682,57 @@ function LeadDetail() {
                           </p>
                         </div>
                       </a>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* 견적 탭 */}
+            {activeTab === "quotes" && (
+              <div>
+                <div className="flex justify-end mb-4">
+                  <button
+                    onClick={() =>
+                      navigate(`/operation/sales/quotes/new?lead=${lead.id}`)
+                    }
+                    className="btn-create-sm flex items-center gap-1"
+                  >
+                    <FiPlus className="w-3 h-3" />
+                    견적 작성
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {quotes.length === 0 ? (
+                    <p className="text-center text-gray-500 py-8">
+                      견적이 없습니다.
+                    </p>
+                  ) : (
+                    quotes.map((quote) => (
+                      <div
+                        key={quote.id}
+                        onClick={() =>
+                          navigate(`/operation/sales/quotes/${quote.id}`)
+                        }
+                        className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">
+                              {quote.title}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {quote.quote_number}
+                            </p>
+                          </div>
+                          <span className="text-sm font-medium text-gray-700">
+                            {formatAmount(quote.total_amount)}
+                          </span>
+                        </div>
+                        <div className="mt-2 text-xs text-gray-500">
+                          {formatDate(quote.created_at)}
+                        </div>
+                      </div>
                     ))
                   )}
                 </div>

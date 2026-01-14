@@ -121,6 +121,12 @@ class LeadService:
         task.is_completed = True
         task.completed_at = timezone.now()
         task.save()
+
+        # 다음 액션 예정일 갱신
+        lead = task.lead
+        next_task = lead.tasks.filter(is_completed=False).order_by('due_date').first()
+        lead.next_action_due_at = next_task.due_date if next_task and next_task.due_date else None
+        lead.save(update_fields=['next_action_due_at'])
         
         # 활동 로그 생성
         activity = LeadActivity.objects.create(

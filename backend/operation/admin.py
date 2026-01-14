@@ -7,7 +7,9 @@ from .models import (
     CustomerCompany, CustomerContact,
     SalesPipeline, SalesStage,
     SalesLead, LeadActivity, LeadTask, LeadFile,
-    Quote, QuoteItem, QuoteTemplate
+    Quote, QuoteItem, QuoteTemplate,
+    SalesContractLink, Tender, RevenueMilestone, Collection,
+    EmailTemplate, EmailSignature, EmailSendLog
 )
 
 
@@ -165,3 +167,47 @@ class QuoteAdmin(admin.ModelAdmin):
 class QuoteTemplateAdmin(admin.ModelAdmin):
     list_display = ['name', 'is_default', 'created_by', 'created_at']
     list_filter = ['is_default']
+
+
+@admin.register(SalesContractLink)
+class SalesContractLinkAdmin(admin.ModelAdmin):
+    list_display = ['lead', 'contract_id', 'created_at']
+    search_fields = ['lead__title', 'contract_id']
+
+
+@admin.register(Tender)
+class TenderAdmin(admin.ModelAdmin):
+    list_display = ['title', 'lead', 'status', 'deadline', 'created_at']
+    list_filter = ['status', 'deadline']
+    search_fields = ['title']
+
+
+@admin.register(RevenueMilestone)
+class RevenueMilestoneAdmin(admin.ModelAdmin):
+    list_display = ['title', 'lead', 'planned_amount', 'planned_date', 'status']
+    list_filter = ['status', 'planned_date']
+    search_fields = ['title', 'lead__title']
+
+
+@admin.register(Collection)
+class CollectionAdmin(admin.ModelAdmin):
+    list_display = ['lead', 'amount', 'due_date', 'status', 'received_at']
+    list_filter = ['status', 'due_date']
+
+
+@admin.register(EmailTemplate)
+class EmailTemplateAdmin(admin.ModelAdmin):
+    list_display = ['name', 'subject', 'created_by', 'created_at']
+    search_fields = ['name', 'subject']
+
+
+@admin.register(EmailSignature)
+class EmailSignatureAdmin(admin.ModelAdmin):
+    list_display = ['name', 'is_default', 'created_by', 'created_at']
+    list_filter = ['is_default']
+
+
+@admin.register(EmailSendLog)
+class EmailSendLogAdmin(admin.ModelAdmin):
+    list_display = ['to', 'subject', 'status', 'scheduled_at', 'sent_at']
+    list_filter = ['status', 'scheduled_at']

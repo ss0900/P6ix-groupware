@@ -23,6 +23,11 @@ function LeadList() {
     stage: searchParams.get("stage") || "",
     status: searchParams.get("status") || "active",
     stalled: searchParams.get("stalled") === "true",
+    amount_min: searchParams.get("amount_min") || "",
+    amount_max: searchParams.get("amount_max") || "",
+    close_date_from: searchParams.get("close_date_from") || "",
+    close_date_to: searchParams.get("close_date_to") || "",
+    source: searchParams.get("source") || "",
   });
 
   const fetchLeads = useCallback(async () => {
@@ -34,6 +39,11 @@ function LeadList() {
       if (filters.stage) params.stage = filters.stage;
       if (filters.status) params.status = filters.status;
       if (filters.stalled) params.stalled = true;
+      if (filters.amount_min) params.amount_min = filters.amount_min;
+      if (filters.amount_max) params.amount_max = filters.amount_max;
+      if (filters.close_date_from) params.close_date_from = filters.close_date_from;
+      if (filters.close_date_to) params.close_date_to = filters.close_date_to;
+      if (filters.source) params.source = filters.source;
 
       const response = await SalesService.getLeads(params);
       setLeads(response.results || response);
@@ -184,6 +194,80 @@ function LeadList() {
               <option value="won">수주</option>
               <option value="lost">실주</option>
             </select>
+          </div>
+
+          {/* 유입 경로 */}
+          <div className="w-40">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              유입 경로
+            </label>
+            <input
+              type="text"
+              value={filters.source}
+              onChange={(e) => handleFilterChange("source", e.target.value)}
+              className="input-base text-sm"
+              placeholder="전화/소개/입찰 등"
+            />
+          </div>
+
+          {/* 예상 마감일 범위 */}
+          <div className="w-40">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              마감일 시작
+            </label>
+            <input
+              type="date"
+              value={filters.close_date_from}
+              onChange={(e) =>
+                handleFilterChange("close_date_from", e.target.value)
+              }
+              className="input-base text-sm"
+            />
+          </div>
+          <div className="w-40">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              마감일 종료
+            </label>
+            <input
+              type="date"
+              value={filters.close_date_to}
+              onChange={(e) =>
+                handleFilterChange("close_date_to", e.target.value)
+              }
+              className="input-base text-sm"
+            />
+          </div>
+
+          {/* 예상 금액 범위 */}
+          <div className="flex items-end gap-2">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                금액 최소
+              </label>
+              <input
+                type="number"
+                value={filters.amount_min}
+                onChange={(e) =>
+                  handleFilterChange("amount_min", e.target.value)
+                }
+                className="input-base text-sm w-32"
+                placeholder="0"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                금액 최대
+              </label>
+              <input
+                type="number"
+                value={filters.amount_max}
+                onChange={(e) =>
+                  handleFilterChange("amount_max", e.target.value)
+                }
+                className="input-base text-sm w-32"
+                placeholder="0"
+              />
+            </div>
           </div>
 
           {/* 지연만 보기 */}
