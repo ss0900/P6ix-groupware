@@ -6,6 +6,7 @@
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
+from core.models import Company  # ✅ workspace 스코프
 
 
 # ============================================================
@@ -13,6 +14,12 @@ from django.utils import timezone
 # ============================================================
 class CustomerCompany(models.Model):
     """고객사(회사) 마스터"""
+    workspace = models.ForeignKey(
+        Company, on_delete=models.PROTECT,
+        related_name="operation_customer_companies",
+        verbose_name="워크스페이스(회사)",
+        null=True, blank=True,  # ✅ 1차는 nullable로 넣고 데이터 백필 후 NOT NULL 추천
+    )
     name = models.CharField("회사명", max_length=200)
     business_number = models.CharField("사업자번호", max_length=20, blank=True)
     industry = models.CharField("업종", max_length=100, blank=True)
@@ -33,6 +40,9 @@ class CustomerCompany(models.Model):
         verbose_name = "고객사"
         verbose_name_plural = "고객사 목록"
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=["workspace", "name"]),
+        ]
 
     def __str__(self):
         return self.name
@@ -70,6 +80,12 @@ class CustomerContact(models.Model):
 # ============================================================
 class SalesPipeline(models.Model):
     """파이프라인(업무유형별)"""
+    workspace = models.ForeignKey(
+        Company, on_delete=models.PROTECT,
+        related_name="operation_pipelines",
+        verbose_name="워크스페이스(회사)",
+        null=True, blank=True,
+    )
     name = models.CharField("파이프라인명", max_length=100)
     description = models.TextField("설명", blank=True)
     is_default = models.BooleanField("기본 파이프라인", default=False)
@@ -82,6 +98,9 @@ class SalesPipeline(models.Model):
         verbose_name = "파이프라인"
         verbose_name_plural = "파이프라인 목록"
         ordering = ['-is_default', 'name']
+        indexes = [
+            models.Index(fields=["workspace", "name"]),
+        ]
 
     def __str__(self):
         return self.name
@@ -131,6 +150,12 @@ class SalesLead(models.Model):
         ('lost', '실주'),
     )
     
+    workspace = models.ForeignKey(
+        Company, on_delete=models.PROTECT,
+        related_name="operation_leads",
+        verbose_name="워크스페이스(회사)",
+        null=True, blank=True,
+    )
     # 파이프라인/단계
     pipeline = models.ForeignKey(
         SalesPipeline, on_delete=models.PROTECT,
@@ -209,6 +234,10 @@ class SalesLead(models.Model):
         verbose_name = "영업기회"
         verbose_name_plural = "영업기회 목록"
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=["workspace", "status", "created_at"]),
+            models.Index(fields=["workspace", "expected_close_date"]),
+        ]
 
     def __str__(self):
         return self.title
@@ -374,6 +403,12 @@ class LeadFile(models.Model):
 # ============================================================
 class QuoteTemplate(models.Model):
     """견적 템플릿"""
+    workspace = models.ForeignKey(
+        Company, on_delete=models.PROTECT,
+        related_name="operation_quote_templates",
+        verbose_name="워크스페이스(회사)",
+        null=True, blank=True,
+    )
     name = models.CharField("템플릿명", max_length=100)
     header_text = models.TextField("머리말", blank=True)
     footer_text = models.TextField("꼬리말", blank=True)
@@ -406,6 +441,12 @@ class Quote(models.Model):
         ('expired', '만료'),
     )
     
+    workspace = models.ForeignKey(
+        Company, on_delete=models.PROTECT,
+        related_name="operation_quotes",
+        verbose_name="워크스페이스(회사)",
+        null=True, blank=True,
+    )
     lead = models.ForeignKey(
         SalesLead, on_delete=models.CASCADE,
         related_name="quotes", verbose_name="영업기회"

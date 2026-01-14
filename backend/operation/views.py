@@ -11,6 +11,8 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
 from django.db.models import Q
+from django.db.models import Q as DJQ
+from .workspace import get_request_workspace
 
 from .models import (
     CustomerCompany, CustomerContact,
@@ -34,11 +36,47 @@ from .filters import (
 from .permissions import IsLeadOwnerOrAssignee, IsOwnerOrReadOnly, IsRelatedToLead
 from .services import LeadService
 
+class WorkspaceScopedMixin:
+    """
+    workspace_field:
+      - 기본: "workspace"
+      - 관계로 스코프 걸어야 하면 override (예: "pipeline__workspace")
+    """
+    workspace_field = "workspace"
+
+    @property
+    def workspace(self):
+        if not hasattr(self, "_workspace_cache"):
+            self._workspace_cache = get_request_workspace(self.request)
+        return self._workspace_cache
+
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        ctx["workspace"] = self.workspace
+        return ctx
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        wf = getattr(self, "workspace_field", None)
+        if not wf:
+            return qs
+        # ✅ workspace 우선(기본: strict). 레거시 null을 같이 보여주고 싶으면 OR를 다시 추가.
+        return qs.filter(DJQ(**{wf: self.workspace}))
+
+    def perform_create(self, serializer):
+        model = serializer.Meta.model
+        field_names = {f.name for f in model._meta.fields}
+        extra = {}
+        if "workspace" in field_names:
+            extra["workspace"] = self.workspace
+        if "created_by" in field_names:
+            extra["created_by"] = self.request.user
+        serializer.save(**extra)
 
 # ============================================================
 # 고객 관리
 # ============================================================
-class CustomerCompanyViewSet(viewsets.ModelViewSet):
+class CustomerCompanyViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     """고객사 ViewSet"""
     queryset = CustomerCompany.objects.all()
     permission_classes = [IsAuthenticated]
@@ -52,15 +90,12 @@ class CustomerCompanyViewSet(viewsets.ModelViewSet):
         if self.action == 'list':
             return CustomerCompanyListSerializer
         return CustomerCompanySerializer
-    
-    def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
 
-
-class CustomerContactViewSet(viewsets.ModelViewSet):
+class CustomerContactViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     """고객 담당자 ViewSet"""
     queryset = CustomerContact.objects.all()
     serializer_class = CustomerContactSerializer
+    workspace_field = "company__workspace"
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, rf_filters.SearchFilter]
     filterset_class = CustomerContactFilter
@@ -70,7 +105,7 @@ class CustomerContactViewSet(viewsets.ModelViewSet):
 # ============================================================
 # 파이프라인 / 단계
 # ============================================================
-class SalesPipelineViewSet(viewsets.ModelViewSet):
+class SalesPipelineViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     """파이프라인 ViewSet"""
     queryset = SalesPipeline.objects.filter(is_active=True)
     serializer_class = SalesPipelineSerializer
@@ -105,19 +140,20 @@ class SalesPipelineViewSet(viewsets.ModelViewSet):
         return Response(result)
 
 
-class SalesStageViewSet(viewsets.ModelViewSet):
+class SalesStageViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     """영업 단계 ViewSet"""
     queryset = SalesStage.objects.all()
     serializer_class = SalesStageSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['pipeline']
+    workspace_field = "pipeline__workspace"
 
 
 # ============================================================
 # 영업 기회 (Lead)
 # ============================================================
-class SalesLeadViewSet(viewsets.ModelViewSet):
+class SalesLeadViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     """영업기회 ViewSet"""
     queryset = SalesLead.objects.all()
     permission_classes = [IsAuthenticated, IsLeadOwnerOrAssignee]
@@ -143,6 +179,8 @@ class SalesLeadViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         # 서비스 레이어를 통해 생성 (자동 활동 기록)
         lead_data = serializer.validated_data.copy()
+        # ✅ workspace 스코프 강제 주입 (mixin perform_create 우회하므로 직접 넣어야 함)
+        lead_data["workspace"] = self.workspace
         lead, activity = LeadService.create_lead_with_activity(lead_data, self.request.user)
         # serializer의 instance 설정
         serializer.instance = lead
@@ -161,7 +199,12 @@ class SalesLeadViewSet(viewsets.ModelViewSet):
             )
         
         try:
-            new_stage = SalesStage.objects.get(id=stage_id, pipeline=lead.pipeline)
+            # ✅ 같은 pipeline 이면서 같은 workspace 소속 stage만 허용
+            new_stage = SalesStage.objects.get(
+                id=stage_id,
+                pipeline=lead.pipeline,
+                pipeline__workspace=self.workspace,
+            )
         except SalesStage.DoesNotExist:
             return Response(
                 {'error': 'Invalid stage_id'},
@@ -253,19 +296,21 @@ class SalesLeadViewSet(viewsets.ModelViewSet):
 # ============================================================
 # 활동 로그 / 할 일 / 파일
 # ============================================================
-class LeadActivityViewSet(viewsets.ModelViewSet):
+class LeadActivityViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     """활동 로그 ViewSet"""
     queryset = LeadActivity.objects.all()
     serializer_class = LeadActivitySerializer
     permission_classes = [IsAuthenticated, IsRelatedToLead]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['lead', 'activity_type']
+    workspace_field = "lead__workspace"
     
     def perform_create(self, serializer):
+        # created_by만 주입 (workspace는 lead를 통해 스코프)
         serializer.save(created_by=self.request.user)
 
 
-class LeadTaskViewSet(viewsets.ModelViewSet):
+class LeadTaskViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     """할 일 ViewSet"""
     queryset = LeadTask.objects.all()
     serializer_class = LeadTaskSerializer
@@ -274,6 +319,7 @@ class LeadTaskViewSet(viewsets.ModelViewSet):
     filterset_class = LeadTaskFilter
     ordering_fields = ['due_date', 'priority', 'created_at']
     ordering = ['is_completed', 'due_date']
+    workspace_field = "lead__workspace"
     
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
@@ -302,7 +348,7 @@ class LeadTaskViewSet(viewsets.ModelViewSet):
         return Response(LeadTaskSerializer(task).data)
 
 
-class LeadFileViewSet(viewsets.ModelViewSet):
+class LeadFileViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     """첨부파일 ViewSet"""
     queryset = LeadFile.objects.all()
     serializer_class = LeadFileSerializer
@@ -310,6 +356,7 @@ class LeadFileViewSet(viewsets.ModelViewSet):
     parser_classes = [MultiPartParser, FormParser]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['lead']
+    workspace_field = "lead__workspace"
     
     def perform_create(self, serializer):
         uploaded_file = self.request.FILES.get('file')
@@ -323,7 +370,7 @@ class LeadFileViewSet(viewsets.ModelViewSet):
 # ============================================================
 # 견적서
 # ============================================================
-class QuoteViewSet(viewsets.ModelViewSet):
+class QuoteViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     """견적서 ViewSet"""
     queryset = Quote.objects.all()
     permission_classes = [IsAuthenticated]
@@ -331,14 +378,12 @@ class QuoteViewSet(viewsets.ModelViewSet):
     filterset_class = QuoteFilter
     ordering_fields = ['created_at', 'total_amount']
     ordering = ['-created_at']
+    workspace_field = "workspace"
     
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
             return QuoteCreateSerializer
         return QuoteSerializer
-    
-    def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
     
     @action(detail=True, methods=['post'])
     def send(self, request, pk=None):
@@ -391,14 +436,12 @@ class QuoteViewSet(viewsets.ModelViewSet):
             )
 
 
-class QuoteTemplateViewSet(viewsets.ModelViewSet):
+class QuoteTemplateViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     """견적 템플릿 ViewSet"""
     queryset = QuoteTemplate.objects.all()
     serializer_class = QuoteTemplateSerializer
     permission_classes = [IsAuthenticated]
-    
-    def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+    workspace_field = "workspace"
 
 
 # ============================================================
@@ -410,6 +453,7 @@ class CalendarFeedView(APIView):
     
     def get(self, request):
         from datetime import datetime, timedelta
+        workspace = get_request_workspace(request)
         
         # 쿼리 파라미터
         start_date = request.query_params.get('start')
@@ -432,7 +476,7 @@ class CalendarFeedView(APIView):
             show_on_calendar=True,
             due_date__gte=start_date,
             due_date__lte=end_date
-        ).select_related('lead')
+        ).select_related('lead').filter(lead__workspace=workspace)
         
         for task in tasks:
             events.append({
@@ -454,7 +498,7 @@ class CalendarFeedView(APIView):
             expected_close_date__gte=start_date.date(),
             expected_close_date__lte=end_date.date(),
             status='active'
-        )
+        ).filter(workspace=workspace)
         
         for lead in leads:
             from datetime import datetime as dt
@@ -485,7 +529,8 @@ class InboxView(APIView):
     permission_classes = [IsAuthenticated]
     
     def get(self, request):
-        leads = LeadService.get_inbox_leads(request.user)
+        workspace = get_request_workspace(request)
+        leads = LeadService.get_inbox_leads(request.user, workspace)
         serializer = SalesLeadListSerializer(leads, many=True)
         return Response(serializer.data)
 
@@ -499,9 +544,10 @@ class SalesDashboardView(APIView):
     
     def get(self, request):
         from django.db.models import Sum, Count
+        workspace = get_request_workspace(request)
         
         # 전체 통계
-        leads = SalesLead.objects.all()
+        leads = SalesLead.objects.filter(workspace=workspace)
         
         total = leads.count()
         active = leads.filter(status='active').count()

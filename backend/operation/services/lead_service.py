@@ -235,7 +235,7 @@ class LeadService:
             return lead, activity
     
     @staticmethod
-    def get_inbox_leads(user):
+    def get_inbox_leads(user, workspace):
         """
         접수함: 신규 접수된 리드 (담당자 미배정 또는 첫 단계에 있는 것)
         
@@ -247,11 +247,15 @@ class LeadService:
         """
         from operation.models import SalesLead, SalesStage
         
-        # 첫 단계(order=0) 또는 담당자 미배정
-        first_stages = SalesStage.objects.filter(order=0).values_list('id', flat=True)
+        # ✅ 해당 workspace 파이프라인의 "첫 단계(order=0)"만
+        first_stages = SalesStage.objects.filter(
+            order=0,
+            pipeline__workspace=workspace,
+        ).values_list('id', flat=True)
         
         return SalesLead.objects.filter(
-            status='active'
+            status='active',
+            workspace=workspace,
         ).filter(
             models.Q(stage_id__in=first_stages) |
             models.Q(owner__isnull=True)

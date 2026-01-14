@@ -337,6 +337,41 @@ class SalesLeadCreateSerializer(serializers.ModelSerializer):
             'next_action_due_at', 'source', 'tags'
         ]
     
+    def validate(self, attrs):
+        """
+        ✅ workspace 우선 스코프 검증
+        - pipeline.workspace == request workspace
+        - stage.pipeline == pipeline
+        - (선택) company.workspace == request workspace
+        - (선택) contact.company.workspace == request workspace
+        """
+        workspace = self.context.get("workspace")
+        pipeline = attrs.get("pipeline")
+        stage = attrs.get("stage")
+        company = attrs.get("company")
+        contact = attrs.get("contact")
+
+        if workspace and pipeline and getattr(pipeline, "workspace_id", None) not in (workspace.id, None):
+            raise serializers.ValidationError({"pipeline": "현재 워크스페이스의 파이프라인만 선택할 수 있습니다."})
+
+        if stage and pipeline and stage.pipeline_id != pipeline.id:
+            raise serializers.ValidationError({"stage": "선택한 stage는 pipeline에 속해있어야 합니다."})
+
+        if workspace and company and getattr(company, "workspace_id", None) not in (workspace.id, None):
+            raise serializers.ValidationError({"company": "현재 워크스페이스의 고객사만 선택할 수 있습니다."})
+
+        if contact:
+            # contact는 company를 통해 workspace를 판단
+            c_ws_id = getattr(getattr(contact, "company", None), "workspace_id", None)
+            if workspace and c_ws_id not in (workspace.id, None):
+                raise serializers.ValidationError({"contact": "현재 워크스페이스의 담당자만 선택할 수 있습니다."})
+
+        # stage 기본 확률 자동 반영(요청값이 없거나 0이면)
+        if stage and (not attrs.get("probability")):
+            attrs["probability"] = stage.probability
+
+        return attrs
+    
     def create(self, validated_data):
         assignees = validated_data.pop('assignees', [])
         
@@ -429,13 +464,48 @@ class QuoteCreateSerializer(serializers.ModelSerializer):
             'tax_rate', 'valid_until', 'notes', 'items'
         ]
     
+    def validate(self, attrs):
+        """
+        ✅ workspace 우선 스코프 검증
+        - lead.workspace == request workspace
+        - template.workspace == request workspace (선택)
+        - company.workspace == request workspace (선택)
+        - contact.company.workspace == request workspace (선택)
+        """
+        workspace = self.context.get("workspace")
+        lead = attrs.get("lead")
+        template = attrs.get("template")
+        company = attrs.get("company")
+        contact = attrs.get("contact")
+
+        if workspace and lead and getattr(lead, "workspace_id", None) not in (workspace.id, None):
+            raise serializers.ValidationError({"lead": "현재 워크스페이스의 리드만 선택할 수 있습니다."})
+
+        if workspace and template and getattr(template, "workspace_id", None) not in (workspace.id, None):
+            raise serializers.ValidationError({"template": "현재 워크스페이스의 템플릿만 선택할 수 있습니다."})
+
+        if workspace and company and getattr(company, "workspace_id", None) not in (workspace.id, None):
+            raise serializers.ValidationError({"company": "현재 워크스페이스의 고객사만 선택할 수 있습니다."})
+
+        if contact:
+            c_ws_id = getattr(getattr(contact, "company", None), "workspace_id", None)
+            if workspace and c_ws_id not in (workspace.id, None):
+                raise serializers.ValidationError({"contact": "현재 워크스페이스의 담당자만 선택할 수 있습니다."})
+
+        return attrs
+
     def create(self, validated_data):
         items_data = validated_data.pop('items', [])
         
         # 견적번호 자동 생성
         from django.utils import timezone
         today = timezone.now().strftime('%Y%m%d')
-        count = Quote.objects.filter(quote_number__startswith=f"Q{today}").count() + 1
+        # ✅ workspace별 시퀀스(추후 quote_number unique를 workspace로 바꿀 때도 안전)
+        workspace = self.context.get("workspace")
+        qs = Quote.objects.filter(quote_number__startswith=f"Q{today}")
+        if workspace:
+            qs = qs.filter(workspace=workspace)
+        count = qs.count() + 1
         validated_data['quote_number'] = f"Q{today}-{count:03d}"
         
         # 템플릿에서 기본값 로드
