@@ -4,7 +4,13 @@
  */
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { FiChevronLeft, FiChevronRight, FiCheck, FiCalendar, FiTarget } from "react-icons/fi";
+import {
+  FiChevronLeft,
+  FiChevronRight,
+  FiCheck,
+  FiCalendar,
+  FiTarget,
+} from "react-icons/fi";
 import { SalesService } from "../../api/operation";
 
 function TodoCalendar() {
@@ -17,11 +23,19 @@ function TodoCalendar() {
 
   const fetchEvents = useCallback(async () => {
     setLoading(true);
-    
+
     // 현재 월의 시작과 끝
-    const start = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-    const end = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-    
+    const start = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth(),
+      1
+    );
+    const end = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth() + 1,
+      0
+    );
+
     try {
       const data = await SalesService.getCalendar(
         start.toISOString(),
@@ -42,22 +56,22 @@ function TodoCalendar() {
   const getDaysInMonth = () => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
-    
+
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
-    
+
     const days = [];
-    
+
     // 이전 달의 빈 칸
     for (let i = 0; i < firstDay.getDay(); i++) {
       days.push(null);
     }
-    
+
     // 현재 달의 날짜
     for (let i = 1; i <= lastDay.getDate(); i++) {
       days.push(new Date(year, month, i));
     }
-    
+
     return days;
   };
 
@@ -77,11 +91,15 @@ function TodoCalendar() {
   };
 
   const prevMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+    setCurrentDate(
+      new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1)
+    );
   };
 
   const nextMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+    setCurrentDate(
+      new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1)
+    );
   };
 
   const today = new Date();
@@ -103,13 +121,19 @@ function TodoCalendar() {
         <div className="lg:col-span-2 page-box">
           {/* Month Navigation */}
           <div className="flex items-center justify-between mb-4">
-            <button onClick={prevMonth} className="p-2 hover:bg-gray-100 rounded-lg">
+            <button
+              onClick={prevMonth}
+              className="p-2 hover:bg-gray-100 rounded-lg"
+            >
               <FiChevronLeft className="w-5 h-5" />
             </button>
             <h2 className="text-lg font-semibold">
               {currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월
             </h2>
-            <button onClick={nextMonth} className="p-2 hover:bg-gray-100 rounded-lg">
+            <button
+              onClick={nextMonth}
+              className="p-2 hover:bg-gray-100 rounded-lg"
+            >
               <FiChevronRight className="w-5 h-5" />
             </button>
           </div>
@@ -126,7 +150,11 @@ function TodoCalendar() {
                   <div
                     key={day}
                     className={`text-center text-sm font-medium py-2 ${
-                      i === 0 ? "text-red-500" : i === 6 ? "text-blue-500" : "text-gray-600"
+                      i === 0
+                        ? "text-red-500"
+                        : i === 6
+                        ? "text-blue-500"
+                        : "text-gray-600"
                     }`}
                   >
                     {day}
@@ -136,25 +164,34 @@ function TodoCalendar() {
               <div className="grid grid-cols-7 gap-1">
                 {days.map((date, index) => {
                   const dayEvents = getEventsForDate(date);
-                  const isToday = date && date.toDateString() === today.toDateString();
-                  const isSelected = date && selectedDate && date.toDateString() === selectedDate.toDateString();
-                  
+                  const isToday =
+                    date && date.toDateString() === today.toDateString();
+                  const isSelected =
+                    date &&
+                    selectedDate &&
+                    date.toDateString() === selectedDate.toDateString();
+
                   return (
                     <div
                       key={index}
                       onClick={() => handleDateClick(date)}
                       className={`min-h-[80px] p-1 border rounded-lg cursor-pointer transition-colors ${
-                        !date ? "bg-gray-50" :
-                        isSelected ? "border-blue-500 bg-blue-50" :
-                        isToday ? "border-blue-300 bg-blue-50/50" :
-                        "border-gray-100 hover:bg-gray-50"
+                        !date
+                          ? "bg-gray-50"
+                          : isSelected
+                          ? "border-blue-500 bg-blue-50"
+                          : isToday
+                          ? "border-blue-300 bg-blue-50/50"
+                          : "border-gray-100 hover:bg-gray-50"
                       }`}
                     >
                       {date && (
                         <>
-                          <div className={`text-sm font-medium mb-1 ${
-                            isToday ? "text-blue-600" : "text-gray-700"
-                          }`}>
+                          <div
+                            className={`text-sm font-medium mb-1 ${
+                              isToday ? "text-blue-600" : "text-gray-700"
+                            }`}
+                          >
                             {date.getDate()}
                           </div>
                           <div className="space-y-0.5">
@@ -162,9 +199,14 @@ function TodoCalendar() {
                               <div
                                 key={event.id}
                                 className="text-xs px-1 py-0.5 rounded truncate"
-                                style={{ backgroundColor: event.color + "20", color: event.color }}
+                                style={{
+                                  backgroundColor: event.color + "20",
+                                  color: event.color,
+                                }}
                               >
-                                {event.is_completed && <FiCheck className="inline w-3 h-3 mr-0.5" />}
+                                {event.is_completed && (
+                                  <FiCheck className="inline w-3 h-3 mr-0.5" />
+                                )}
                                 {event.title}
                               </div>
                             ))}
@@ -187,13 +229,13 @@ function TodoCalendar() {
         {/* Selected Date Detail */}
         <div className="page-box">
           <h3 className="text-sm font-semibold text-gray-700 mb-4">
-            {selectedDate ? (
-              `${selectedDate.getMonth() + 1}월 ${selectedDate.getDate()}일 일정`
-            ) : (
-              "날짜를 선택하세요"
-            )}
+            {selectedDate
+              ? `${
+                  selectedDate.getMonth() + 1
+                }월 ${selectedDate.getDate()}일 일정`
+              : "날짜를 선택하세요"}
           </h3>
-          
+
           {selectedDate ? (
             selectedEvents.length === 0 ? (
               <p className="text-center text-gray-500 py-8">일정이 없습니다.</p>
@@ -202,20 +244,36 @@ function TodoCalendar() {
                 {selectedEvents.map((event) => (
                   <div
                     key={event.id}
-                    onClick={() => navigate(`/operation/leads/${event.lead_id}`)}
+                    onClick={() =>
+                      navigate(`/operation/sales/leads/${event.lead_id}`)
+                    }
                     className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
                   >
                     <div className="flex items-start gap-2">
                       {event.event_type === "task" ? (
-                        <FiCheck className={`w-4 h-4 mt-0.5 ${event.is_completed ? "text-green-500" : "text-gray-400"}`} />
+                        <FiCheck
+                          className={`w-4 h-4 mt-0.5 ${
+                            event.is_completed
+                              ? "text-green-500"
+                              : "text-gray-400"
+                          }`}
+                        />
                       ) : (
                         <FiTarget className="w-4 h-4 mt-0.5 text-orange-500" />
                       )}
                       <div className="flex-1">
-                        <p className={`text-sm font-medium ${event.is_completed ? "line-through text-gray-400" : "text-gray-900"}`}>
+                        <p
+                          className={`text-sm font-medium ${
+                            event.is_completed
+                              ? "line-through text-gray-400"
+                              : "text-gray-900"
+                          }`}
+                        >
                           {event.title}
                         </p>
-                        <p className="text-xs text-gray-500 mt-1">{event.lead_title}</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {event.lead_title}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -224,7 +282,9 @@ function TodoCalendar() {
             )
           ) : (
             <p className="text-center text-gray-400 py-8">
-              캘린더에서 날짜를 클릭하면<br />해당 일정이 표시됩니다.
+              캘린더에서 날짜를 클릭하면
+              <br />
+              해당 일정이 표시됩니다.
             </p>
           )}
         </div>

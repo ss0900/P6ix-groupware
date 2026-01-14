@@ -13,7 +13,7 @@ function CustomerList() {
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  
+
   // 고객사 추가 모달
   const [showModal, setShowModal] = useState(false);
   const [newCompany, setNewCompany] = useState({
@@ -30,7 +30,7 @@ function CustomerList() {
     try {
       const params = {};
       if (searchQuery) params.search = searchQuery;
-      
+
       const data = await CustomerService.getCompanies(params);
       setCompanies(data.results || data);
     } catch (error) {
@@ -52,11 +52,17 @@ function CustomerList() {
   const handleCreateCompany = async (e) => {
     e.preventDefault();
     setSaving(true);
-    
+
     try {
       await CustomerService.createCompany(newCompany);
       setShowModal(false);
-      setNewCompany({ name: "", business_number: "", industry: "", phone: "", address: "" });
+      setNewCompany({
+        name: "",
+        business_number: "",
+        industry: "",
+        phone: "",
+        address: "",
+      });
       fetchCompanies();
     } catch (error) {
       console.error("Error creating company:", error);
@@ -96,7 +102,9 @@ function CustomerList() {
               className="input-search"
             />
           </div>
-          <button type="submit" className="btn-search">검색</button>
+          <button type="submit" className="btn-search">
+            검색
+          </button>
         </form>
       </div>
 
@@ -116,12 +124,18 @@ function CustomerList() {
             {companies.map((company) => (
               <div
                 key={company.id}
-                onClick={() => navigate(`/operation/customers/${company.id}`)}
+                onClick={() =>
+                  navigate(`/operation/sales/customers/${company.id}`)
+                }
                 className="p-4 border border-gray-200 rounded-lg hover:shadow-md cursor-pointer transition-shadow"
               >
-                <h3 className="font-semibold text-gray-900 mb-2">{company.name}</h3>
+                <h3 className="font-semibold text-gray-900 mb-2">
+                  {company.name}
+                </h3>
                 {company.industry && (
-                  <p className="text-sm text-gray-500 mb-2">{company.industry}</p>
+                  <p className="text-sm text-gray-500 mb-2">
+                    {company.industry}
+                  </p>
                 )}
                 <div className="flex items-center gap-4 text-sm text-gray-500">
                   {company.phone && (
@@ -144,7 +158,8 @@ function CustomerList() {
                     <p className="text-xs text-gray-400">주 담당자</p>
                     <p className="text-sm text-gray-700">
                       {company.primary_contact.name}
-                      {company.primary_contact.phone && ` · ${company.primary_contact.phone}`}
+                      {company.primary_contact.phone &&
+                        ` · ${company.primary_contact.phone}`}
                     </p>
                   </div>
                 )}
@@ -155,7 +170,12 @@ function CustomerList() {
       </div>
 
       {/* 고객사 추가 모달 */}
-      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="고객사 등록" size="md">
+      <Modal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        title="고객사 등록"
+        size="md"
+      >
         <form onSubmit={handleCreateCompany} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -164,52 +184,77 @@ function CustomerList() {
             <input
               type="text"
               value={newCompany.name}
-              onChange={(e) => setNewCompany({ ...newCompany, name: e.target.value })}
+              onChange={(e) =>
+                setNewCompany({ ...newCompany, name: e.target.value })
+              }
               className="input-base"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">사업자번호</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              사업자번호
+            </label>
             <input
               type="text"
               value={newCompany.business_number}
-              onChange={(e) => setNewCompany({ ...newCompany, business_number: e.target.value })}
+              onChange={(e) =>
+                setNewCompany({
+                  ...newCompany,
+                  business_number: e.target.value,
+                })
+              }
               className="input-base"
               placeholder="000-00-00000"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">업종</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              업종
+            </label>
             <input
               type="text"
               value={newCompany.industry}
-              onChange={(e) => setNewCompany({ ...newCompany, industry: e.target.value })}
+              onChange={(e) =>
+                setNewCompany({ ...newCompany, industry: e.target.value })
+              }
               className="input-base"
               placeholder="예: 건설, IT, 제조"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">대표전화</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              대표전화
+            </label>
             <input
               type="text"
               value={newCompany.phone}
-              onChange={(e) => setNewCompany({ ...newCompany, phone: e.target.value })}
+              onChange={(e) =>
+                setNewCompany({ ...newCompany, phone: e.target.value })
+              }
               className="input-base"
               placeholder="02-000-0000"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">주소</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              주소
+            </label>
             <input
               type="text"
               value={newCompany.address}
-              onChange={(e) => setNewCompany({ ...newCompany, address: e.target.value })}
+              onChange={(e) =>
+                setNewCompany({ ...newCompany, address: e.target.value })
+              }
               className="input-base"
             />
           </div>
           <div className="flex justify-end gap-2 pt-4">
-            <button type="button" onClick={() => setShowModal(false)} className="btn-cancel">
+            <button
+              type="button"
+              onClick={() => setShowModal(false)}
+              className="btn-cancel"
+            >
               취소
             </button>
             <button type="submit" disabled={saving} className="btn-save">

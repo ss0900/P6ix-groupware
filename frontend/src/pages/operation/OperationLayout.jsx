@@ -16,37 +16,37 @@ import {
 
 const menuItems = [
   {
-    path: "/operation/leads",
+    path: "/operation/sales/leads",
     label: "영업기회",
     icon: FiTarget,
   },
   {
-    path: "/operation/pipeline",
+    path: "/operation/sales/pipeline",
     label: "파이프라인",
     icon: FiTrello,
   },
   {
-    path: "/operation/inbox",
+    path: "/operation/sales/inbox",
     label: "영업접수",
     icon: FiInbox,
   },
   {
-    path: "/operation/todo",
+    path: "/operation/sales/todo",
     label: "TODO 캘린더",
     icon: FiCalendar,
   },
   {
-    path: "/operation/customers",
+    path: "/operation/sales/customers",
     label: "고객관리",
     icon: FiUsers,
   },
   {
-    path: "/operation/quotes",
+    path: "/operation/sales/quotes",
     label: "견적서",
     icon: FiFileText,
   },
   {
-    path: "/operation/templates",
+    path: "/operation/sales/templates",
     label: "견적 템플릿",
     icon: FiLayers,
   },
@@ -64,7 +64,7 @@ function OperationLayout() {
           {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname.startsWith(item.path);
-            
+
             return (
               <NavLink
                 key={item.path}

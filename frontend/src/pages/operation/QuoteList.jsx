@@ -19,19 +19,20 @@ function QuoteList() {
     try {
       const params = {};
       if (statusFilter) params.status = statusFilter;
-      
+
       const data = await QuoteService.getQuotes(params);
       let results = data.results || data;
-      
+
       // 클라이언트 사이드 검색
       if (searchQuery) {
-        results = results.filter(q => 
-          q.quote_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          q.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          q.company_name?.toLowerCase().includes(searchQuery.toLowerCase())
+        results = results.filter(
+          (q) =>
+            q.quote_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            q.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            q.company_name?.toLowerCase().includes(searchQuery.toLowerCase())
         );
       }
-      
+
       setQuotes(results);
     } catch (error) {
       console.error("Error fetching quotes:", error);
@@ -47,7 +48,7 @@ function QuoteList() {
   const handleSend = async (e, quoteId) => {
     e.stopPropagation();
     if (!window.confirm("견적서를 발송하시겠습니까?")) return;
-    
+
     try {
       await QuoteService.sendQuote(quoteId);
       fetchQuotes();
@@ -148,20 +149,36 @@ function QuoteList() {
               {quotes.map((quote) => (
                 <tr
                   key={quote.id}
-                  onClick={() => navigate(`/operation/quotes/${quote.id}`)}
+                  onClick={() =>
+                    navigate(`/operation/sales/quotes/${quote.id}`)
+                  }
                   className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
                 >
-                  <td className="px-3 py-3 text-sm font-mono">{quote.quote_number}</td>
+                  <td className="px-3 py-3 text-sm font-mono">
+                    {quote.quote_number}
+                  </td>
                   <td className="px-3 py-3 text-sm">{quote.title}</td>
-                  <td className="px-3 py-3 text-sm">{quote.company_name || "-"}</td>
-                  <td className="px-3 py-3 text-sm">{quote.lead_title || "-"}</td>
-                  <td className="px-3 py-3 text-sm text-right font-medium">{formatAmount(quote.total_amount)}</td>
+                  <td className="px-3 py-3 text-sm">
+                    {quote.company_name || "-"}
+                  </td>
+                  <td className="px-3 py-3 text-sm">
+                    {quote.lead_title || "-"}
+                  </td>
+                  <td className="px-3 py-3 text-sm text-right font-medium">
+                    {formatAmount(quote.total_amount)}
+                  </td>
                   <td className="px-3 py-3 text-center">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusLabels[quote.status]?.color}`}>
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        statusLabels[quote.status]?.color
+                      }`}
+                    >
                       {statusLabels[quote.status]?.label}
                     </span>
                   </td>
-                  <td className="px-3 py-3 text-sm text-center">{formatDate(quote.created_at)}</td>
+                  <td className="px-3 py-3 text-sm text-center">
+                    {formatDate(quote.created_at)}
+                  </td>
                   <td className="px-3 py-3 text-center">
                     {quote.status === "draft" && (
                       <button

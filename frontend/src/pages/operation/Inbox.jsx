@@ -65,7 +65,7 @@ function Inbox() {
             {leads.map((lead) => (
               <div
                 key={lead.id}
-                onClick={() => navigate(`/operation/leads/${lead.id}`)}
+                onClick={() => navigate(`/operation/sales/leads/${lead.id}`)}
                 className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
               >
                 <div className="flex-1">
@@ -97,7 +97,9 @@ function Inbox() {
                       {lead.owner_name}
                     </span>
                   ) : (
-                    <span className="text-sm text-orange-500">담당자 미배정</span>
+                    <span className="text-sm text-orange-500">
+                      담당자 미배정
+                    </span>
                   )}
                   <FiArrowRight className="w-5 h-5 text-gray-400" />
                 </div>

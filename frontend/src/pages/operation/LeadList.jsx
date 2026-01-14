@@ -10,12 +10,12 @@ import { SalesService } from "../../api/operation";
 function LeadList() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  
+
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pipelines, setPipelines] = useState([]);
   const [stages, setStages] = useState([]);
-  
+
   // 필터 상태
   const [filters, setFilters] = useState({
     q: searchParams.get("q") || "",
@@ -24,7 +24,7 @@ function LeadList() {
     status: searchParams.get("status") || "active",
     stalled: searchParams.get("stalled") === "true",
   });
-  
+
   const fetchLeads = useCallback(async () => {
     setLoading(true);
     try {
@@ -34,7 +34,7 @@ function LeadList() {
       if (filters.stage) params.stage = filters.stage;
       if (filters.status) params.status = filters.status;
       if (filters.stalled) params.stalled = true;
-      
+
       const response = await SalesService.getLeads(params);
       setLeads(response.results || response);
     } catch (error) {
@@ -43,12 +43,12 @@ function LeadList() {
       setLoading(false);
     }
   }, [filters]);
-  
+
   const fetchPipelines = useCallback(async () => {
     try {
       const data = await SalesService.getPipelines();
       setPipelines(data);
-      
+
       // 선택된 파이프라인의 단계 로드
       if (filters.pipeline) {
         const stagesData = await SalesService.getStages(filters.pipeline);
@@ -58,19 +58,19 @@ function LeadList() {
       console.error("Error fetching pipelines:", error);
     }
   }, [filters.pipeline]);
-  
+
   useEffect(() => {
     fetchLeads();
   }, [fetchLeads]);
-  
+
   useEffect(() => {
     fetchPipelines();
   }, [fetchPipelines]);
-  
+
   const handleFilterChange = (key, value) => {
     const newFilters = { ...filters, [key]: value };
     setFilters(newFilters);
-    
+
     // URL 파라미터 업데이트
     const params = new URLSearchParams();
     Object.entries(newFilters).forEach(([k, v]) => {
@@ -78,17 +78,17 @@ function LeadList() {
     });
     setSearchParams(params);
   };
-  
+
   const handleSearch = (e) => {
     e.preventDefault();
     fetchLeads();
   };
-  
+
   const formatAmount = (amount) => {
     if (!amount) return "-";
     return new Intl.NumberFormat("ko-KR").format(amount) + "원";
   };
-  
+
   const formatDate = (dateStr) => {
     if (!dateStr) return "-";
     return new Date(dateStr).toLocaleDateString("ko-KR");
@@ -100,20 +100,24 @@ function LeadList() {
       <div className="flex items-center justify-between">
         <h1 className="text-title">영업기회</h1>
         <button
-          onClick={() => navigate("/operation/leads/new")}
+          onClick={() => navigate("/operation/sales/leads/new")}
           className="btn-create flex items-center gap-2"
         >
-          <FiPlus className="w-4 h-4" />
-          새 영업기회
+          <FiPlus className="w-4 h-4" />새 영업기회
         </button>
       </div>
 
       {/* Filters */}
       <div className="page-box">
-        <form onSubmit={handleSearch} className="flex flex-wrap gap-4 items-end">
+        <form
+          onSubmit={handleSearch}
+          className="flex flex-wrap gap-4 items-end"
+        >
           {/* 검색어 */}
           <div className="flex-1 min-w-[200px]">
-            <label className="block text-sm font-medium text-gray-700 mb-1">검색</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              검색
+            </label>
             <div className="relative">
               <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
@@ -125,10 +129,12 @@ function LeadList() {
               />
             </div>
           </div>
-          
+
           {/* 파이프라인 */}
           <div className="w-40">
-            <label className="block text-sm font-medium text-gray-700 mb-1">파이프라인</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              파이프라인
+            </label>
             <select
               value={filters.pipeline}
               onChange={(e) => handleFilterChange("pipeline", e.target.value)}
@@ -136,14 +142,18 @@ function LeadList() {
             >
               <option value="">전체</option>
               {pipelines.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
               ))}
             </select>
           </div>
-          
+
           {/* 단계 */}
           <div className="w-40">
-            <label className="block text-sm font-medium text-gray-700 mb-1">단계</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              단계
+            </label>
             <select
               value={filters.stage}
               onChange={(e) => handleFilterChange("stage", e.target.value)}
@@ -152,14 +162,18 @@ function LeadList() {
             >
               <option value="">전체</option>
               {stages.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
               ))}
             </select>
           </div>
-          
+
           {/* 상태 */}
           <div className="w-32">
-            <label className="block text-sm font-medium text-gray-700 mb-1">상태</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              상태
+            </label>
             <select
               value={filters.status}
               onChange={(e) => handleFilterChange("status", e.target.value)}
@@ -171,7 +185,7 @@ function LeadList() {
               <option value="lost">실주</option>
             </select>
           </div>
-          
+
           {/* 지연만 보기 */}
           <div className="flex items-center gap-2">
             <input
@@ -185,7 +199,7 @@ function LeadList() {
               지연만 보기
             </label>
           </div>
-          
+
           <button type="submit" className="btn-search flex items-center gap-2">
             <FiFilter className="w-4 h-4" />
             검색
@@ -221,7 +235,7 @@ function LeadList() {
               {leads.map((lead) => (
                 <tr
                   key={lead.id}
-                  onClick={() => navigate(`/operation/leads/${lead.id}`)}
+                  onClick={() => navigate(`/operation/sales/leads/${lead.id}`)}
                   className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
                 >
                   <td className="px-3 py-3">
@@ -235,10 +249,14 @@ function LeadList() {
                       {lead.stage_name}
                     </span>
                   </td>
-                  <td className="px-3 py-3 text-sm">{lead.company_name || "-"}</td>
+                  <td className="px-3 py-3 text-sm">
+                    {lead.company_name || "-"}
+                  </td>
                   <td className="px-3 py-3">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-900">{lead.title}</span>
+                      <span className="text-sm font-medium text-gray-900">
+                        {lead.title}
+                      </span>
                       {lead.is_stalled && (
                         <span className="flex items-center gap-1 text-xs text-orange-600">
                           <FiAlertCircle className="w-3 h-3" />
@@ -247,17 +265,33 @@ function LeadList() {
                       )}
                     </div>
                   </td>
-                  <td className="px-3 py-3 text-sm text-right">{formatAmount(lead.expected_amount)}</td>
-                  <td className="px-3 py-3 text-sm text-center">{lead.owner_name || "-"}</td>
-                  <td className="px-3 py-3 text-sm text-center">{formatDate(lead.next_action_due_at)}</td>
-                  <td className="px-3 py-3 text-sm text-center">{formatDate(lead.last_contacted_at)}</td>
+                  <td className="px-3 py-3 text-sm text-right">
+                    {formatAmount(lead.expected_amount)}
+                  </td>
+                  <td className="px-3 py-3 text-sm text-center">
+                    {lead.owner_name || "-"}
+                  </td>
+                  <td className="px-3 py-3 text-sm text-center">
+                    {formatDate(lead.next_action_due_at)}
+                  </td>
+                  <td className="px-3 py-3 text-sm text-center">
+                    {formatDate(lead.last_contacted_at)}
+                  </td>
                   <td className="px-3 py-3 text-center">
-                    <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
-                      lead.status === "won" ? "bg-green-100 text-green-700" :
-                      lead.status === "lost" ? "bg-red-100 text-red-700" :
-                      "bg-blue-100 text-blue-700"
-                    }`}>
-                      {lead.status === "won" ? "수주" : lead.status === "lost" ? "실주" : "진행"}
+                    <span
+                      className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
+                        lead.status === "won"
+                          ? "bg-green-100 text-green-700"
+                          : lead.status === "lost"
+                          ? "bg-red-100 text-red-700"
+                          : "bg-blue-100 text-blue-700"
+                      }`}
+                    >
+                      {lead.status === "won"
+                        ? "수주"
+                        : lead.status === "lost"
+                        ? "실주"
+                        : "진행"}
                     </span>
                   </td>
                 </tr>

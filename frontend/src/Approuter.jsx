@@ -44,8 +44,6 @@ import ScheduleDetail from "./pages/schedule/ScheduleDetail";
 // Archive
 import ArchiveList from "./pages/archive/ArchiveList";
 
-
-
 // Help
 import HelpCenter from "./pages/help/HelpCenter";
 
@@ -175,7 +173,10 @@ function AppRouter() {
           <Route path=":id" element={<ScheduleDetail />} />
           <Route path=":id/edit" element={<ScheduleForm />} />
           <Route path="meeting" element={<ScheduleCalendar />} />
-          <Route path="room" element={<div className="p-6">회의실 관리 (준비 중)</div>} />
+          <Route
+            path="room"
+            element={<div className="p-6">회의실 관리 (준비 중)</div>}
+          />
         </Route>
 
         {/* 자료실 - with sidebar layout */}
@@ -183,8 +184,6 @@ function AppRouter() {
           <Route index element={<Navigate to="main" replace />} />
           <Route path="main" element={<ArchiveList />} />
         </Route>
-
-
 
         {/* 관리자 - with sidebar layout */}
         <Route path="admin" element={<AdminLayout />}>
@@ -218,21 +217,87 @@ function AppRouter() {
 
         {/* 영업관리 - with sidebar layout */}
         <Route path="operation" element={<OperationLayout />}>
-          <Route index element={<Navigate to="leads" replace />} />
-          <Route path="leads" element={<LeadList />} />
-          <Route path="leads/new" element={<LeadForm />} />
-          <Route path="leads/:id" element={<LeadDetail />} />
-          <Route path="leads/:id/edit" element={<LeadForm />} />
-          <Route path="pipeline" element={<PipelineBoard />} />
-          <Route path="pipeline/settings" element={<PipelineSettings />} />
-          <Route path="inbox" element={<Inbox />} />
-          <Route path="todo" element={<TodoCalendar />} />
-          <Route path="customers" element={<CustomerList />} />
-          <Route path="customers/:id" element={<CustomerDetail />} />
-          <Route path="quotes" element={<QuoteList />} />
-          <Route path="quotes/new" element={<QuoteForm />} />
-          <Route path="quotes/:id" element={<QuoteForm />} />
-          <Route path="templates" element={<QuoteTemplateList />} />
+          {/* ✅ 통일된 진입점 */}
+          <Route index element={<Navigate to="sales/leads" replace />} />
+
+          {/* ✅ 신규 표준 라우팅: /operation/sales/* */}
+          <Route path="sales">
+            <Route index element={<Navigate to="leads" replace />} />
+
+            <Route path="leads" element={<LeadList />} />
+            <Route path="leads/new" element={<LeadForm />} />
+            <Route path="leads/:id" element={<LeadDetail />} />
+            <Route path="leads/:id/edit" element={<LeadForm />} />
+
+            <Route path="pipeline" element={<PipelineBoard />} />
+            <Route path="pipeline/settings" element={<PipelineSettings />} />
+
+            <Route path="inbox" element={<Inbox />} />
+            <Route path="todo" element={<TodoCalendar />} />
+
+            <Route path="customers" element={<CustomerList />} />
+            <Route path="customers/:id" element={<CustomerDetail />} />
+
+            <Route path="quotes" element={<QuoteList />} />
+            <Route path="quotes/new" element={<QuoteForm />} />
+            <Route path="quotes/:id" element={<QuoteForm />} />
+
+            <Route path="templates" element={<QuoteTemplateList />} />
+          </Route>
+
+          {/* ✅ Legacy redirect (기존 /operation/* 깨짐 방지) */}
+          <Route path="leads" element={<Navigate to="sales/leads" replace />} />
+          <Route
+            path="leads/new"
+            element={<Navigate to="sales/leads/new" replace />}
+          />
+          <Route
+            path="leads/:id"
+            element={<Navigate to="../sales/leads/:id" replace />}
+          />
+          <Route
+            path="leads/:id/edit"
+            element={<Navigate to="../sales/leads/:id/edit" replace />}
+          />
+
+          <Route
+            path="pipeline"
+            element={<Navigate to="sales/pipeline" replace />}
+          />
+          <Route
+            path="pipeline/settings"
+            element={<Navigate to="sales/pipeline/settings" replace />}
+          />
+
+          <Route path="inbox" element={<Navigate to="sales/inbox" replace />} />
+          <Route path="todo" element={<Navigate to="sales/todo" replace />} />
+
+          <Route
+            path="customers"
+            element={<Navigate to="sales/customers" replace />}
+          />
+          <Route
+            path="customers/:id"
+            element={<Navigate to="../sales/customers/:id" replace />}
+          />
+
+          <Route
+            path="quotes"
+            element={<Navigate to="sales/quotes" replace />}
+          />
+          <Route
+            path="quotes/new"
+            element={<Navigate to="sales/quotes/new" replace />}
+          />
+          <Route
+            path="quotes/:id"
+            element={<Navigate to="../sales/quotes/:id" replace />}
+          />
+
+          <Route
+            path="templates"
+            element={<Navigate to="sales/templates" replace />}
+          />
         </Route>
 
         {/* 도움말 */}

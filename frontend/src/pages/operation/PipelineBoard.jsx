@@ -5,7 +5,13 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
-import { FiPlus, FiDollarSign, FiCalendar, FiUser, FiAlertCircle } from "react-icons/fi";
+import {
+  FiPlus,
+  FiDollarSign,
+  FiCalendar,
+  FiUser,
+  FiAlertCircle,
+} from "react-icons/fi";
 import { SalesService } from "../../api/operation";
 
 function PipelineBoard() {
@@ -34,7 +40,7 @@ function PipelineBoard() {
 
   const fetchBoardData = useCallback(async () => {
     if (!selectedPipeline) return;
-    
+
     setLoading(true);
     try {
       const data = await SalesService.getPipelineLeads(selectedPipeline);
@@ -60,7 +66,10 @@ function PipelineBoard() {
     const { destination, source, draggableId } = result;
 
     if (!destination) return;
-    if (destination.droppableId === source.droppableId && destination.index === source.index) {
+    if (
+      destination.droppableId === source.droppableId &&
+      destination.index === source.index
+    ) {
       return;
     }
 
@@ -70,16 +79,18 @@ function PipelineBoard() {
     // Optimistic update
     const newBoardData = { ...boardData };
     const sourceStageId = parseInt(source.droppableId.replace("stage-", ""));
-    
+
     // Find the lead
-    const leadIndex = newBoardData[sourceStageId].leads.findIndex(l => l.id === leadId);
+    const leadIndex = newBoardData[sourceStageId].leads.findIndex(
+      (l) => l.id === leadId
+    );
     if (leadIndex === -1) return;
-    
+
     const [movedLead] = newBoardData[sourceStageId].leads.splice(leadIndex, 1);
     movedLead.stage = newStageId;
     movedLead.stage_name = newBoardData[newStageId].stage.name;
     movedLead.stage_color = newBoardData[newStageId].stage.color;
-    
+
     newBoardData[newStageId].leads.splice(destination.index, 0, movedLead);
     setBoardData(newBoardData);
 
@@ -109,9 +120,13 @@ function PipelineBoard() {
     return `${date.getMonth() + 1}/${date.getDate()}`;
   };
 
-  const stageIds = Object.keys(boardData).map(Number).sort((a, b) => {
-    return (boardData[a]?.stage?.order || 0) - (boardData[b]?.stage?.order || 0);
-  });
+  const stageIds = Object.keys(boardData)
+    .map(Number)
+    .sort((a, b) => {
+      return (
+        (boardData[a]?.stage?.order || 0) - (boardData[b]?.stage?.order || 0)
+      );
+    });
 
   return (
     <div className="h-full flex flex-col">
@@ -125,7 +140,9 @@ function PipelineBoard() {
             className="input-base text-sm w-48"
           >
             {pipelines.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
             ))}
           </select>
         </div>
@@ -141,8 +158,7 @@ function PipelineBoard() {
             onClick={() => navigate("/operation/leads/new")}
             className="btn-create flex items-center gap-2"
           >
-            <FiPlus className="w-4 h-4" />
-            새 영업기회
+            <FiPlus className="w-4 h-4" />새 영업기회
           </button>
         </div>
       </div>
@@ -155,11 +171,23 @@ function PipelineBoard() {
       ) : pipelines.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center text-center">
           <div className="text-gray-400 mb-4">
-            <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+            <svg
+              className="w-16 h-16 mx-auto"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"
+              />
             </svg>
           </div>
-          <h3 className="text-lg font-medium text-gray-700 mb-2">파이프라인이 없습니다</h3>
+          <h3 className="text-lg font-medium text-gray-700 mb-2">
+            파이프라인이 없습니다
+          </h3>
           <p className="text-gray-500 mb-6">
             먼저 파이프라인과 단계를 생성해야 합니다.
           </p>
@@ -177,10 +205,13 @@ function PipelineBoard() {
             {stageIds.map((stageId) => {
               const stageData = boardData[stageId];
               if (!stageData) return null;
-              
+
               const { stage, leads } = stageData;
-              const totalAmount = leads.reduce((sum, l) => sum + (parseFloat(l.expected_amount) || 0), 0);
-              
+              const totalAmount = leads.reduce(
+                (sum, l) => sum + (parseFloat(l.expected_amount) || 0),
+                0
+              );
+
               return (
                 <div key={stageId} className="flex-shrink-0 w-72">
                   {/* Stage Header */}
@@ -193,14 +224,18 @@ function PipelineBoard() {
                         className="w-3 h-3 rounded-full"
                         style={{ backgroundColor: stage.color }}
                       />
-                      <span className="font-medium text-sm text-gray-800">{stage.name}</span>
+                      <span className="font-medium text-sm text-gray-800">
+                        {stage.name}
+                      </span>
                       <span className="bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full text-xs">
                         {leads.length}
                       </span>
                     </div>
-                    <span className="text-xs text-gray-500">{formatAmount(totalAmount)}</span>
+                    <span className="text-xs text-gray-500">
+                      {formatAmount(totalAmount)}
+                    </span>
                   </div>
-                  
+
                   {/* Stage Column */}
                   <Droppable droppableId={`stage-${stageId}`}>
                     {(provided, snapshot) => (
@@ -223,9 +258,15 @@ function PipelineBoard() {
                                   ref={provided.innerRef}
                                   {...provided.draggableProps}
                                   {...provided.dragHandleProps}
-                                  onClick={() => navigate(`/operation/leads/${lead.id}`)}
+                                  onClick={() =>
+                                    navigate(
+                                      `/operation/sales/leads/${lead.id}`
+                                    )
+                                  }
                                   className={`bg-white rounded-lg p-3 border border-gray-200 cursor-pointer hover:shadow-md transition-shadow ${
-                                    snapshot.isDragging ? "shadow-lg ring-2 ring-blue-500" : ""
+                                    snapshot.isDragging
+                                      ? "shadow-lg ring-2 ring-blue-500"
+                                      : ""
                                   }`}
                                 >
                                   {/* Lead Card */}
@@ -235,7 +276,9 @@ function PipelineBoard() {
                                         {lead.title}
                                       </p>
                                       {lead.company_name && (
-                                        <p className="text-xs text-gray-500 mt-1">{lead.company_name}</p>
+                                        <p className="text-xs text-gray-500 mt-1">
+                                          {lead.company_name}
+                                        </p>
                                       )}
                                     </div>
                                     {lead.is_stalled && (
@@ -245,7 +288,7 @@ function PipelineBoard() {
                                       </span>
                                     )}
                                   </div>
-                                  
+
                                   <div className="flex items-center gap-3 text-xs text-gray-500">
                                     {lead.expected_amount && (
                                       <span className="flex items-center gap-1">

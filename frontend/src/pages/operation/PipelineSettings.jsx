@@ -4,7 +4,15 @@
  */
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { FiArrowLeft, FiPlus, FiEdit2, FiTrash2, FiCheck, FiX, FiMove } from "react-icons/fi";
+import {
+  FiArrowLeft,
+  FiPlus,
+  FiEdit2,
+  FiTrash2,
+  FiCheck,
+  FiX,
+  FiMove,
+} from "react-icons/fi";
 import { SalesService } from "../../api/operation";
 
 function PipelineSettings() {
@@ -13,16 +21,22 @@ function PipelineSettings() {
   const [selectedPipeline, setSelectedPipeline] = useState(null);
   const [stages, setStages] = useState([]);
   const [loading, setLoading] = useState(true);
-  
+
   // 파이프라인 편집
   const [editingPipeline, setEditingPipeline] = useState(null);
-  const [pipelineForm, setPipelineForm] = useState({ name: "", description: "" });
+  const [pipelineForm, setPipelineForm] = useState({
+    name: "",
+    description: "",
+  });
   const [savingPipeline, setSavingPipeline] = useState(false);
-  
+
   // 단계 편집
   const [editingStage, setEditingStage] = useState(null);
   const [stageForm, setStageForm] = useState({
-    name: "", stage_type: "open", probability: 50, color: "#3B82F6"
+    name: "",
+    stage_type: "open",
+    probability: 50,
+    color: "#3B82F6",
   });
   const [savingStage, setSavingStage] = useState(false);
 
@@ -67,12 +81,15 @@ function PipelineSettings() {
 
   const handleEditPipeline = (pipeline) => {
     setEditingPipeline(pipeline.id);
-    setPipelineForm({ name: pipeline.name, description: pipeline.description || "" });
+    setPipelineForm({
+      name: pipeline.name,
+      description: pipeline.description || "",
+    });
   };
 
   const handleSavePipeline = async () => {
     if (!pipelineForm.name.trim()) return;
-    
+
     setSavingPipeline(true);
     try {
       if (editingPipeline === "new") {
@@ -80,8 +97,13 @@ function PipelineSettings() {
         setPipelines([...pipelines, created]);
         setSelectedPipeline(created);
       } else {
-        const updated = await SalesService.updatePipeline(editingPipeline, pipelineForm);
-        setPipelines(pipelines.map(p => p.id === editingPipeline ? updated : p));
+        const updated = await SalesService.updatePipeline(
+          editingPipeline,
+          pipelineForm
+        );
+        setPipelines(
+          pipelines.map((p) => (p.id === editingPipeline ? updated : p))
+        );
         if (selectedPipeline?.id === editingPipeline) {
           setSelectedPipeline(updated);
         }
@@ -95,11 +117,16 @@ function PipelineSettings() {
   };
 
   const handleDeletePipeline = async (id) => {
-    if (!window.confirm("파이프라인을 삭제하시겠습니까? 관련된 모든 단계도 함께 삭제됩니다.")) return;
-    
+    if (
+      !window.confirm(
+        "파이프라인을 삭제하시겠습니까? 관련된 모든 단계도 함께 삭제됩니다."
+      )
+    )
+      return;
+
     try {
       await SalesService.deletePipeline(id);
-      const remaining = pipelines.filter(p => p.id !== id);
+      const remaining = pipelines.filter((p) => p.id !== id);
       setPipelines(remaining);
       if (selectedPipeline?.id === id) {
         setSelectedPipeline(remaining.length > 0 ? remaining[0] : null);
@@ -117,7 +144,7 @@ function PipelineSettings() {
       stage_type: "open",
       probability: 50,
       color: "#3B82F6",
-      order: stages.length
+      order: stages.length,
     });
   };
 
@@ -127,27 +154,27 @@ function PipelineSettings() {
       name: stage.name,
       stage_type: stage.stage_type,
       probability: stage.probability,
-      color: stage.color
+      color: stage.color,
     });
   };
 
   const handleSaveStage = async () => {
     if (!stageForm.name.trim() || !selectedPipeline) return;
-    
+
     setSavingStage(true);
     try {
       const data = {
         ...stageForm,
-        pipeline: selectedPipeline.id
+        pipeline: selectedPipeline.id,
       };
-      
+
       if (editingStage === "new") {
         data.order = stages.length;
         const created = await SalesService.createStage(data);
         setStages([...stages, created]);
       } else {
         const updated = await SalesService.updateStage(editingStage, stageForm);
-        setStages(stages.map(s => s.id === editingStage ? updated : s));
+        setStages(stages.map((s) => (s.id === editingStage ? updated : s)));
       }
       setEditingStage(null);
     } catch (error) {
@@ -159,10 +186,10 @@ function PipelineSettings() {
 
   const handleDeleteStage = async (id) => {
     if (!window.confirm("단계를 삭제하시겠습니까?")) return;
-    
+
     try {
       await SalesService.deleteStage(id);
-      setStages(stages.filter(s => s.id !== id));
+      setStages(stages.filter((s) => s.id !== id));
     } catch (error) {
       console.error("Error deleting stage:", error);
     }
@@ -171,7 +198,7 @@ function PipelineSettings() {
   const stageTypeLabels = {
     open: "진행중",
     won: "수주",
-    lost: "실주"
+    lost: "실주",
   };
 
   const colorPresets = [
@@ -197,7 +224,10 @@ function PipelineSettings() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <button onClick={() => navigate("/operation/pipeline")} className="p-2 hover:bg-gray-100 rounded-lg">
+        <button
+          onClick={() => navigate("/operation/sales/pipeline")}
+          className="p-2 hover:bg-gray-100 rounded-lg"
+        >
           <FiArrowLeft className="w-5 h-5" />
         </button>
         <h1 className="text-title">파이프라인 설정</h1>
@@ -208,7 +238,10 @@ function PipelineSettings() {
         <div className="page-box">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-gray-700">파이프라인</h3>
-            <button onClick={handleAddPipeline} className="btn-create-sm flex items-center gap-1">
+            <button
+              onClick={handleAddPipeline}
+              className="btn-create-sm flex items-center gap-1"
+            >
               <FiPlus className="w-3 h-3" />
               추가
             </button>
@@ -216,16 +249,20 @@ function PipelineSettings() {
 
           <div className="space-y-2">
             {pipelines.length === 0 && !editingPipeline && (
-              <p className="text-center text-gray-500 py-4">파이프라인을 추가해주세요.</p>
+              <p className="text-center text-gray-500 py-4">
+                파이프라인을 추가해주세요.
+              </p>
             )}
-            
+
             {/* 새 파이프라인 입력 */}
             {editingPipeline === "new" && (
               <div className="p-3 border-2 border-blue-500 rounded-lg bg-blue-50">
                 <input
                   type="text"
                   value={pipelineForm.name}
-                  onChange={(e) => setPipelineForm({ ...pipelineForm, name: e.target.value })}
+                  onChange={(e) =>
+                    setPipelineForm({ ...pipelineForm, name: e.target.value })
+                  }
                   placeholder="파이프라인 이름"
                   className="input-base mb-2"
                   autoFocus
@@ -248,11 +285,14 @@ function PipelineSettings() {
                 </div>
               </div>
             )}
-            
+
             {pipelines.map((pipeline) => (
               <div
                 key={pipeline.id}
-                onClick={() => editingPipeline !== pipeline.id && setSelectedPipeline(pipeline)}
+                onClick={() =>
+                  editingPipeline !== pipeline.id &&
+                  setSelectedPipeline(pipeline)
+                }
                 className={`p-3 rounded-lg border transition-colors cursor-pointer ${
                   selectedPipeline?.id === pipeline.id
                     ? "border-blue-500 bg-blue-50"
@@ -264,7 +304,12 @@ function PipelineSettings() {
                     <input
                       type="text"
                       value={pipelineForm.name}
-                      onChange={(e) => setPipelineForm({ ...pipelineForm, name: e.target.value })}
+                      onChange={(e) =>
+                        setPipelineForm({
+                          ...pipelineForm,
+                          name: e.target.value,
+                        })
+                      }
                       className="input-base mb-2"
                       autoFocus
                     />
@@ -287,20 +332,28 @@ function PipelineSettings() {
                 ) : (
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-medium text-gray-900">{pipeline.name}</p>
+                      <p className="font-medium text-gray-900">
+                        {pipeline.name}
+                      </p>
                       {pipeline.is_default && (
                         <span className="text-xs text-blue-600">기본</span>
                       )}
                     </div>
                     <div className="flex items-center gap-1">
                       <button
-                        onClick={(e) => { e.stopPropagation(); handleEditPipeline(pipeline); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditPipeline(pipeline);
+                        }}
                         className="p-1 text-gray-400 hover:text-gray-600"
                       >
                         <FiEdit2 className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={(e) => { e.stopPropagation(); handleDeletePipeline(pipeline.id); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeletePipeline(pipeline.id);
+                        }}
                         className="p-1 text-gray-400 hover:text-red-600"
                       >
                         <FiTrash2 className="w-4 h-4" />
@@ -320,7 +373,10 @@ function PipelineSettings() {
               {selectedPipeline ? `${selectedPipeline.name} - 단계` : "단계"}
             </h3>
             {selectedPipeline && (
-              <button onClick={handleAddStage} className="btn-create-sm flex items-center gap-1">
+              <button
+                onClick={handleAddStage}
+                className="btn-create-sm flex items-center gap-1"
+              >
                 <FiPlus className="w-3 h-3" />
                 단계 추가
               </button>
@@ -328,9 +384,13 @@ function PipelineSettings() {
           </div>
 
           {!selectedPipeline ? (
-            <p className="text-center text-gray-500 py-8">파이프라인을 선택해주세요.</p>
+            <p className="text-center text-gray-500 py-8">
+              파이프라인을 선택해주세요.
+            </p>
           ) : stages.length === 0 && !editingStage ? (
-            <p className="text-center text-gray-500 py-8">단계를 추가해주세요.</p>
+            <p className="text-center text-gray-500 py-8">
+              단계를 추가해주세요.
+            </p>
           ) : (
             <div className="space-y-2">
               {/* 새 단계 입력 */}
@@ -338,21 +398,32 @@ function PipelineSettings() {
                 <div className="p-4 border-2 border-blue-500 rounded-lg bg-blue-50">
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
                     <div className="col-span-2">
-                      <label className="block text-xs text-gray-600 mb-1">단계명</label>
+                      <label className="block text-xs text-gray-600 mb-1">
+                        단계명
+                      </label>
                       <input
                         type="text"
                         value={stageForm.name}
-                        onChange={(e) => setStageForm({ ...stageForm, name: e.target.value })}
+                        onChange={(e) =>
+                          setStageForm({ ...stageForm, name: e.target.value })
+                        }
                         className="input-base"
                         placeholder="예: 신규 접수"
                         autoFocus
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-600 mb-1">유형</label>
+                      <label className="block text-xs text-gray-600 mb-1">
+                        유형
+                      </label>
                       <select
                         value={stageForm.stage_type}
-                        onChange={(e) => setStageForm({ ...stageForm, stage_type: e.target.value })}
+                        onChange={(e) =>
+                          setStageForm({
+                            ...stageForm,
+                            stage_type: e.target.value,
+                          })
+                        }
                         className="input-base"
                       >
                         <option value="open">진행중</option>
@@ -361,19 +432,28 @@ function PipelineSettings() {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-600 mb-1">확률 (%)</label>
+                      <label className="block text-xs text-gray-600 mb-1">
+                        확률 (%)
+                      </label>
                       <input
                         type="number"
                         min="0"
                         max="100"
                         value={stageForm.probability}
-                        onChange={(e) => setStageForm({ ...stageForm, probability: parseInt(e.target.value) || 0 })}
+                        onChange={(e) =>
+                          setStageForm({
+                            ...stageForm,
+                            probability: parseInt(e.target.value) || 0,
+                          })
+                        }
                         className="input-base"
                       />
                     </div>
                   </div>
                   <div className="mb-3">
-                    <label className="block text-xs text-gray-600 mb-1">색상</label>
+                    <label className="block text-xs text-gray-600 mb-1">
+                      색상
+                    </label>
                     <div className="flex gap-2">
                       {colorPresets.map((color) => (
                         <button
@@ -381,7 +461,9 @@ function PipelineSettings() {
                           type="button"
                           onClick={() => setStageForm({ ...stageForm, color })}
                           className={`w-8 h-8 rounded-full border-2 ${
-                            stageForm.color === color ? "border-gray-800" : "border-transparent"
+                            stageForm.color === color
+                              ? "border-gray-800"
+                              : "border-transparent"
                           }`}
                           style={{ backgroundColor: color }}
                         />
@@ -411,7 +493,9 @@ function PipelineSettings() {
                 <div
                   key={stage.id}
                   className={`p-3 rounded-lg border transition-colors ${
-                    editingStage === stage.id ? "border-blue-500 bg-blue-50" : "border-gray-200"
+                    editingStage === stage.id
+                      ? "border-blue-500 bg-blue-50"
+                      : "border-gray-200"
                   }`}
                 >
                   {editingStage === stage.id ? (
@@ -421,7 +505,12 @@ function PipelineSettings() {
                           <input
                             type="text"
                             value={stageForm.name}
-                            onChange={(e) => setStageForm({ ...stageForm, name: e.target.value })}
+                            onChange={(e) =>
+                              setStageForm({
+                                ...stageForm,
+                                name: e.target.value,
+                              })
+                            }
                             className="input-base"
                             autoFocus
                           />
@@ -429,7 +518,12 @@ function PipelineSettings() {
                         <div>
                           <select
                             value={stageForm.stage_type}
-                            onChange={(e) => setStageForm({ ...stageForm, stage_type: e.target.value })}
+                            onChange={(e) =>
+                              setStageForm({
+                                ...stageForm,
+                                stage_type: e.target.value,
+                              })
+                            }
                             className="input-base"
                           >
                             <option value="open">진행중</option>
@@ -443,7 +537,12 @@ function PipelineSettings() {
                             min="0"
                             max="100"
                             value={stageForm.probability}
-                            onChange={(e) => setStageForm({ ...stageForm, probability: parseInt(e.target.value) || 0 })}
+                            onChange={(e) =>
+                              setStageForm({
+                                ...stageForm,
+                                probability: parseInt(e.target.value) || 0,
+                              })
+                            }
                             className="input-base"
                           />
                         </div>
@@ -453,19 +552,30 @@ function PipelineSettings() {
                           <button
                             key={color}
                             type="button"
-                            onClick={() => setStageForm({ ...stageForm, color })}
+                            onClick={() =>
+                              setStageForm({ ...stageForm, color })
+                            }
                             className={`w-6 h-6 rounded-full border-2 ${
-                              stageForm.color === color ? "border-gray-800" : "border-transparent"
+                              stageForm.color === color
+                                ? "border-gray-800"
+                                : "border-transparent"
                             }`}
                             style={{ backgroundColor: color }}
                           />
                         ))}
                       </div>
                       <div className="flex gap-2">
-                        <button onClick={handleSaveStage} disabled={savingStage} className="btn-save-sm">
+                        <button
+                          onClick={handleSaveStage}
+                          disabled={savingStage}
+                          className="btn-save-sm"
+                        >
                           <FiCheck className="w-4 h-4" />
                         </button>
-                        <button onClick={() => setEditingStage(null)} className="btn-cancel-sm">
+                        <button
+                          onClick={() => setEditingStage(null)}
+                          className="btn-cancel-sm"
+                        >
                           <FiX className="w-4 h-4" />
                         </button>
                       </div>
@@ -480,15 +590,23 @@ function PipelineSettings() {
                           className="w-4 h-4 rounded-full"
                           style={{ backgroundColor: stage.color }}
                         />
-                        <span className="font-medium text-gray-900">{stage.name}</span>
-                        <span className={`px-2 py-0.5 rounded text-xs ${
-                          stage.stage_type === "won" ? "bg-green-100 text-green-700" :
-                          stage.stage_type === "lost" ? "bg-red-100 text-red-700" :
-                          "bg-blue-100 text-blue-700"
-                        }`}>
+                        <span className="font-medium text-gray-900">
+                          {stage.name}
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 rounded text-xs ${
+                            stage.stage_type === "won"
+                              ? "bg-green-100 text-green-700"
+                              : stage.stage_type === "lost"
+                              ? "bg-red-100 text-red-700"
+                              : "bg-blue-100 text-blue-700"
+                          }`}
+                        >
                           {stageTypeLabels[stage.stage_type]}
                         </span>
-                        <span className="text-sm text-gray-500">{stage.probability}%</span>
+                        <span className="text-sm text-gray-500">
+                          {stage.probability}%
+                        </span>
                       </div>
                       <div className="flex items-center gap-1">
                         <button
