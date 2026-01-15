@@ -6,6 +6,10 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { FiPlus, FiFileText, FiSearch, FiSend } from "react-icons/fi";
 import { QuoteService } from "../../api/operation";
+import BoardTable from "../../components/common/board/BoardTable";
+import BoardToolbar from "../../components/common/board/BoardToolbar";
+import BoardPagination from "../../components/common/board/BoardPagination";
+import SearchFilterBar from "../../components/common/board/SearchFilterBar";
 
 function QuoteList() {
   const navigate = useNavigate();
@@ -13,33 +17,27 @@ function QuoteList() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const pageSize = 20;
 
   const fetchQuotes = useCallback(async () => {
     setLoading(true);
     try {
-      const params = {};
+      const params = { page, page_size: pageSize };
       if (statusFilter) params.status = statusFilter;
+      if (searchQuery) params.search = searchQuery;
 
       const data = await QuoteService.getQuotes(params);
-      let results = data.results || data;
-
-      // 클라이언트 사이드 검색
-      if (searchQuery) {
-        results = results.filter(
-          (q) =>
-            q.quote_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            q.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            q.company_name?.toLowerCase().includes(searchQuery.toLowerCase())
-        );
-      }
-
+      const results = data.results || data;
       setQuotes(results);
+      setTotal(data.count ?? results.length);
     } catch (error) {
       console.error("Error fetching quotes:", error);
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, searchQuery]);
+  }, [statusFilter, searchQuery, page, pageSize]);
 
   useEffect(() => {
     fetchQuotes();
@@ -75,127 +73,142 @@ function QuoteList() {
     expired: { label: "만료", color: "bg-orange-100 text-orange-700" },
   };
 
+  const columns = [
+    {
+      key: "quote_number",
+      header: "견적번호",
+      align: "left",
+      render: (quote) => (
+        <span className="text-sm font-mono">{quote.quote_number}</span>
+      ),
+    },
+    {
+      key: "title",
+      header: "제목",
+      align: "left",
+      render: (quote) => quote.title,
+    },
+    {
+      key: "company_name",
+      header: "고객사",
+      align: "left",
+      render: (quote) => quote.company_name || "-",
+    },
+    {
+      key: "lead_title",
+      header: "영업기회",
+      align: "left",
+      render: (quote) => quote.lead_title || "-",
+    },
+    {
+      key: "total_amount",
+      header: "총액",
+      align: "right",
+      render: (quote) => formatAmount(quote.total_amount),
+    },
+    {
+      key: "status",
+      header: "상태",
+      align: "center",
+      render: (quote) => (
+        <span
+          className={`px-2 py-1 rounded-full text-xs font-medium ${
+            statusLabels[quote.status]?.color || "bg-gray-100 text-gray-700"
+          }`}
+        >
+          {statusLabels[quote.status]?.label || quote.status}
+        </span>
+      ),
+    },
+    {
+      key: "created_at",
+      header: "작성일",
+      align: "center",
+      render: (quote) => formatDate(quote.created_at),
+    },
+    {
+      key: "actions",
+      header: "액션",
+      align: "center",
+      render: (quote) =>
+        quote.status === "draft" ? (
+          <button
+            onClick={(e) => handleSend(e, quote.id)}
+            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"
+            title="발송"
+          >
+            <FiSend className="w-4 h-4" />
+          </button>
+        ) : (
+          "-"
+        ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <FiFileText className="w-6 h-6 text-blue-600" />
-          <h1 className="text-title">견적서</h1>
-        </div>
-        <button
-          onClick={() => navigate("/operation/sales/quotes/new")}
-          className="btn-create flex items-center gap-2"
-        >
-          <FiPlus className="w-4 h-4" />
-          견적서 작성
-        </button>
-      </div>
-
-      {/* Filters */}
-      <div className="page-box">
-        <div className="flex gap-4">
-          <div className="flex-1 relative">
-            <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="견적번호, 제목, 고객사..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="input-search"
-            />
-          </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="input-base w-32"
+      <BoardToolbar
+        title="견적서"
+        actions={
+          <button
+            onClick={() => navigate("/operation/sales/quotes/new")}
+            className="btn-create flex items-center gap-2"
           >
-            <option value="">전체 상태</option>
-            <option value="draft">작성중</option>
-            <option value="sent">발송됨</option>
-            <option value="accepted">수락</option>
-            <option value="rejected">거절</option>
-            <option value="expired">만료</option>
-          </select>
-        </div>
-      </div>
+            <FiPlus className="w-4 h-4" />
+            견적서 작성
+          </button>
+        }
+      />
 
-      {/* List */}
-      <div className="page-box overflow-x-auto">
-        {loading ? (
-          <div className="flex justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-500 border-t-transparent" />
-          </div>
-        ) : quotes.length === 0 ? (
-          <div className="text-center py-12">
-            <FiFileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500">등록된 견적서가 없습니다.</p>
-          </div>
-        ) : (
-          <table className="w-full">
-            <thead className="doc-thead">
-              <tr>
-                <th className="doc-th text-left">견적번호</th>
-                <th className="doc-th text-left">제목</th>
-                <th className="doc-th text-left">고객사</th>
-                <th className="doc-th text-left">영업기회</th>
-                <th className="doc-th text-right">총액</th>
-                <th className="doc-th text-center">상태</th>
-                <th className="doc-th text-center">작성일</th>
-                <th className="doc-th-end text-center">액션</th>
-              </tr>
-            </thead>
-            <tbody>
-              {quotes.map((quote) => (
-                <tr
-                  key={quote.id}
-                  onClick={() =>
-                    navigate(`/operation/sales/quotes/${quote.id}`)
-                  }
-                  className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
-                >
-                  <td className="px-3 py-3 text-sm font-mono">
-                    {quote.quote_number}
-                  </td>
-                  <td className="px-3 py-3 text-sm">{quote.title}</td>
-                  <td className="px-3 py-3 text-sm">
-                    {quote.company_name || "-"}
-                  </td>
-                  <td className="px-3 py-3 text-sm">
-                    {quote.lead_title || "-"}
-                  </td>
-                  <td className="px-3 py-3 text-sm text-right font-medium">
-                    {formatAmount(quote.total_amount)}
-                  </td>
-                  <td className="px-3 py-3 text-center">
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        statusLabels[quote.status]?.color
-                      }`}
-                    >
-                      {statusLabels[quote.status]?.label}
-                    </span>
-                  </td>
-                  <td className="px-3 py-3 text-sm text-center">
-                    {formatDate(quote.created_at)}
-                  </td>
-                  <td className="px-3 py-3 text-center">
-                    {quote.status === "draft" && (
-                      <button
-                        onClick={(e) => handleSend(e, quote.id)}
-                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"
-                        title="발송"
-                      >
-                        <FiSend className="w-4 h-4" />
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      <SearchFilterBar
+        onSubmit={(e) => {
+          e.preventDefault();
+          setPage(1);
+        }}
+        actions={
+          <button type="submit" className="btn-search">
+            검색
+          </button>
+        }
+      >
+        <div className="flex-1 relative min-w-[240px]">
+          <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="견적번호, 제목, 고객사.."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="input-search"
+          />
+        </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="input-base w-32"
+        >
+          <option value="">전체 상태</option>
+          <option value="draft">작성중</option>
+          <option value="sent">발송됨</option>
+          <option value="accepted">수락</option>
+          <option value="rejected">거절</option>
+          <option value="expired">만료</option>
+        </select>
+      </SearchFilterBar>
+
+      <BoardTable
+        columns={columns}
+        rows={quotes}
+        loading={loading}
+        onRowClick={(row) => navigate(`/operation/sales/quotes/${row.id}`)}
+      />
+
+      <BoardPagination
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        onPageChange={setPage}
+        className="page-box"
+      />
     </div>
   );
 }

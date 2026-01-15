@@ -61,6 +61,12 @@ function TodoCalendar() {
     fetchEvents();
   }, [fetchEvents]);
 
+  useEffect(() => {
+    if (selectedDate) {
+      setSelectedEvents(getEventsForDate(selectedDate));
+    }
+  }, [events, selectedDate]);
+
   const getDaysInMonth = () => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
@@ -96,6 +102,17 @@ function TodoCalendar() {
     if (!date) return;
     setSelectedDate(date);
     setSelectedEvents(getEventsForDate(date));
+  };
+
+  const handleCompleteTask = async (e, event) => {
+    e.stopPropagation();
+    if (!event?.source_id) return;
+    try {
+      await SalesService.completeTask(event.source_id);
+      fetchEvents();
+    } catch (error) {
+      console.error("Error completing task:", error);
+    }
   };
 
   const prevMonth = () => {
@@ -257,36 +274,45 @@ function TodoCalendar() {
                     }
                     className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
                   >
-                    <div className="flex items-start gap-2">
-                      {event.event_type === "task" ? (
-                        <FiCheck
-                          className={`w-4 h-4 mt-0.5 ${
-                            event.is_completed
-                              ? "text-green-500"
-                              : "text-gray-400"
-                          }`}
-                        />
-                      ) : (
-                        <FiTarget className="w-4 h-4 mt-0.5 text-orange-500" />
-                      )}
-                      <div className="flex-1">
-                        <p
-                          className={`text-sm font-medium ${
-                            event.is_completed
-                              ? "line-through text-gray-400"
-                              : "text-gray-900"
-                          }`}
-                        >
-                          {event.title}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {event.lead_title}
-                        </p>
-                      </div>
+                  <div className="flex items-start gap-2">
+                    {event.event_type === "task" ? (
+                      <FiCheck
+                        className={`w-4 h-4 mt-0.5 ${
+                          event.is_completed
+                            ? "text-green-500"
+                            : "text-gray-400"
+                        }`}
+                      />
+                    ) : (
+                      <FiTarget className="w-4 h-4 mt-0.5 text-orange-500" />
+                    )}
+                    <div className="flex-1">
+                      <p
+                        className={`text-sm font-medium ${
+                          event.is_completed
+                            ? "line-through text-gray-400"
+                            : "text-gray-900"
+                        }`}
+                      >
+                        {event.title}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {event.lead_title}
+                      </p>
                     </div>
+                    {event.event_type === "task" && !event.is_completed && (
+                      <button
+                        type="button"
+                        onClick={(e) => handleCompleteTask(e, event)}
+                        className="btn-basic-sm"
+                      >
+                        완료
+                      </button>
+                    )}
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
+            </div>
             )
           ) : (
             <p className="text-center text-gray-400 py-8">

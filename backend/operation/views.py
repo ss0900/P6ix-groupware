@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
 from django.db.models import Q, F, ExpressionWrapper, fields
@@ -39,8 +40,20 @@ from .filters import (
     SalesLeadFilter, LeadTaskFilter, QuoteFilter,
     SalesContractLinkFilter, TenderFilter, RevenueMilestoneFilter, CollectionFilter, EmailSendLogFilter
 )
-from .permissions import IsLeadOwnerOrAssignee, IsOwnerOrReadOnly, IsRelatedToLead
+from .permissions import (
+    IsLeadOwnerOrAssignee,
+    IsOwnerOrReadOnly,
+    IsRelatedToLead,
+    IsOperationManagerOrReadOnly,
+)
 from .services import LeadService
+
+
+class OperationPagination(PageNumberPagination):
+    page_size = 20
+    page_size_query_param = "page_size"
+    max_page_size = 200
+
 
 class WorkspaceScopedMixin:
     """
@@ -115,7 +128,7 @@ class SalesPipelineViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     """파이프라인 ViewSet"""
     queryset = SalesPipeline.objects.filter(is_active=True)
     serializer_class = SalesPipelineSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsOperationManagerOrReadOnly]
     
     @action(detail=True, methods=['get'])
     def stages(self, request, pk=None):
@@ -150,7 +163,7 @@ class SalesStageViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     """영업 단계 ViewSet"""
     queryset = SalesStage.objects.all()
     serializer_class = SalesStageSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsOperationManagerOrReadOnly]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['pipeline']
     workspace_field = "pipeline__workspace"
@@ -318,9 +331,7 @@ class SalesLeadViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
         })
         serializer.is_valid(raise_exception=True)
         task = serializer.save(created_by=request.user)
-        if task.due_date:
-            lead.next_action_due_at = task.due_date
-            lead.save(update_fields=["next_action_due_at"])
+        LeadService.refresh_next_action_due(lead)
         return Response(LeadTaskSerializer(task).data, status=status.HTTP_201_CREATED)
     
     @action(detail=True, methods=['get', 'post'], parser_classes=[MultiPartParser, FormParser])
@@ -362,7 +373,10 @@ class LeadActivityViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     
     def perform_create(self, serializer):
         # created_by만 주입 (workspace는 lead를 통해 스코프)
-        serializer.save(created_by=self.request.user)
+        activity = serializer.save(created_by=self.request.user)
+        if activity.activity_type in ['call', 'email', 'meeting']:
+            activity.lead.last_contacted_at = timezone.now()
+            activity.lead.save(update_fields=['last_contacted_at'])
 
 
 class LeadTaskViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
@@ -378,9 +392,23 @@ class LeadTaskViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     
     def perform_create(self, serializer):
         task = serializer.save(created_by=self.request.user)
-        if task.due_date:
-            task.lead.next_action_due_at = task.due_date
-            task.lead.save(update_fields=["next_action_due_at"])
+        if task.lead_id:
+            LeadService.refresh_next_action_due(task.lead)
+
+    def perform_update(self, serializer):
+        task = self.get_object()
+        prev_lead = task.lead
+        updated = serializer.save()
+        if prev_lead and prev_lead.id != updated.lead_id:
+            LeadService.refresh_next_action_due(prev_lead)
+        if updated.lead_id:
+            LeadService.refresh_next_action_due(updated.lead)
+
+    def perform_destroy(self, instance):
+        lead = instance.lead
+        instance.delete()
+        if lead:
+            LeadService.refresh_next_action_due(lead)
     
     @action(detail=True, methods=['post'])
     def complete(self, request, pk=None):
@@ -403,9 +431,8 @@ class LeadTaskViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
         task.is_completed = False
         task.completed_at = None
         task.save()
-        if task.due_date:
-            task.lead.next_action_due_at = task.due_date
-            task.lead.save(update_fields=["next_action_due_at"])
+        if task.lead_id:
+            LeadService.refresh_next_action_due(task.lead)
         return Response(LeadTaskSerializer(task).data)
 
 
@@ -421,11 +448,19 @@ class LeadFileViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     
     def perform_create(self, serializer):
         uploaded_file = self.request.FILES.get('file')
-        serializer.save(
+        lead_file = serializer.save(
             uploaded_by=self.request.user,
             name=uploaded_file.name if uploaded_file else '',
             size=uploaded_file.size if uploaded_file else 0
         )
+        if lead_file.lead_id:
+            LeadService.create_activity(
+                lead=lead_file.lead,
+                activity_type='file_added',
+                title=f"File added: {lead_file.name}",
+                content=f"File size: {lead_file.size} bytes",
+                user=self.request.user,
+            )
 
 
 # ============================================================
@@ -434,12 +469,14 @@ class LeadFileViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
 class QuoteViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     """견적서 ViewSet"""
     queryset = Quote.objects.all()
-    permission_classes = [IsAuthenticated]
-    filter_backends = [DjangoFilterBackend, rf_filters.OrderingFilter]
+    permission_classes = [IsAuthenticated, IsRelatedToLead]
+    filter_backends = [DjangoFilterBackend, rf_filters.SearchFilter, rf_filters.OrderingFilter]
     filterset_class = QuoteFilter
     ordering_fields = ['created_at', 'total_amount']
     ordering = ['-created_at']
     workspace_field = "workspace"
+    search_fields = ['quote_number', 'title', 'company__name', 'lead__title']
+    pagination_class = OperationPagination
     
     def perform_create(self, serializer):
         super().perform_create(serializer)
@@ -592,7 +629,7 @@ class SalesContractLinkViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     """계약 연결 ViewSet"""
     queryset = SalesContractLink.objects.all()
     serializer_class = SalesContractLinkSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRelatedToLead]
     filter_backends = [DjangoFilterBackend]
     filterset_class = SalesContractLinkFilter
     workspace_field = "workspace"
@@ -602,7 +639,7 @@ class TenderViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     """입찰 ViewSet"""
     queryset = Tender.objects.all()
     serializer_class = TenderSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRelatedToLead]
     filter_backends = [DjangoFilterBackend, rf_filters.SearchFilter, rf_filters.OrderingFilter]
     filterset_class = TenderFilter
     search_fields = ['title', 'description']
@@ -615,7 +652,7 @@ class RevenueMilestoneViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     """매출 계획 ViewSet"""
     queryset = RevenueMilestone.objects.all()
     serializer_class = RevenueMilestoneSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRelatedToLead]
     filter_backends = [DjangoFilterBackend, rf_filters.OrderingFilter]
     filterset_class = RevenueMilestoneFilter
     ordering_fields = ['planned_date', 'planned_amount', 'created_at']
@@ -627,7 +664,7 @@ class CollectionViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     """수금 ViewSet"""
     queryset = Collection.objects.all()
     serializer_class = CollectionSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRelatedToLead]
     filter_backends = [DjangoFilterBackend, rf_filters.OrderingFilter]
     filterset_class = CollectionFilter
     ordering_fields = ['due_date', 'amount', 'created_at']
@@ -655,7 +692,7 @@ class EmailSendLogViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     """이메일 발송 로그 ViewSet"""
     queryset = EmailSendLog.objects.all()
     serializer_class = EmailSendLogSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsRelatedToLead]
     filter_backends = [DjangoFilterBackend, rf_filters.OrderingFilter]
     filterset_class = EmailSendLogFilter
     ordering_fields = ['sent_at', 'created_at']
@@ -705,6 +742,7 @@ class CalendarFeedView(APIView):
                 'start': task.due_date,
                 'end': task.due_date,
                 'event_type': 'task',
+                'source_id': task.id,
                 'lead_id': task.lead.id,
                 'lead_title': task.lead.title,
                 'color': '#10B981' if task.is_completed else (
@@ -732,6 +770,7 @@ class CalendarFeedView(APIView):
                 'start': close_datetime,
                 'end': close_datetime,
                 'event_type': 'close_date',
+                'source_id': lead.id,
                 'lead_id': lead.id,
                 'lead_title': lead.title,
                 'color': '#F59E0B',
@@ -756,6 +795,7 @@ class CalendarFeedView(APIView):
                 'start': valid_datetime,
                 'end': valid_datetime,
                 'event_type': 'quote_valid_until',
+                'source_id': quote.id,
                 'lead_id': quote.lead_id,
                 'lead_title': quote.lead.title if quote.lead else "-",
                 'color': '#6366F1',
@@ -776,6 +816,7 @@ class CalendarFeedView(APIView):
                 'start': tender.deadline,
                 'end': tender.deadline,
                 'event_type': 'tender_deadline',
+                'source_id': tender.id,
                 'lead_id': tender.lead_id or 0,
                 'lead_title': tender.lead.title if tender.lead else "-",
                 'color': '#EF4444' if tender.status in ['lost'] else '#14B8A6',

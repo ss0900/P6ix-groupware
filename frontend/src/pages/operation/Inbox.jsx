@@ -2,29 +2,33 @@
 /**
  * 영업접수함 - 신규/미배정 리드
  */
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { FiInbox, FiUser, FiCalendar, FiArrowRight } from "react-icons/fi";
 import { SalesService } from "../../api/operation";
+import { fetchUsers } from "../../api/users/user";
 import Modal from "../../components/common/ui/Modal";
 
 function Inbox() {
   const navigate = useNavigate();
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [users, setUsers] = useState([]);
   const [acceptOpen, setAcceptOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState(null);
   const [stageOptions, setStageOptions] = useState([]);
   const [acceptForm, setAcceptForm] = useState({
     stage_id: "",
+    owner_id: "",
     note: "",
     create_task: true,
     task_title: "다음 액션",
     task_due_date: "",
     task_priority: "medium",
+    task_assignee_id: "",
   });
- 
-  const fetchInbox = async () => {
+
+  const fetchInbox = useCallback(async () => {
     setLoading(true);
     try {
       const data = await SalesService.getInbox();
@@ -34,11 +38,25 @@ function Inbox() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  const loadUsers = useCallback(async () => {
+    try {
+      const res = await fetchUsers();
+      const list = res.data?.results ?? res.data ?? [];
+      setUsers(list);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+    }
+  }, []);
 
   useEffect(() => {
     fetchInbox();
-  }, []);
+  }, [fetchInbox]);
+
+  useEffect(() => {
+    loadUsers();
+  }, [loadUsers]);
 
   const formatDate = (dateStr) => {
     if (!dateStr) return "-";
@@ -50,6 +68,11 @@ function Inbox() {
     return new Intl.NumberFormat("ko-KR").format(amount) + "원";
   };
 
+  const getUserLabel = (user) => {
+    const name = `${user.last_name ?? ""}${user.first_name ?? ""}`.trim();
+    return name || user.username || user.email || `사용자${user.id}`;
+  };
+
   const openAccept = async (lead, e) => {
     e?.stopPropagation();
     setSelectedLead(lead);
@@ -58,6 +81,8 @@ function Inbox() {
       ...prev,
       stage_id: "",
       note: "",
+      owner_id: lead.owner || "",
+      task_assignee_id: lead.owner || "",
     }));
     try {
       if (lead.pipeline) {
@@ -80,20 +105,17 @@ function Inbox() {
       return;
     }
     try {
-      // stage_id가 비어있으면 서버가 "다음 단계" 자동 처리 시도
       const payload = {
         stage_id: acceptForm.stage_id || null,
+        owner_id: acceptForm.owner_id || null,
         note: acceptForm.note,
         create_task: acceptForm.create_task,
-        // owner_id 미전달 -> 서버가 (owner 없으면) 현재 유저로 지정
       };
       if (acceptForm.create_task) {
         payload.task_title = acceptForm.task_title;
         payload.task_due_date = acceptForm.task_due_date || null;
         payload.task_priority = acceptForm.task_priority;
-        if (acceptForm.task_assignee_id) {
-          payload.task_assignee_id = acceptForm.task_assignee_id;
-        }
+        payload.task_assignee_id = acceptForm.task_assignee_id || null;
       }
       const leadId = selectedLead.id;
       await SalesService.acceptInbox(leadId, payload);
@@ -108,17 +130,15 @@ function Inbox() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center gap-3">
         <FiInbox className="w-6 h-6 text-blue-600" />
         <h1 className="text-title">영업접수</h1>
       </div>
 
       <p className="text-muted-sm">
-        담당자가 미배정되었거나 첫 단계에 있는 신규 영업기회입니다.
+        담당자 미배정 또는 첫 단계에 머무는 신규 영업기회입니다.
       </p>
 
-      {/* List */}
       <div className="page-box">
         {loading ? (
           <div className="flex justify-center py-12">
@@ -160,7 +180,7 @@ function Inbox() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                <button
+                  <button
                     onClick={(e) => openAccept(lead, e)}
                     className="px-3 py-1 rounded-lg text-sm border border-gray-200 hover:bg-gray-100"
                   >
@@ -172,9 +192,7 @@ function Inbox() {
                       {lead.owner_name}
                     </span>
                   ) : (
-                    <span className="text-sm text-orange-500">
-                      담당자 미배정
-                    </span>
+                    <span className="text-sm text-orange-500">담당자 미배정</span>
                   )}
                   <FiArrowRight className="w-5 h-5 text-gray-400" />
                 </div>
@@ -183,7 +201,7 @@ function Inbox() {
           </div>
         )}
       </div>
-      {/* Accept Modal */}
+
       <Modal
         isOpen={acceptOpen}
         onClose={() => setAcceptOpen(false)}
@@ -198,6 +216,26 @@ function Inbox() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
+              담당자 지정
+            </label>
+            <select
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+              value={acceptForm.owner_id}
+              onChange={(e) =>
+                setAcceptForm((p) => ({ ...p, owner_id: e.target.value }))
+              }
+            >
+              <option value="">(미지정)</option>
+              {users.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {getUserLabel(user)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               이동할 단계 (선택)
             </label>
             <select
@@ -207,7 +245,7 @@ function Inbox() {
                 setAcceptForm((p) => ({ ...p, stage_id: e.target.value }))
               }
             >
-              <option value="">(미선택 시 다음 단계 자동)</option>
+              <option value="">(미선택 시 다음 단계 이동)</option>
               {stageOptions.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
@@ -225,7 +263,7 @@ function Inbox() {
               rows={3}
               value={acceptForm.note}
               onChange={(e) => setAcceptForm((p) => ({ ...p, note: e.target.value }))}
-              placeholder="접수 메모를 남겨두면 활동 로그에 저장됩니다."
+              placeholder="접수 메모를 남기면 활동 로그에 기록됩니다."
             />
           </div>
 
@@ -266,6 +304,25 @@ function Inbox() {
                     setAcceptForm((p) => ({ ...p, task_due_date: e.target.value }))
                   }
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  담당자
+                </label>
+                <select
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                  value={acceptForm.task_assignee_id}
+                  onChange={(e) =>
+                    setAcceptForm((p) => ({ ...p, task_assignee_id: e.target.value }))
+                  }
+                >
+                  <option value="">(미지정)</option>
+                  {users.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {getUserLabel(user)}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
           )}

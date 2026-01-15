@@ -202,18 +202,30 @@ class LeadTaskSerializer(serializers.ModelSerializer):
     )
     lead_title = serializers.CharField(source='lead.title', read_only=True)
     is_overdue = serializers.SerializerMethodField()
+    due_at = serializers.DateTimeField(write_only=True, required=False, allow_null=True)
     
     class Meta:
         model = LeadTask
         fields = [
             'id', 'lead', 'lead_title', 'title', 'description',
-            'assignee', 'assignee_name', 'due_date',
+            'assignee', 'assignee_name', 'due_date', 'due_at',
             'priority', 'priority_display',
             'is_completed', 'completed_at',
             'show_on_calendar', 'reminder_at', 'is_overdue',
             'created_by', 'created_at', 'updated_at'
         ]
         read_only_fields = ['created_by', 'completed_at']
+
+    def validate(self, attrs):
+        due_at = attrs.pop("due_at", None)
+        if due_at is not None and not attrs.get("due_date"):
+            attrs["due_date"] = due_at
+        return attrs
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["due_at"] = data.get("due_date")
+        return data
     
     def get_assignee_name(self, obj):
         if obj.assignee:
@@ -353,7 +365,7 @@ class SalesLeadCreateSerializer(serializers.ModelSerializer):
             'company', 'contact',
             'expected_amount', 'expected_close_date',
             'owner', 'assignees',
-            'status', 'probability',
+            'status', 'probability', 'lost_reason',
             'next_action_due_at', 'source', 'utm', 'tags'
         ]
     
@@ -579,6 +591,20 @@ class QuoteCreateSerializer(serializers.ModelSerializer):
         
         return quote
 
+    def update(self, instance, validated_data):
+        items_data = validated_data.pop("items", None)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        if items_data is not None:
+            instance.items.all().delete()
+            for idx, item_data in enumerate(items_data):
+                QuoteItem.objects.create(quote=instance, order=idx, **item_data)
+            instance.calculate_totals()
+
+        return instance
+
 
 class SalesContractLinkSerializer(serializers.ModelSerializer):
     """계약 연결 Serializer"""
@@ -729,6 +755,7 @@ class CalendarEventSerializer(serializers.Serializer):
     start = serializers.DateTimeField()
     end = serializers.DateTimeField(allow_null=True)
     event_type = serializers.CharField()  # 'task', 'close_date', 'meeting'
+    source_id = serializers.IntegerField(allow_null=True)
     lead_id = serializers.IntegerField()
     lead_title = serializers.CharField()
     color = serializers.CharField()

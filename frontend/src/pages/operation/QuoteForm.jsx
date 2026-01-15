@@ -1,10 +1,10 @@
 // src/pages/operation/QuoteForm.jsx
 /**
- * 견적서 작성/수정
+ * 견적서 생성/수정
  */
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { FiArrowLeft, FiSave, FiPlus, FiTrash2 } from "react-icons/fi";
+import { FiArrowLeft, FiSave, FiPlus, FiTrash2, FiSend, FiEye } from "react-icons/fi";
 import {
   QuoteService,
   SalesService,
@@ -20,6 +20,7 @@ function QuoteForm() {
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [quoteStatus, setQuoteStatus] = useState("draft");
 
   const [leads, setLeads] = useState([]);
   const [companies, setCompanies] = useState([]);
@@ -45,7 +46,7 @@ function QuoteForm() {
       name: "",
       description: "",
       specification: "",
-      unit: "식",
+      unit: "EA",
       quantity: 1,
       unit_price: 0,
     },
@@ -64,7 +65,6 @@ function QuoteForm() {
       setCompanies(companiesData.results || companiesData);
       setTemplates(templatesData);
 
-      // 리드 선택 시 고객사 자동 설정
       if (leadId) {
         const lead = (leadsData.results || leadsData).find(
           (l) => l.id === parseInt(leadId)
@@ -91,15 +91,72 @@ function QuoteForm() {
     }
   }, [leadId]);
 
+  const fetchQuote = useCallback(async () => {
+    if (!id) return;
+    setLoading(true);
+    try {
+      const data = await QuoteService.getQuote(id);
+      setQuoteStatus(data.status || "draft");
+      setFormData({
+        lead: data.lead || "",
+        company: data.company || "",
+        contact: data.contact || "",
+        title: data.title || "",
+        template: data.template || "",
+        header_text: data.header_text || "",
+        footer_text: data.footer_text || "",
+        terms: data.terms || "",
+        tax_rate: data.tax_rate ?? 10,
+        valid_until: data.valid_until || "",
+        notes: data.notes || "",
+      });
+
+      if (data.company) {
+        const companyData = await CustomerService.getCompany(data.company);
+        setContacts(companyData.contacts || []);
+      }
+
+      const mappedItems =
+        data.items?.length > 0
+          ? data.items.map((item) => ({
+              name: item.name || "",
+              description: item.description || "",
+              specification: item.specification || "",
+              unit: item.unit || "EA",
+              quantity: Number(item.quantity || 0),
+              unit_price: Number(item.unit_price || 0),
+            }))
+          : [
+              {
+                name: "",
+                description: "",
+                specification: "",
+                unit: "EA",
+                quantity: 1,
+                unit_price: 0,
+              },
+            ];
+      setItems(mappedItems);
+    } catch (error) {
+      console.error("Error fetching quote:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
   useEffect(() => {
     fetchMasterData();
   }, [fetchMasterData]);
 
-  const handleLeadChange = async (leadId) => {
-    const lead = leads.find((l) => l.id === parseInt(leadId));
+  useEffect(() => {
+    fetchQuote();
+  }, [fetchQuote]);
+
+  const handleLeadChange = async (leadIdValue) => {
+    const lead = leads.find((l) => l.id === parseInt(leadIdValue));
     setFormData((prev) => ({
       ...prev,
-      lead: leadId,
+      lead: leadIdValue,
       company: lead?.company || "",
       contact: lead?.contact || "",
       title: lead?.title || prev.title,
@@ -153,7 +210,7 @@ function QuoteForm() {
         name: "",
         description: "",
         specification: "",
-        unit: "식",
+        unit: "EA",
         quantity: 1,
         unit_price: 0,
       },
@@ -172,6 +229,30 @@ function QuoteForm() {
     );
     const taxAmount = Math.floor((subtotal * formData.tax_rate) / 100);
     return { subtotal, taxAmount, total: subtotal + taxAmount };
+  };
+
+  const handlePreviewPdf = async () => {
+    if (!id) return;
+    try {
+      const data = await QuoteService.renderPdf(id);
+      if (data?.pdf_url) {
+        window.open(data.pdf_url, "_blank", "noopener,noreferrer");
+      }
+    } catch (error) {
+      console.error("Error rendering PDF:", error);
+    }
+  };
+
+  const handleSendQuote = async () => {
+    if (!id) return;
+    if (!window.confirm("견적서를 발송하시겠습니까?")) return;
+    try {
+      await QuoteService.sendQuote(id);
+      setQuoteStatus("sent");
+      fetchQuote();
+    } catch (error) {
+      console.error("Error sending quote:", error);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -224,19 +305,48 @@ function QuoteForm() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <button
-          onClick={() => navigate(-1)}
-          className="p-2 hover:bg-gray-100 rounded-lg"
-        >
-          <FiArrowLeft className="w-5 h-5" />
-        </button>
-        <h1 className="text-title">{isEdit ? "견적서 수정" : "견적서 작성"}</h1>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => navigate(-1)}
+            className="p-2 hover:bg-gray-100 rounded-lg"
+          >
+            <FiArrowLeft className="w-5 h-5" />
+          </button>
+          <div>
+            <h1 className="text-title">
+              {isEdit ? "견적서 수정" : "견적서 생성"}
+            </h1>
+            {isEdit && (
+              <p className="text-muted-sm">상태: {quoteStatus}</p>
+            )}
+          </div>
+        </div>
+        {isEdit && (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handlePreviewPdf}
+              className="btn-basic flex items-center gap-2"
+            >
+              <FiEye className="w-4 h-4" />
+              PDF 미리보기
+            </button>
+            {quoteStatus === "draft" && (
+              <button
+                type="button"
+                onClick={handleSendQuote}
+                className="btn-primary flex items-center gap-2"
+              >
+                <FiSend className="w-4 h-4" />
+                발송
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* 기본 정보 */}
         <div className="page-box">
           <h3 className="text-sm font-semibold text-gray-700 mb-4">
             기본 정보
@@ -330,7 +440,7 @@ function QuoteForm() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                유효기한
+                유효기간
               </label>
               <input
                 type="date"
@@ -362,7 +472,6 @@ function QuoteForm() {
           </div>
         </div>
 
-        {/* 견적 항목 */}
         <div className="page-box">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-gray-700">견적 항목</h3>
@@ -381,7 +490,7 @@ function QuoteForm() {
               <thead className="doc-thead">
                 <tr>
                   <th className="doc-th text-left" style={{ width: "25%" }}>
-                    품목명
+                    항목명
                   </th>
                   <th className="doc-th text-left" style={{ width: "15%" }}>
                     규격
@@ -406,7 +515,7 @@ function QuoteForm() {
                           handleItemChange(index, "name", e.target.value)
                         }
                         className="input-sm"
-                        placeholder="품목명"
+                        placeholder="항목명"
                       />
                     </td>
                     <td className="px-2 py-2">
@@ -414,11 +523,7 @@ function QuoteForm() {
                         type="text"
                         value={item.specification}
                         onChange={(e) =>
-                          handleItemChange(
-                            index,
-                            "specification",
-                            e.target.value
-                          )
+                          handleItemChange(index, "specification", e.target.value)
                         }
                         className="input-sm"
                         placeholder="규격"
@@ -522,7 +627,6 @@ function QuoteForm() {
           </div>
         </div>
 
-        {/* 추가 정보 */}
         <div className="page-box">
           <h3 className="text-sm font-semibold text-gray-700 mb-4">
             추가 정보
@@ -583,7 +687,6 @@ function QuoteForm() {
           </div>
         </div>
 
-        {/* 버튼 */}
         <div className="flex justify-end gap-2">
           <button
             type="button"
@@ -598,7 +701,7 @@ function QuoteForm() {
             className="btn-save flex items-center gap-2"
           >
             <FiSave className="w-4 h-4" />
-            {saving ? "저장 중..." : "저장"}
+            {saving ? "저장 중.." : "저장"}
           </button>
         </div>
       </form>

@@ -19,8 +19,13 @@ import {
   FiClock,
   FiUser,
   FiDollarSign,
+  FiLink,
 } from "react-icons/fi";
-import { SalesService, QuoteService } from "../../api/operation";
+import {
+  SalesService,
+  QuoteService,
+  ContractLinkService,
+} from "../../api/operation";
 import { fetchUsers } from "../../api/users/user";
 import Modal from "../../components/common/ui/Modal";
 
@@ -33,17 +38,26 @@ function LeadDetail() {
   const [activeTab, setActiveTab] = useState("activities");
   const [stages, setStages] = useState([]);
   const [quotes, setQuotes] = useState([]);
+  const [contractLinks, setContractLinks] = useState([]);
   const [users, setUsers] = useState([]);
+
+  const [contractModal, setContractModal] = useState(false);
+  const [newContract, setNewContract] = useState({
+    contract_id: "",
+    notes: "",
+  });
 
   // 접수 처리 모달
   const [acceptOpen, setAcceptOpen] = useState(false);
   const [acceptForm, setAcceptForm] = useState({
     stage_id: "",
+    owner_id: "",
     note: "",
     create_task: true,
     task_title: "다음 액션",
     task_due_date: "",
     task_priority: "medium",
+    task_assignee_id: "",
   });
 
   // 모달 상태
@@ -103,6 +117,15 @@ function LeadDetail() {
     }
   }, [id]);
 
+  const fetchContractLinks = useCallback(async () => {
+    try {
+      const data = await ContractLinkService.getLinks({ lead: id });
+      setContractLinks(data.results || data);
+    } catch (error) {
+      console.error("Error fetching contract links:", error);
+    }
+  }, [id]);
+
   useEffect(() => {
     fetchLead();
   }, [fetchLead]);
@@ -115,6 +138,10 @@ function LeadDetail() {
     fetchQuotes();
   }, [fetchQuotes]);
 
+  useEffect(() => {
+    fetchContractLinks();
+  }, [fetchContractLinks]);
+
   const isInboxLike = () => {
     // owner가 없거나, stage가 첫 단계인 경우(상세 serializer에 stage_data가 있으면 더 정확히 가능)
     if (!lead) return false;
@@ -123,12 +150,23 @@ function LeadDetail() {
     return false;
   };
 
+  const openAcceptModal = () => {
+    setAcceptForm((prev) => ({
+      ...prev,
+      owner_id: lead?.owner || "",
+      task_assignee_id: lead?.owner || "",
+    }));
+    setAcceptOpen(true);
+  };
+
   const submitAccept = async (e) => {
     e.preventDefault();
     try {
       const payload = {
         ...acceptForm,
         stage_id: acceptForm.stage_id || null,
+        owner_id: acceptForm.owner_id || null,
+        task_assignee_id: acceptForm.task_assignee_id || null,
       };
       await SalesService.acceptInbox(id, payload);
       setAcceptOpen(false);
@@ -205,6 +243,36 @@ function LeadDetail() {
       fetchLead();
     } catch (error) {
       console.error("Error uploading file:", error);
+    }
+  };
+
+  const handleAddContract = async (e) => {
+    e.preventDefault();
+    if (!newContract.contract_id) {
+      alert("계약 ID를 입력해주세요.");
+      return;
+    }
+    try {
+      await ContractLinkService.createLink({
+        lead: id,
+        contract_id: Number(newContract.contract_id),
+        notes: newContract.notes || "",
+      });
+      setContractModal(false);
+      setNewContract({ contract_id: "", notes: "" });
+      fetchContractLinks();
+    } catch (error) {
+      console.error("Error creating contract link:", error);
+    }
+  };
+
+  const handleDeleteContract = async (linkId) => {
+    if (!window.confirm("연관 계약을 삭제하시겠습니까?")) return;
+    try {
+      await ContractLinkService.deleteLink(linkId);
+      fetchContractLinks();
+    } catch (error) {
+      console.error("Error deleting contract link:", error);
     }
   };
 
@@ -289,7 +357,7 @@ function LeadDetail() {
         <div className="flex items-center gap-2">
           {isInboxLike() && (
             <button
-              onClick={() => setAcceptOpen(true)}
+              onClick={openAcceptModal}
               className="btn-primary"
             >
               접수 처리
@@ -344,6 +412,25 @@ function LeadDetail() {
           size="md"
         >
           <form onSubmit={submitAccept} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                담당자 지정
+              </label>
+              <select
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                value={acceptForm.owner_id}
+                onChange={(e) =>
+                  setAcceptForm((p) => ({ ...p, owner_id: e.target.value }))
+                }
+              >
+                <option value="">(미지정)</option>
+                {users.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {getUserLabel(user)}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 이동할 단계 (선택)
@@ -458,6 +545,28 @@ function LeadDetail() {
                     {formatDate(lead.expected_close_date)}
                   </p>
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    담당자
+                  </label>
+                  <select
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
+                    value={acceptForm.task_assignee_id}
+                    onChange={(e) =>
+                      setAcceptForm((p) => ({
+                        ...p,
+                        task_assignee_id: e.target.value,
+                      }))
+                    }
+                  >
+                    <option value="">(미지정)</option>
+                    {users.map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {getUserLabel(user)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
               <div className="flex items-center gap-3">
                 <FiCalendar className="w-4 h-4 text-gray-400" />
@@ -547,6 +656,12 @@ function LeadDetail() {
                   label: "견적",
                   icon: FiFileText,
                   count: quotes.length,
+                },
+                {
+                  key: "contracts",
+                  label: "연관계약",
+                  icon: FiLink,
+                  count: contractLinks.length,
                 },
               ].map((tab) => (
                 <button
@@ -788,6 +903,51 @@ function LeadDetail() {
                 </div>
               </div>
             )}
+            {activeTab === "contracts" && (
+              <div>
+                <div className="flex justify-end mb-4">
+                  <button
+                    onClick={() => setContractModal(true)}
+                    className="btn-create-sm flex items-center gap-1"
+                  >
+                    <FiPlus className="w-3 h-3" />
+                    연관계약 추가
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {contractLinks.length === 0 ? (
+                    <p className="text-center text-gray-500 py-8">
+                      연관계약이 없습니다.
+                    </p>
+                  ) : (
+                    contractLinks.map((link) => (
+                      <div
+                        key={link.id}
+                        className="p-3 border border-gray-200 rounded-lg flex items-center justify-between"
+                      >
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">
+                            계약 ID: {link.contract_id}
+                          </p>
+                          {link.notes && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              {link.notes}
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteContract(link.id)}
+                          className="btn-delete-sm"
+                        >
+                          삭제
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -934,6 +1094,54 @@ function LeadDetail() {
             <button
               type="button"
               onClick={() => setTaskModal(false)}
+              className="btn-cancel"
+            >
+              취소
+            </button>
+            <button type="submit" className="btn-save">
+              저장
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        isOpen={contractModal}
+        onClose={() => setContractModal(false)}
+        title="연관계약 추가"
+      >
+        <form onSubmit={handleAddContract} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              계약 ID <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="number"
+              value={newContract.contract_id}
+              onChange={(e) =>
+                setNewContract({ ...newContract, contract_id: e.target.value })
+              }
+              className="input-base"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              메모
+            </label>
+            <textarea
+              value={newContract.notes}
+              onChange={(e) =>
+                setNewContract({ ...newContract, notes: e.target.value })
+              }
+              className="input-base"
+              rows={3}
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setContractModal(false)}
               className="btn-cancel"
             >
               취소

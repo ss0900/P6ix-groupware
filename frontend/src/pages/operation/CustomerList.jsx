@@ -4,15 +4,22 @@
  */
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { FiPlus, FiSearch, FiUsers, FiPhone, FiTarget } from "react-icons/fi";
+import { FiPlus, FiSearch, FiUsers, FiPhone } from "react-icons/fi";
 import { CustomerService } from "../../api/operation";
 import Modal from "../../components/common/ui/Modal";
+import BoardTable from "../../components/common/board/BoardTable";
+import BoardToolbar from "../../components/common/board/BoardToolbar";
+import BoardPagination from "../../components/common/board/BoardPagination";
+import SearchFilterBar from "../../components/common/board/SearchFilterBar";
 
 function CustomerList() {
   const navigate = useNavigate();
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const pageSize = 20;
 
   // 고객사 추가 모달
   const [showModal, setShowModal] = useState(false);
@@ -28,17 +35,19 @@ function CustomerList() {
   const fetchCompanies = useCallback(async () => {
     setLoading(true);
     try {
-      const params = {};
+      const params = { page, page_size: pageSize };
       if (searchQuery) params.search = searchQuery;
 
       const data = await CustomerService.getCompanies(params);
-      setCompanies(data.results || data);
+      const results = data.results || data;
+      setCompanies(results);
+      setTotal(data.count ?? results.length);
     } catch (error) {
       console.error("Error fetching companies:", error);
     } finally {
       setLoading(false);
     }
-  }, [searchQuery]);
+  }, [searchQuery, page, pageSize]);
 
   useEffect(() => {
     fetchCompanies();
@@ -46,7 +55,7 @@ function CustomerList() {
 
   const handleSearch = (e) => {
     e.preventDefault();
-    fetchCompanies();
+    setPage(1);
   };
 
   const handleCreateCompany = async (e) => {
@@ -72,102 +81,113 @@ function CustomerList() {
     }
   };
 
+  const columns = [
+    {
+      key: "name",
+      header: "고객사",
+      align: "left",
+      render: (company) => (
+        <div>
+          <div className="font-medium text-gray-900">{company.name}</div>
+          {company.industry && (
+            <div className="text-xs text-gray-500">{company.industry}</div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "phone",
+      header: "연락처",
+      align: "left",
+      render: (company) =>
+        company.phone ? (
+          <span className="inline-flex items-center gap-1 text-sm text-gray-600">
+            <FiPhone className="w-3 h-3" />
+            {company.phone}
+          </span>
+        ) : (
+          "-"
+        ),
+    },
+    {
+      key: "contacts_count",
+      header: "담당자",
+      align: "center",
+      render: (company) => `${company.contacts_count ?? 0}명`,
+    },
+    {
+      key: "leads_count",
+      header: "영업기회",
+      align: "center",
+      render: (company) => `${company.leads_count ?? 0}건`,
+    },
+    {
+      key: "primary_contact",
+      header: "주 담당자",
+      align: "left",
+      render: (company) =>
+        company.primary_contact ? (
+          <span className="text-sm text-gray-700">
+            {company.primary_contact.name}
+            {company.primary_contact.phone
+              ? ` · ${company.primary_contact.phone}`
+              : ""}
+          </span>
+        ) : (
+          "-"
+        ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <FiUsers className="w-6 h-6 text-blue-600" />
-          <h1 className="text-title">고객관리</h1>
-        </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="btn-create flex items-center gap-2"
-        >
-          <FiPlus className="w-4 h-4" />
-          고객사 등록
-        </button>
-      </div>
+      <BoardToolbar
+        title="고객관리"
+        actions={
+          <button
+            onClick={() => setShowModal(true)}
+            className="btn-create flex items-center gap-2"
+          >
+            <FiPlus className="w-4 h-4" />
+            고객사 등록
+          </button>
+        }
+      />
 
-      {/* Search */}
-      <div className="page-box">
-        <form onSubmit={handleSearch} className="flex gap-4">
-          <div className="flex-1 relative">
-            <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="회사명, 사업자번호, 업종으로 검색..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="input-search"
-            />
-          </div>
+      <SearchFilterBar
+        onSubmit={handleSearch}
+        actions={
           <button type="submit" className="btn-search">
             검색
           </button>
-        </form>
-      </div>
+        }
+      >
+        <div className="flex-1 relative min-w-[240px]">
+          <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="회사명, 사업자번호, 업종으로 검색.."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="input-search"
+          />
+        </div>
+      </SearchFilterBar>
 
-      {/* List */}
-      <div className="page-box">
-        {loading ? (
-          <div className="flex justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-500 border-t-transparent" />
-          </div>
-        ) : companies.length === 0 ? (
-          <div className="text-center py-12">
-            <FiUsers className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500">등록된 고객사가 없습니다.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {companies.map((company) => (
-              <div
-                key={company.id}
-                onClick={() =>
-                  navigate(`/operation/sales/customers/${company.id}`)
-                }
-                className="p-4 border border-gray-200 rounded-lg hover:shadow-md cursor-pointer transition-shadow"
-              >
-                <h3 className="font-semibold text-gray-900 mb-2">
-                  {company.name}
-                </h3>
-                {company.industry && (
-                  <p className="text-sm text-gray-500 mb-2">
-                    {company.industry}
-                  </p>
-                )}
-                <div className="flex items-center gap-4 text-sm text-gray-500">
-                  {company.phone && (
-                    <span className="flex items-center gap-1">
-                      <FiPhone className="w-4 h-4" />
-                      {company.phone}
-                    </span>
-                  )}
-                  <span className="flex items-center gap-1">
-                    <FiUsers className="w-4 h-4" />
-                    담당자 {company.contacts_count}명
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <FiTarget className="w-4 h-4" />
-                    영업 {company.leads_count}건
-                  </span>
-                </div>
-                {company.primary_contact && (
-                  <div className="mt-3 pt-3 border-t border-gray-100">
-                    <p className="text-xs text-gray-400">주 담당자</p>
-                    <p className="text-sm text-gray-700">
-                      {company.primary_contact.name}
-                      {company.primary_contact.phone &&
-                        ` · ${company.primary_contact.phone}`}
-                    </p>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      <BoardTable
+        columns={columns}
+        rows={companies}
+        loading={loading}
+        onRowClick={(row) => navigate(`/operation/sales/customers/${row.id}`)}
+      />
+
+      <BoardPagination
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        onPageChange={setPage}
+        className="page-box"
+      />
 
       {/* 고객사 추가 모달 */}
       <Modal
@@ -179,7 +199,7 @@ function CustomerList() {
         <form onSubmit={handleCreateCompany} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              회사명 <span className="text-red-500">*</span>
+              회사명<span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -219,12 +239,12 @@ function CustomerList() {
                 setNewCompany({ ...newCompany, industry: e.target.value })
               }
               className="input-base"
-              placeholder="예: 건설, IT, 제조"
+              placeholder="건설, IT, 제조"
             />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              대표전화
+              연락처
             </label>
             <input
               type="text"
@@ -258,7 +278,7 @@ function CustomerList() {
               취소
             </button>
             <button type="submit" disabled={saving} className="btn-save">
-              {saving ? "저장 중..." : "저장"}
+              {saving ? "저장 중.." : "저장"}
             </button>
           </div>
         </form>

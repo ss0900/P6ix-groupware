@@ -3,6 +3,36 @@
 영업관리(Operation) 모듈 - Permissions
 """
 from rest_framework import permissions
+from django.conf import settings
+
+
+def is_operation_manager(user):
+    if user.is_staff or user.is_superuser:
+        return True
+
+    group_names = set(user.groups.values_list("name", flat=True))
+    manager_groups = set(
+        getattr(
+            settings,
+            "OPERATION_MANAGER_GROUPS",
+            {"sales_manager", "operation_manager", "team_lead", "sales_lead"},
+        )
+    )
+    if group_names & manager_groups:
+        return True
+
+    memberships = getattr(user, "memberships", None)
+    if memberships is None:
+        return False
+
+    membership = (
+        memberships.select_related("position").filter(is_primary=True).first()
+        or memberships.select_related("position").first()
+    )
+    position = getattr(membership, "position", None)
+    position_name = getattr(position, "name", "") or ""
+    lowered = position_name.lower()
+    return any(keyword in lowered for keyword in ["manager", "lead", "team", "head"])
 
 
 class IsLeadOwnerOrAssignee(permissions.BasePermission):
@@ -18,6 +48,15 @@ class IsLeadOwnerOrAssignee(permissions.BasePermission):
         
         # 관리자는 모든 권한
         if request.user.is_staff:
+            return True
+
+        if is_operation_manager(request.user):
+            return True
+
+        if is_operation_manager(request.user):
+            return True
+
+        if is_operation_manager(request.user):
             return True
         
         # owner인 경우
@@ -80,3 +119,14 @@ class IsRelatedToLead(permissions.BasePermission):
             return True
         
         return False
+
+
+class IsOperationManagerOrReadOnly(permissions.BasePermission):
+    """
+    Allow read for everyone in workspace, write for managers/admins only.
+    """
+
+    def has_permission(self, request, view):
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        return is_operation_manager(request.user)

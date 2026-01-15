@@ -68,6 +68,18 @@ class LeadService:
         )
         
         return activity
+
+    @staticmethod
+    def refresh_next_action_due(lead):
+        """
+        Recalculate lead.next_action_due_at based on open tasks.
+        """
+        next_task = lead.tasks.filter(
+            is_completed=False, due_date__isnull=False
+        ).order_by("due_date").first()
+        lead.next_action_due_at = next_task.due_date if next_task else None
+        lead.save(update_fields=["next_action_due_at"])
+        return lead.next_action_due_at
     
     @staticmethod
     def create_activity(lead, activity_type, title, content="", user=None, **kwargs):
@@ -124,9 +136,7 @@ class LeadService:
 
         # 다음 액션 예정일 갱신
         lead = task.lead
-        next_task = lead.tasks.filter(is_completed=False).order_by('due_date').first()
-        lead.next_action_due_at = next_task.due_date if next_task and next_task.due_date else None
-        lead.save(update_fields=['next_action_due_at'])
+        LeadService.refresh_next_action_due(lead)
         
         # 활동 로그 생성
         activity = LeadActivity.objects.create(
@@ -357,6 +367,8 @@ class LeadService:
             if task_due_date:
                 lead.next_action_due_at = task_due_date
                 lead.save(update_fields=["next_action_due_at"])
+            else:
+                LeadService.refresh_next_action_due(lead)
 
         # 4) 접수 처리 활동(노트) - owner/할일 생성/단계 이동을 한 번에 요약
         summary_bits = []
