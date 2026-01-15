@@ -55,7 +55,7 @@ export default function UserForm() {
   // 편집 모드: 사용자 정보 로드
   useEffect(() => {
     if (!isEdit) return;
-    
+
     setLoading(true);
     (async () => {
       try {
@@ -89,7 +89,9 @@ export default function UserForm() {
     (d) => !formData.company || String(d.company) === String(formData.company)
   );
   const filteredPositions = positions.filter(
-    (p) => !formData.company || String(p.company_id || p.company) === String(formData.company)
+    (p) =>
+      !formData.company ||
+      String(p.company_id || p.company) === String(formData.company)
   );
 
   // 저장
@@ -127,7 +129,10 @@ export default function UserForm() {
       navigate("/admin/users");
     } catch (err) {
       console.error(err);
-      const msg = err.response?.data?.detail || err.response?.data?.message || "저장 중 오류가 발생했습니다.";
+      const msg =
+        err.response?.data?.detail ||
+        err.response?.data?.message ||
+        "저장 중 오류가 발생했습니다.";
       alert(msg);
     } finally {
       setSaving(false);
@@ -158,27 +163,40 @@ export default function UserForm() {
       </div>
 
       {/* 폼 */}
-      <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
+      <form
+        onSubmit={handleSubmit}
+        className="bg-white rounded-xl border border-gray-200 p-6 space-y-6"
+      >
         {/* 기본 정보 */}
         <div>
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">기본 정보</h2>
+          <h2 className="text-lg font-semibold text-gray-800 mb-4">
+            기본 정보
+          </h2>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">성 *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                성 <span className="text-red-500">*</span>
+              </label>
               <input
                 type="text"
                 value={formData.last_name}
-                onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, last_name: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">이름 *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                이름 <span className="text-red-500">*</span>
+              </label>
               <input
                 type="text"
                 value={formData.first_name}
-                onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, first_name: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                 required
               />
@@ -188,14 +206,20 @@ export default function UserForm() {
 
         {/* 계정 정보 */}
         <div>
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">계정 정보</h2>
+          <h2 className="text-lg font-semibold text-gray-800 mb-4">
+            계정 정보
+          </h2>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">아이디 *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                아이디 <span className="text-red-500">*</span>
+              </label>
               <input
                 type="text"
                 value={formData.username}
-                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, username: e.target.value })
+                }
                 disabled={isEdit}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-gray-100"
                 required
@@ -209,7 +233,9 @@ export default function UserForm() {
                 <input
                   type={showPassword ? "text" : "password"}
                   value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, password: e.target.value })
+                  }
                   placeholder={isEdit ? "변경 시에만 입력" : ""}
                   className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                   required={!isEdit}
@@ -224,21 +250,29 @@ export default function UserForm() {
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">이메일 *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                이메일 <span className="text-red-500">*</span>
+              </label>
               <input
                 type="email"
                 value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, email: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">연락처 *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                연락처 <span className="text-red-500">*</span>
+              </label>
               <input
                 type="tel"
                 value={formData.phone_number}
-                onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, phone_number: e.target.value })
+                }
                 placeholder="010-0000-0000"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                 required
@@ -249,45 +283,70 @@ export default function UserForm() {
 
         {/* 소속 정보 */}
         <div>
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">소속 정보</h2>
+          <h2 className="text-lg font-semibold text-gray-800 mb-4">
+            소속 정보
+          </h2>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">회사</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                회사
+              </label>
               <select
                 value={formData.company}
-                onChange={(e) => setFormData({ ...formData, company: e.target.value, department: "", position: "" })}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    company: e.target.value,
+                    department: "",
+                    position: "",
+                  })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
               >
                 <option value="">선택</option>
                 {companies.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
                 ))}
               </select>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">부서</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  부서
+                </label>
                 <select
                   value={formData.department}
-                  onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, department: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                 >
                   <option value="">선택</option>
                   {filteredDepartments.map((d) => (
-                    <option key={d.id} value={d.id}>{d.name}</option>
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">직위</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  직위
+                </label>
                 <select
                   value={formData.position}
-                  onChange={(e) => setFormData({ ...formData, position: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, position: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                 >
                   <option value="">선택</option>
                   {filteredPositions.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -303,7 +362,9 @@ export default function UserForm() {
               <input
                 type="checkbox"
                 checked={formData.is_active}
-                onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                onChange={(e) =>
+                  setFormData({ ...formData, is_active: e.target.checked })
+                }
                 className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
               />
               <span className="text-sm text-gray-700">활성화</span>
@@ -312,7 +373,9 @@ export default function UserForm() {
               <input
                 type="checkbox"
                 checked={formData.is_staff}
-                onChange={(e) => setFormData({ ...formData, is_staff: e.target.checked })}
+                onChange={(e) =>
+                  setFormData({ ...formData, is_staff: e.target.checked })
+                }
                 className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
               />
               <span className="text-sm text-gray-700">관리자 권한</span>

@@ -137,6 +137,7 @@ export const projectMenus = {
         title: "사용자 관리",
         items: [
           { to: "users", label: "사용자 목록" },
+          { to: "companies", label: "회사(워크스페이스) 관리" },
           { to: "organization", label: "조직도 관리" },
           { to: "positions", label: "직위 관리" },
         ],

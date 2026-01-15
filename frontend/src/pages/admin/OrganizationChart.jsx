@@ -1,15 +1,15 @@
 // src/pages/admin/OrganizationChart.jsx
 import React, { useEffect, useState } from "react";
 import api from "../../api/axios";
-import { 
-  Building2, 
-  ChevronRight, 
-  ChevronDown, 
-  Users, 
-  Plus, 
-  Edit, 
+import {
+  Building2,
+  ChevronRight,
+  ChevronDown,
+  Users,
+  Plus,
+  Edit,
   Trash2,
-  X
+  X,
 } from "lucide-react";
 
 // 트리 노드 컴포넌트
@@ -19,30 +19,42 @@ const TreeNode = ({ node, level = 0, onEdit, onDelete, onAddChild }) => {
 
   return (
     <div className="select-none">
-      <div 
+      <div
         className="flex items-center gap-2 py-2 px-3 hover:bg-gray-50 rounded-lg cursor-pointer group"
         style={{ paddingLeft: `${level * 24 + 12}px` }}
       >
         {/* 확장/축소 */}
-        <button 
+        <button
           onClick={() => setIsOpen(!isOpen)}
           className="w-5 h-5 flex items-center justify-center text-gray-400"
         >
           {hasChildren ? (
-            isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />
+            isOpen ? (
+              <ChevronDown size={16} />
+            ) : (
+              <ChevronRight size={16} />
+            )
           ) : (
             <span className="w-4" />
           )}
         </button>
 
         {/* 아이콘 */}
-        <div className={`p-1.5 rounded ${level === 0 ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'}`}>
+        <div
+          className={`p-1.5 rounded ${
+            level === 0
+              ? "bg-blue-100 text-blue-600"
+              : "bg-gray-100 text-gray-600"
+          }`}
+        >
           {level === 0 ? <Building2 size={16} /> : <Users size={16} />}
         </div>
 
         {/* 이름 */}
-        <span className="flex-1 text-sm font-medium text-gray-800">{node.name}</span>
-        
+        <span className="flex-1 text-sm font-medium text-gray-800">
+          {node.name}
+        </span>
+
         {/* 타입 뱃지 */}
         {node.type && (
           <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-500 rounded">
@@ -52,23 +64,32 @@ const TreeNode = ({ node, level = 0, onEdit, onDelete, onAddChild }) => {
 
         {/* 액션 버튼 */}
         <div className="hidden group-hover:flex items-center gap-1">
-          <button 
-            onClick={(e) => { e.stopPropagation(); onAddChild(node); }}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddChild(node);
+            }}
             className="p-1 hover:bg-blue-100 rounded text-blue-600"
             title="하위 부서 추가"
           >
             <Plus size={14} />
           </button>
-          <button 
-            onClick={(e) => { e.stopPropagation(); onEdit(node); }}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit(node);
+            }}
             className="p-1 hover:bg-gray-200 rounded text-gray-600"
             title="수정"
           >
             <Edit size={14} />
           </button>
           {level > 0 && (
-            <button 
-              onClick={(e) => { e.stopPropagation(); onDelete(node); }}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(node);
+              }}
               className="p-1 hover:bg-red-100 rounded text-red-600"
               title="삭제"
             >
@@ -82,9 +103,9 @@ const TreeNode = ({ node, level = 0, onEdit, onDelete, onAddChild }) => {
       {isOpen && hasChildren && (
         <div>
           {node.children.map((child) => (
-            <TreeNode 
-              key={child.id} 
-              node={child} 
+            <TreeNode
+              key={child.id}
+              node={child}
               level={level + 1}
               onEdit={onEdit}
               onDelete={onDelete}
@@ -98,7 +119,14 @@ const TreeNode = ({ node, level = 0, onEdit, onDelete, onAddChild }) => {
 };
 
 // 부서 편집 모달
-const DepartmentModal = ({ isOpen, onClose, department, companies, onSave, parentDept }) => {
+const DepartmentModal = ({
+  isOpen,
+  onClose,
+  department,
+  companies,
+  onSave,
+  parentDept,
+}) => {
   const [formData, setFormData] = useState({
     name: "",
     type: "",
@@ -158,12 +186,14 @@ const DepartmentModal = ({ isOpen, onClose, department, companies, onSave, paren
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              부서명 *
+              부서명 <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, name: e.target.value })
+              }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               required
             />
@@ -175,7 +205,9 @@ const DepartmentModal = ({ isOpen, onClose, department, companies, onSave, paren
             </label>
             <select
               value={formData.type}
-              onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, type: e.target.value })
+              }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
             >
               <option value="">선택</option>
@@ -188,17 +220,21 @@ const DepartmentModal = ({ isOpen, onClose, department, companies, onSave, paren
           {!parentDept && !department && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                회사 *
+                회사 <span className="text-red-500">*</span>
               </label>
               <select
                 value={formData.company}
-                onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, company: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                 required
               >
                 <option value="">선택</option>
                 {companies.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
                 ))}
               </select>
             </div>
@@ -245,13 +281,13 @@ export default function OrganizationChart() {
         api.get("core/companies/"),
         api.get("core/departments/"),
       ]);
-      
+
       const comps = compRes.data?.results ?? compRes.data ?? [];
       const depts = deptRes.data?.results ?? deptRes.data ?? [];
-      
+
       setCompanies(comps);
       setDepartments(depts);
-      
+
       // 트리 구조 생성
       const tree = buildTree(comps, depts);
       setTreeData(tree);
@@ -268,7 +304,7 @@ export default function OrganizationChart() {
       const companyDepts = departments.filter(
         (d) => d.company === company.id || d.company?.id === company.id
       );
-      
+
       const buildDeptTree = (parentId) => {
         return companyDepts
           .filter((d) => d.parent === parentId)

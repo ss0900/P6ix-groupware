@@ -10,6 +10,7 @@ export default function UserList() {
 
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState({});
 
   // 필터
   const [q, setQ] = useState("");
@@ -51,6 +52,24 @@ export default function UserList() {
       console.error(e);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const toggleUserField = async (user, field, value) => {
+    setUpdating((prev) => ({ ...prev, [user.id]: true }));
+    try {
+      const res = await api.patch(`core/users/${user.id}/`, {
+        [field]: value,
+      });
+      const updated = res.data;
+      setRows((prev) =>
+        prev.map((row) => (row.id === user.id ? updated : row))
+      );
+    } catch (e) {
+      console.error(e);
+      alert("권한 변경 중 오류가 발생했습니다.");
+    } finally {
+      setUpdating((prev) => ({ ...prev, [user.id]: false }));
     }
   };
 
@@ -117,6 +136,50 @@ export default function UserList() {
     {
       key: "email",
       header: "이메일",
+    },
+    {
+      key: "is_active",
+      header: "활성화",
+      render: (row) => (
+        <label
+          className="relative inline-flex items-center cursor-pointer"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <input
+            type="checkbox"
+            className="sr-only peer"
+            checked={!!row.is_active}
+            disabled={!!updating[row.id]}
+            onChange={(e) =>
+              toggleUserField(row, "is_active", e.target.checked)
+            }
+          />
+          <div className="w-10 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:bg-blue-600 transition-colors" />
+          <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5" />
+        </label>
+      ),
+    },
+    {
+      key: "is_staff",
+      header: "관리자 권한",
+      render: (row) => (
+        <label
+          className="relative inline-flex items-center cursor-pointer"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <input
+            type="checkbox"
+            className="sr-only peer"
+            checked={!!row.is_staff}
+            disabled={!!updating[row.id]}
+            onChange={(e) =>
+              toggleUserField(row, "is_staff", e.target.checked)
+            }
+          />
+          <div className="w-10 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:bg-blue-600 transition-colors" />
+          <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5" />
+        </label>
+      ),
     },
   ];
 
@@ -191,6 +254,7 @@ export default function UserList() {
         keyField="id"
         emptyText="등록된 사용자가 없습니다."
         onRowClick={(row) => navigate(`/admin/users/${row.id}`)}
+        sortable={false}
       />
     </div>
   );

@@ -55,29 +55,35 @@ const PositionModal = ({ isOpen, onClose, position, companies, onSave }) => {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              회사 *
+              회사 <span className="text-red-500">*</span>
             </label>
             <select
               value={formData.company}
-              onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, company: e.target.value })
+              }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               required
             >
               <option value="">선택</option>
               {companies.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
               ))}
             </select>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              직위명 *
+              직위명 <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, name: e.target.value })
+              }
               placeholder="예: 대표이사, 부장, 과장"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               required
@@ -91,7 +97,9 @@ const PositionModal = ({ isOpen, onClose, position, companies, onSave }) => {
             <input
               type="number"
               value={formData.level}
-              onChange={(e) => setFormData({ ...formData, level: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, level: e.target.value })
+              }
               placeholder="숫자가 낮을수록 높은 직급"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
             />
@@ -140,13 +148,13 @@ export default function PositionManagement() {
         api.get("core/companies/"),
         api.get("core/positions/"),
       ]);
-      
+
       const comps = compRes.data?.results ?? compRes.data ?? [];
       const poss = posRes.data?.results ?? posRes.data ?? [];
-      
+
       setCompanies(comps);
       setPositions(poss);
-      
+
       // 첫 번째 회사 자동 선택
       if (comps.length > 0 && !selectedCompany) {
         setSelectedCompany(String(comps[0].id));
@@ -164,7 +172,11 @@ export default function PositionManagement() {
 
   // 필터링된 직위 목록
   const filteredPositions = positions
-    .filter((p) => !selectedCompany || String(p.company_id || p.company) === selectedCompany)
+    .filter(
+      (p) =>
+        !selectedCompany ||
+        String(p.company_id || p.company) === selectedCompany
+    )
     .sort((a, b) => (a.level || 999) - (b.level || 999));
 
   // 저장 핸들러
@@ -216,7 +228,9 @@ export default function PositionManagement() {
         >
           <option value="">전체</option>
           {companies.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
           ))}
         </select>
       </div>
@@ -235,16 +249,29 @@ export default function PositionManagement() {
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">순서</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">직위명</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">회사</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">레벨</th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">관리</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                  순서
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                  직위명
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                  회사
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                  레벨
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase">
+                  관리
+                </th>
               </tr>
             </thead>
             <tbody>
               {filteredPositions.map((position, index) => (
-                <tr key={position.id} className="border-b border-gray-100 hover:bg-gray-50">
+                <tr
+                  key={position.id}
+                  className="border-b border-gray-100 hover:bg-gray-50"
+                >
                   <td className="px-4 py-3 text-sm text-gray-500">
                     <div className="flex items-center gap-2">
                       <GripVertical size={16} className="text-gray-400" />
