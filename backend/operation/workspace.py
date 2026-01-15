@@ -6,14 +6,13 @@ def get_request_workspace(request):
     """
     Workspace(=Company) 결정 규칙:
     1) Header: X-Company-ID / X-Workspace-ID
-    2) Query:  ?workspace= / ?company= / ?company_id=
+    2) Query:  ?workspace= / ?company_id=
     3) 없으면: user.memberships 중 primary 우선, 없으면 첫 membership
     """
     company_id = (
         request.headers.get("X-Company-ID")
         or request.headers.get("X-Workspace-ID")
         or request.query_params.get("workspace")
-        or request.query_params.get("company")
         or request.query_params.get("company_id")
     )
 

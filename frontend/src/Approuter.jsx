@@ -67,6 +67,7 @@ import Inbox from "./pages/operation/Inbox";
 import TodoCalendar from "./pages/operation/TodoCalendar";
 import CustomerList from "./pages/operation/CustomerList";
 import CustomerDetail from "./pages/operation/CustomerDetail";
+import CustomerForm from "./pages/operation/CustomerForm";
 import QuoteList from "./pages/operation/QuoteList";
 import QuoteForm from "./pages/operation/QuoteForm";
 import QuoteTemplateList from "./pages/operation/QuoteTemplateList";
@@ -245,6 +246,7 @@ function AppRouter() {
 
             <Route path="customers" element={<CustomerList />} />
             <Route path="customers/:id" element={<CustomerDetail />} />
+            <Route path="customers/:id/edit" element={<CustomerForm />} />
 
             <Route path="quotes" element={<QuoteList />} />
             <Route path="quotes/new" element={<QuoteForm />} />
@@ -293,6 +295,10 @@ function AppRouter() {
           <Route
             path="customers/:id"
             element={<Navigate to="../sales/customers/:id" replace />}
+          />
+          <Route
+            path="customers/:id/edit"
+            element={<Navigate to="../sales/customers/:id/edit" replace />}
           />
 
           <Route

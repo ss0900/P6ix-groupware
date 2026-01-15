@@ -91,7 +91,7 @@ function CustomerDetail() {
       return;
     try {
       await CustomerService.deleteCompany(id);
-      navigate("/operation/customers");
+      navigate("/operation/sales/customers");
     } catch (error) {
       console.error("Error deleting company:", error);
     }
@@ -129,7 +129,7 @@ function CustomerDetail() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => navigate("/operation/customers")}
+            onClick={() => navigate("/operation/sales/customers")}
             className="p-2 hover:bg-gray-100 rounded-lg"
           >
             <FiArrowLeft className="w-5 h-5" />
@@ -143,7 +143,7 @@ function CustomerDetail() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => {}}
+            onClick={() => navigate(`/operation/sales/customers/${id}/edit`)}
             className="btn-edit flex items-center gap-2"
           >
             <FiEdit2 className="w-4 h-4" />
