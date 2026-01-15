@@ -139,6 +139,16 @@ code {
     @apply bg-white border border-gray-300 rounded-lg text-xs px-2.5 py-1.5 hover:bg-gray-200 hover:border-gray-400 hover:text-gray-900 transition-colors mt-1;
   }
 
+  /* 주요 버튼 (Primary) */
+  .btn-primary {
+    @apply bg-blue-600 text-white rounded-lg text-sm px-4 py-1.5 hover:bg-blue-700 transition-colors;
+  }
+
+  /* 보조 버튼 (Secondary) */
+  .btn-secondary {
+    @apply bg-white border border-gray-300 text-gray-700 rounded-lg text-sm px-4 py-1.5 hover:bg-gray-100 transition-colors;
+  }
+
   /* 수량 · 단가 · 공급가 · 세액 · 합계 — 숫자열 고정폭 */
   .col-number {
     width: 110px;

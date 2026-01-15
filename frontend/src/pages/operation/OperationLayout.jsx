@@ -1,114 +1,13 @@
 // src/pages/operation/OperationLayout.jsx
-/**
- * 영업관리 모듈 레이아웃 - 사이드바 포함
- */
-import React from "react";
-import { Outlet, NavLink, useLocation } from "react-router-dom";
-import {
-  FiUsers,
-  FiTarget,
-  FiTrello,
-  FiInbox,
-  FiCalendar,
-  FiFileText,
-  FiLayers,
-  FiTrendingUp,
-  FiClipboard,
-  FiDollarSign,
-  FiMail,
-} from "react-icons/fi";
+import SidebarLayout from "../../components/common/SidebarLayout";
+import { projectMenus } from "../../components/layout/ProjectMenus";
 
-const menuItems = [
-  {
-    path: "/operation/sales/dashboard",
-    label: "대시보드",
-    icon: FiTrendingUp,
-  },
-  {
-    path: "/operation/sales/leads",
-    label: "영업기회",
-    icon: FiTarget,
-  },
-  {
-    path: "/operation/sales/pipeline",
-    label: "파이프라인",
-    icon: FiTrello,
-  },
-  {
-    path: "/operation/sales/inbox",
-    label: "영업접수",
-    icon: FiInbox,
-  },
-  {
-    path: "/operation/sales/todo",
-    label: "TODO 캘린더",
-    icon: FiCalendar,
-  },
-  {
-    path: "/operation/sales/customers",
-    label: "고객관리",
-    icon: FiUsers,
-  },
-  {
-    path: "/operation/sales/quotes",
-    label: "견적서",
-    icon: FiFileText,
-  },
-  {
-    path: "/operation/sales/templates",
-    label: "견적 템플릿",
-    icon: FiLayers,
-  },
-  {
-    path: "/operation/sales/tenders",
-    label: "입찰",
-    icon: FiClipboard,
-  },
-  {
-    path: "/operation/sales/revenue",
-    label: "매출/수금",
-    icon: FiDollarSign,
-  },
-  {
-    path: "/operation/sales/emails",
-    label: "이메일",
-    icon: FiMail,
-  },
-];
-
-function OperationLayout() {
-  const location = useLocation();
-
+export default function OperationLayout() {
   return (
-    <div className="flex h-full">
-      {/* Sidebar */}
-      <aside className="sidebar p-4">
-        <h2 className="text-lg font-bold text-gray-800 mb-6 px-2">영업관리</h2>
-        <nav className="space-y-1">
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = location.pathname.startsWith(item.path);
-
-            return (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                className={`sidebar-menu-item ${isActive ? "active" : ""}`}
-              >
-                <Icon className="w-5 h-5" />
-                <span>{item.label}</span>
-              </NavLink>
-            );
-          })}
-        </nav>
-      </aside>
-
-      {/* Main Content */}
-      <main className="main-content flex-1 p-6 overflow-auto">
-        <Outlet />
-      </main>
-    </div>
+    <SidebarLayout
+      title="영업관리"
+      base={projectMenus.operation.base}
+      sections={projectMenus.operation.sections}
+    />
   );
 }
-
-export default OperationLayout;
