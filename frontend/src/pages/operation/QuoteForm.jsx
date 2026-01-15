@@ -176,6 +176,10 @@ function QuoteForm() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!formData.lead) {
+      alert("영업기회를 선택해주세요.");
+      return;
+    }
     setSaving(true);
 
     try {
@@ -240,12 +244,13 @@ function QuoteForm() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                영업기회
+                영업기회 <span className="text-red-500">*</span>
               </label>
               <select
                 value={formData.lead}
                 onChange={(e) => handleLeadChange(e.target.value)}
                 className="input-base"
+                required
               >
                 <option value="">선택</option>
                 {leads.map((lead) => (

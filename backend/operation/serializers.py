@@ -469,7 +469,7 @@ class QuoteItemSerializer(serializers.ModelSerializer):
             'id', 'quote', 'order', 'name', 'description',
             'specification', 'unit', 'quantity', 'unit_price', 'amount', 'notes'
         ]
-        read_only_fields = ['amount']
+        read_only_fields = ['amount', 'quote']
 
 
 class QuoteSerializer(serializers.ModelSerializer):

@@ -84,7 +84,7 @@ function QuoteList() {
           <h1 className="text-title">견적서</h1>
         </div>
         <button
-          onClick={() => navigate("/operation/quotes/new")}
+          onClick={() => navigate("/operation/sales/quotes/new")}
           className="btn-create flex items-center gap-2"
         >
           <FiPlus className="w-4 h-4" />

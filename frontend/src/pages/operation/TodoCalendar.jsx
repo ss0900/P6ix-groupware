@@ -28,12 +28,20 @@ function TodoCalendar() {
     const start = new Date(
       currentDate.getFullYear(),
       currentDate.getMonth(),
-      1
+      1,
+      0,
+      0,
+      0,
+      0
     );
     const end = new Date(
       currentDate.getFullYear(),
       currentDate.getMonth() + 1,
-      0
+      0,
+      23,
+      59,
+      59,
+      999
     );
 
     try {

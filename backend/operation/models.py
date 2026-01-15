@@ -262,10 +262,17 @@ class SalesLead(models.Model):
     @property
     def stalled_days(self):
         """현재 단계에서 정체된 일수"""
+        cached = self.__dict__.get("_stalled_days")
+        if cached is not None:
+            return cached
         if self.stage_entered_at:
             delta = timezone.now() - self.stage_entered_at
             return delta.days
         return 0
+
+    @stalled_days.setter
+    def stalled_days(self, value):
+        self.__dict__["_stalled_days"] = value
 
     @property
     def is_stalled(self):

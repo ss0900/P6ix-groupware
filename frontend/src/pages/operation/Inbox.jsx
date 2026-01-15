@@ -75,17 +75,31 @@ function Inbox() {
   const submitAccept = async (e) => {
     e.preventDefault();
     if (!selectedLead) return;
+    if (acceptForm.create_task && !acceptForm.task_title.trim()) {
+      alert("TODO 제목을 입력해주세요.");
+      return;
+    }
     try {
       // stage_id가 비어있으면 서버가 "다음 단계" 자동 처리 시도
       const payload = {
-        ...acceptForm,
         stage_id: acceptForm.stage_id || null,
+        note: acceptForm.note,
+        create_task: acceptForm.create_task,
         // owner_id 미전달 -> 서버가 (owner 없으면) 현재 유저로 지정
       };
-      await SalesService.acceptInbox(selectedLead.id, payload);
+      if (acceptForm.create_task) {
+        payload.task_title = acceptForm.task_title;
+        payload.task_due_date = acceptForm.task_due_date || null;
+        payload.task_priority = acceptForm.task_priority;
+        if (acceptForm.task_assignee_id) {
+          payload.task_assignee_id = acceptForm.task_assignee_id;
+        }
+      }
+      const leadId = selectedLead.id;
+      await SalesService.acceptInbox(leadId, payload);
       setAcceptOpen(false);
       setSelectedLead(null);
-      await fetchInbox();
+      navigate(`/operation/sales/leads/${leadId}`);
     } catch (err) {
       console.error(err);
       alert("접수 처리 중 오류가 발생했습니다.");

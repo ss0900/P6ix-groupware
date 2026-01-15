@@ -21,6 +21,7 @@ import {
   FiDollarSign,
 } from "react-icons/fi";
 import { SalesService, QuoteService } from "../../api/operation";
+import { fetchUsers } from "../../api/users/user";
 import Modal from "../../components/common/ui/Modal";
 
 function LeadDetail() {
@@ -32,6 +33,7 @@ function LeadDetail() {
   const [activeTab, setActiveTab] = useState("activities");
   const [stages, setStages] = useState([]);
   const [quotes, setQuotes] = useState([]);
+  const [users, setUsers] = useState([]);
 
   // 접수 처리 모달
   const [acceptOpen, setAcceptOpen] = useState(false);
@@ -56,13 +58,29 @@ function LeadDetail() {
     title: "",
     due_date: "",
     priority: "medium",
+    assignee: "",
   });
+
+  const loadUsers = useCallback(async () => {
+    try {
+      const res = await fetchUsers();
+      const list = res.data?.results ?? res.data ?? [];
+      setUsers(list);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+    }
+  }, []);
 
   const fetchLead = useCallback(async () => {
     setLoading(true);
     try {
       const data = await SalesService.getLead(id);
       setLead(data);
+      if (data?.owner) {
+        setNewTask((prev) =>
+          prev.assignee ? prev : { ...prev, assignee: data.owner }
+        );
+      }
 
       // 파이프라인의 단계 로드
       if (data.pipeline) {
@@ -88,6 +106,10 @@ function LeadDetail() {
   useEffect(() => {
     fetchLead();
   }, [fetchLead]);
+
+  useEffect(() => {
+    loadUsers();
+  }, [loadUsers]);
 
   useEffect(() => {
     fetchQuotes();
@@ -142,13 +164,27 @@ function LeadDetail() {
   const handleAddTask = async (e) => {
     e.preventDefault();
     try {
-      await SalesService.createTask(id, newTask);
+      const payload = {
+        ...newTask,
+        due_date: newTask.due_date || null,
+        assignee: newTask.assignee ? Number(newTask.assignee) : null,
+      };
+      await SalesService.createTask(id, payload);
       setTaskModal(false);
-      setNewTask({ title: "", due_date: "", priority: "medium" });
+      setNewTask({ title: "", due_date: "", priority: "medium", assignee: "" });
       fetchLead();
     } catch (error) {
       console.error("Error creating task:", error);
     }
+  };
+
+  const openTaskModal = () => {
+    if (lead?.owner) {
+      setNewTask((prev) =>
+        prev.assignee ? prev : { ...prev, assignee: lead.owner }
+      );
+    }
+    setTaskModal(true);
   };
 
   const handleCompleteTask = async (taskId) => {
@@ -195,6 +231,11 @@ function LeadDetail() {
   const formatDateTime = (dateStr) => {
     if (!dateStr) return "-";
     return new Date(dateStr).toLocaleString("ko-KR");
+  };
+
+  const getUserLabel = (user) => {
+    const name = `${user.last_name ?? ""}${user.first_name ?? ""}`.trim();
+    return name || user.username || user.email || `사용자 ${user.id}`;
   };
 
   const activityTypeIcon = {
@@ -419,6 +460,15 @@ function LeadDetail() {
                 </div>
               </div>
               <div className="flex items-center gap-3">
+                <FiCalendar className="w-4 h-4 text-gray-400" />
+                <div>
+                  <p className="text-xs text-gray-500">다음 액션 예정일</p>
+                  <p className="text-sm font-medium">
+                    {formatDateTime(lead.next_action_due_at)}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
                 <FiUser className="w-4 h-4 text-gray-400" />
                 <div>
                   <p className="text-xs text-gray-500">담당자</p>
@@ -576,7 +626,7 @@ function LeadDetail() {
               <div>
                 <div className="flex justify-end mb-4">
                   <button
-                    onClick={() => setTaskModal(true)}
+                    onClick={openTaskModal}
                     className="btn-create-sm flex items-center gap-1"
                   >
                     <FiPlus className="w-3 h-3" />할 일 추가
@@ -844,6 +894,25 @@ function LeadDetail() {
               }
               className="input-base"
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              담당자
+            </label>
+            <select
+              value={newTask.assignee}
+              onChange={(e) =>
+                setNewTask({ ...newTask, assignee: e.target.value })
+              }
+              className="input-base"
+            >
+              <option value="">(미지정)</option>
+              {users.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {getUserLabel(user)}
+                </option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">

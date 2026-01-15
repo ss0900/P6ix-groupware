@@ -469,9 +469,28 @@ class QuoteViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
             )
         
         activity = LeadService.send_quote(quote, request.user)
+        to = None
+        if quote.contact and quote.contact.email:
+            to = quote.contact.email
+        elif quote.lead and quote.lead.contact and quote.lead.contact.email:
+            to = quote.lead.contact.email
+        else:
+            to = "unknown"
+
+        log = EmailSendLog.objects.create(
+            workspace=self.workspace,
+            lead=quote.lead,
+            to=to,
+            subject=quote.title,
+            body_snapshot="Quote sent via system.",
+            status="sent",
+            sent_at=quote.sent_at or timezone.now(),
+            created_by=request.user
+        )
         return Response({
             'quote': QuoteSerializer(quote).data,
-            'activity': LeadActivitySerializer(activity).data
+            'activity': LeadActivitySerializer(activity).data,
+            'email_log': EmailSendLogSerializer(log).data
         })
 
     @action(detail=True, methods=['get'])

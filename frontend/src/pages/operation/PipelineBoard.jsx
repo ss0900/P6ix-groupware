@@ -148,7 +148,7 @@ function PipelineBoard() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => navigate("/operation/pipeline/settings")}
+            onClick={() => navigate("/operation/sales/pipeline/settings")}
             className="btn-edit flex items-center gap-2"
             title="파이프라인 설정"
           >
@@ -192,7 +192,7 @@ function PipelineBoard() {
             먼저 파이프라인과 단계를 생성해야 합니다.
           </p>
           <button
-            onClick={() => navigate("/operation/pipeline/settings")}
+            onClick={() => navigate("/operation/sales/pipeline/settings")}
             className="btn-create flex items-center gap-2"
           >
             <FiPlus className="w-4 h-4" />
