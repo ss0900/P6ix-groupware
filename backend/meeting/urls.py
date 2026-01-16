@@ -6,8 +6,6 @@ from . import views
 app_name = "meeting"
 
 router = DefaultRouter()
-router.register("rooms", views.MeetingRoomViewSet, basename="room")
-router.register("meetings", views.MeetingViewSet, basename="meeting")
 router.register("calendars", views.CalendarViewSet, basename="calendar")
 router.register("schedules", views.ScheduleViewSet, basename="schedule")
 router.register("resources", views.ResourceViewSet, basename="resource")
@@ -16,4 +14,3 @@ router.register("reservations", views.ResourceReservationViewSet, basename="rese
 urlpatterns = [
     path("", include(router.urls)),
 ]
-

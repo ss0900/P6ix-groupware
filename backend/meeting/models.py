@@ -3,131 +3,28 @@ from django.db import models
 from django.conf import settings
 
 
-class MeetingRoom(models.Model):
-    """회의실"""
-    name = models.CharField("회의실명", max_length=100)
-    location = models.CharField("위치", max_length=200, blank=True)
-    capacity = models.PositiveIntegerField("수용 인원", default=10)
-    description = models.TextField("설명", blank=True)
-    is_active = models.BooleanField("사용 가능", default=True)
-    color = models.CharField("색상", max_length=20, default="#3B82F6")
-    order = models.PositiveIntegerField("정렬 순서", default=0)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        verbose_name = "회의실"
-        verbose_name_plural = "회의실"
-        ordering = ["order", "name"]
-
-    def __str__(self):
-        return self.name
-
-
-class Meeting(models.Model):
-    """회의 일정"""
-    LOCATION_TYPE_ONLINE = "online"
-    LOCATION_TYPE_OFFLINE_ROOM = "offline_room"
-    LOCATION_TYPE_OFFLINE_ADDRESS = "offline_address"
-
-    LOCATION_TYPE_CHOICES = [
-        (LOCATION_TYPE_ONLINE, "온라인"),
-        (LOCATION_TYPE_OFFLINE_ROOM, "오프라인(회의실)"),
-        (LOCATION_TYPE_OFFLINE_ADDRESS, "오프라인(주소)"),
-    ]
-
-    title = models.CharField("제목", max_length=255)
-    schedule = models.DateTimeField("일정")
-    location_type = models.CharField(
-        "장소 구분",
-        max_length=20,
-        choices=LOCATION_TYPE_CHOICES,
-        default=LOCATION_TYPE_OFFLINE_ADDRESS,
-        db_index=True,
-    )
-    location = models.TextField("장소", blank=True)
-    meeting_room = models.ForeignKey(
-        MeetingRoom,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="meetings",
-        verbose_name="회의실",
-    )
-    agenda = models.TextField("안건", blank=True)
-    result = models.TextField("회의 결과", blank=True)
-    is_urgent = models.BooleanField("긴급", default=False, db_index=True)
-
-    author = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="created_meetings",
-        verbose_name="작성자",
-    )
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        verbose_name = "회의"
-        verbose_name_plural = "회의 목록"
-        ordering = ["-schedule"]
-        indexes = [
-            models.Index(fields=["schedule"]),
-        ]
-
-    def __str__(self):
-        return f"{self.title} ({self.schedule.strftime('%Y-%m-%d %H:%M')})"
-
-
-class MeetingParticipant(models.Model):
-    """회의 참석자"""
-    meeting = models.ForeignKey(
-        Meeting,
-        on_delete=models.CASCADE,
-        related_name="participants",
-    )
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="meeting_attendances",
-    )
-    responded = models.BooleanField("참여 응답 여부", default=False)
-    is_attending = models.BooleanField("참여", default=False)
-    responded_at = models.DateTimeField("응답 시간", null=True, blank=True)
-
-    class Meta:
-        verbose_name = "회의 참석자"
-        verbose_name_plural = "회의 참석자 목록"
-        unique_together = ["meeting", "user"]
-        indexes = [
-            models.Index(fields=["meeting", "responded", "is_attending"]),
-            models.Index(fields=["user", "responded", "is_attending"]),
-        ]
-
-    def __str__(self):
-        status = "참석" if self.is_attending else "불참" if self.responded else "미응답"
-        return f"{self.user.username} ({status})"
-
-
 class Calendar(models.Model):
     """캘린더 (분류)"""
+    # 카테고리 (시스템 기본 캘린더용)
     CATEGORY_ALL = "all"
     CATEGORY_SHARED = "shared"
     CATEGORY_PERSONAL = "personal"
-    CATEGORY_SITE = "site"
-    CATEGORY_PROJECT = "project"
-    CATEGORY_DEVELOPMENT = "development"
-    CATEGORY_RESOURCE = "resource"
+    CATEGORY_HEADQUARTERS = "headquarters"  # 본사일정
 
     CATEGORY_CHOICES = [
         (CATEGORY_ALL, "전체 일정"),
         (CATEGORY_SHARED, "공유 일정"),
         (CATEGORY_PERSONAL, "개인 일정"),
-        (CATEGORY_SITE, "현장일정"),
-        (CATEGORY_PROJECT, "프로젝트"),
-        (CATEGORY_DEVELOPMENT, "개발자회의 일정"),
-        (CATEGORY_RESOURCE, "자원예약"),
+        (CATEGORY_HEADQUARTERS, "본사일정"),
+    ]
+
+    # 캘린더 타입
+    CALENDAR_TYPE_SYSTEM = "system"
+    CALENDAR_TYPE_CUSTOM = "custom"
+
+    CALENDAR_TYPE_CHOICES = [
+        (CALENDAR_TYPE_SYSTEM, "시스템"),
+        (CALENDAR_TYPE_CUSTOM, "사용자 정의"),
     ]
 
     name = models.CharField("캘린더명", max_length=100)
@@ -136,7 +33,23 @@ class Calendar(models.Model):
         max_length=20,
         choices=CATEGORY_CHOICES,
         default=CATEGORY_PERSONAL,
+        blank=True,
         db_index=True,
+    )
+    calendar_type = models.CharField(
+        "캘린더 타입",
+        max_length=20,
+        choices=CALENDAR_TYPE_CHOICES,
+        default=CALENDAR_TYPE_SYSTEM,
+        db_index=True,
+    )
+    parent = models.ForeignKey(
+        "self",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="sub_calendars",
+        verbose_name="상위 캘린더",
     )
     color = models.CharField("색상", max_length=20, default="#3B82F6")
     description = models.TextField("설명", blank=True)
@@ -164,13 +77,59 @@ class Calendar(models.Model):
         verbose_name = "캘린더"
         verbose_name_plural = "캘린더"
         ordering = ["order", "name"]
+        indexes = [
+            models.Index(fields=["calendar_type", "category"]),
+        ]
 
     def __str__(self):
+        if self.calendar_type == self.CALENDAR_TYPE_CUSTOM:
+            return f"[사용자정의] {self.name}"
         return f"[{self.get_category_display()}] {self.name}"
 
 
+class Resource(models.Model):
+    """자원 (회의실/차량/장비 등)"""
+    RESOURCE_TYPE_ROOM = "room"
+    RESOURCE_TYPE_VEHICLE = "vehicle"
+    RESOURCE_TYPE_EQUIPMENT = "equipment"
+
+    RESOURCE_TYPE_CHOICES = [
+        (RESOURCE_TYPE_ROOM, "회의실"),
+        (RESOURCE_TYPE_VEHICLE, "차량"),
+        (RESOURCE_TYPE_EQUIPMENT, "장비"),
+    ]
+
+    name = models.CharField("자원명", max_length=100)
+    resource_type = models.CharField(
+        "자원유형",
+        max_length=20,
+        choices=RESOURCE_TYPE_CHOICES,
+        default=RESOURCE_TYPE_ROOM,
+        db_index=True,
+    )
+    description = models.TextField("설명", blank=True)
+    capacity = models.PositiveIntegerField("수용인원/좌석", default=1)
+    location = models.CharField("위치", max_length=200, blank=True)
+    # 회의실 전용 필드 (MeetingRoom에서 통합)
+    equipment = models.TextField("장비", blank=True, help_text="보유 장비 목록")
+    color = models.CharField("색상", max_length=20, default="#10B981")
+    is_active = models.BooleanField("사용가능", default=True)
+    requires_approval = models.BooleanField("승인필요", default=False)
+    order = models.PositiveIntegerField("정렬 순서", default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "자원"
+        verbose_name_plural = "자원"
+        ordering = ["order", "name"]
+
+    def __str__(self):
+        return f"[{self.get_resource_type_display()}] {self.name}"
+
+
 class Schedule(models.Model):
-    """일정 (개인/회사)"""
+    """일정 (개인/회사/회의 통합)"""
     SCOPE_PERSONAL = "personal"
     SCOPE_COMPANY = "company"
 
@@ -216,6 +175,19 @@ class Schedule(models.Model):
         (VISIBILITY_PUBLIC, "전체"),
     ]
 
+    # 회의 장소 유형 (Meeting 모델에서 통합)
+    LOCATION_TYPE_NONE = ""
+    LOCATION_TYPE_ONLINE = "online"
+    LOCATION_TYPE_OFFLINE_ROOM = "offline_room"
+    LOCATION_TYPE_OFFLINE_ADDRESS = "offline_address"
+
+    LOCATION_TYPE_CHOICES = [
+        (LOCATION_TYPE_NONE, "-"),
+        (LOCATION_TYPE_ONLINE, "온라인"),
+        (LOCATION_TYPE_OFFLINE_ROOM, "오프라인(회의실)"),
+        (LOCATION_TYPE_OFFLINE_ADDRESS, "오프라인(주소)"),
+    ]
+
     title = models.CharField("제목", max_length=255)
     start = models.DateTimeField("시작일시")
     end = models.DateTimeField("종료일시", null=True, blank=True)
@@ -248,7 +220,6 @@ class Schedule(models.Model):
         verbose_name="캘린더",
     )
 
-    # 새 필드들
     event_type = models.CharField(
         "일정 유형",
         max_length=20,
@@ -287,6 +258,27 @@ class Schedule(models.Model):
         verbose_name="참여자",
     )
 
+    # ===== 회의 전용 필드 (Meeting 모델에서 통합) =====
+    location_type = models.CharField(
+        "장소 구분",
+        max_length=20,
+        choices=LOCATION_TYPE_CHOICES,
+        default=LOCATION_TYPE_NONE,
+        blank=True,
+    )
+    meet_url = models.URLField("온라인 링크", max_length=500, blank=True)
+    resource = models.ForeignKey(
+        Resource,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="schedules",
+        verbose_name="회의실/자원",
+    )
+    agenda = models.TextField("안건", blank=True)
+    result = models.TextField("회의 결과", blank=True)
+    is_urgent = models.BooleanField("긴급", default=False, db_index=True)
+
     # 반복 일정 (RFC 5545 RRULE)
     is_recurring = models.BooleanField("반복 일정", default=False)
     rrule = models.TextField("반복규칙(RRULE)", blank=True, help_text="RFC 5545 형식: FREQ=WEEKLY;BYDAY=MO,WE;UNTIL=20260301")
@@ -312,19 +304,25 @@ class Schedule(models.Model):
         ordering = ["-start"]
         indexes = [
             models.Index(fields=["scope", "start"]),
+            models.Index(fields=["event_type", "start"]),
         ]
 
     def __str__(self):
-        return f"[{self.get_scope_display()}] {self.title}"
+        return f"[{self.get_event_type_display()}] {self.title}"
 
 
 class ScheduleAttendee(models.Model):
-    """일정 참석자 응답"""
+    """일정 참석자 응답 (MeetingParticipant 통합)"""
+    RESPONSE_PENDING = "pending"
+    RESPONSE_ACCEPTED = "accepted"
+    RESPONSE_DECLINED = "declined"
+    RESPONSE_TENTATIVE = "tentative"
+
     RESPONSE_CHOICES = [
-        ("pending", "대기"),
-        ("accepted", "수락"),
-        ("declined", "거절"),
-        ("tentative", "미정"),
+        (RESPONSE_PENDING, "대기"),
+        (RESPONSE_ACCEPTED, "수락"),
+        (RESPONSE_DECLINED, "거절"),
+        (RESPONSE_TENTATIVE, "미정"),
     ]
 
     schedule = models.ForeignKey(
@@ -343,56 +341,23 @@ class ScheduleAttendee(models.Model):
         "응답",
         max_length=20,
         choices=RESPONSE_CHOICES,
-        default="pending",
+        default=RESPONSE_PENDING,
     )
+    # MeetingParticipant에서 통합된 필드
+    is_attending = models.BooleanField("참석 여부", null=True, blank=True, help_text="True=참석, False=불참, None=미응답")
     responded_at = models.DateTimeField("응답 시간", null=True, blank=True)
 
     class Meta:
         verbose_name = "참석 응답"
         verbose_name_plural = "참석 응답"
         unique_together = ["schedule", "user"]
+        indexes = [
+            models.Index(fields=["schedule", "response"]),
+            models.Index(fields=["user", "response"]),
+        ]
 
     def __str__(self):
         return f"{self.user} - {self.schedule.title}: {self.get_response_display()}"
-
-
-class Resource(models.Model):
-    """자원 (회의실/차량 등)"""
-    RESOURCE_TYPE_ROOM = "room"
-    RESOURCE_TYPE_VEHICLE = "vehicle"
-    RESOURCE_TYPE_EQUIPMENT = "equipment"
-
-    RESOURCE_TYPE_CHOICES = [
-        (RESOURCE_TYPE_ROOM, "회의실"),
-        (RESOURCE_TYPE_VEHICLE, "차량"),
-        (RESOURCE_TYPE_EQUIPMENT, "장비"),
-    ]
-
-    name = models.CharField("자원명", max_length=100)
-    resource_type = models.CharField(
-        "자원유형",
-        max_length=20,
-        choices=RESOURCE_TYPE_CHOICES,
-        default=RESOURCE_TYPE_ROOM,
-        db_index=True,
-    )
-    description = models.TextField("설명", blank=True)
-    capacity = models.PositiveIntegerField("수용인원/좌석", default=1)
-    location = models.CharField("위치", max_length=200, blank=True)
-    color = models.CharField("색상", max_length=20, default="#10B981")
-    is_active = models.BooleanField("사용가능", default=True)
-    requires_approval = models.BooleanField("승인필요", default=False)
-    order = models.PositiveIntegerField("정렬 순서", default=0)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        verbose_name = "자원"
-        verbose_name_plural = "자원"
-        ordering = ["order", "name"]
-
-    def __str__(self):
-        return f"[{self.get_resource_type_display()}] {self.name}"
 
 
 class ResourceReservation(models.Model):

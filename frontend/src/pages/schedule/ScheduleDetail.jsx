@@ -1,8 +1,11 @@
 // src/pages/schedule/ScheduleDetail.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { format } from "date-fns";
-import { X, Clock, User, FileText, Edit, Trash2, MapPin, Tag } from "lucide-react";
-import { scheduleApi } from "../../api/schedule";
+import { 
+  X, Clock, User, FileText, Edit, Trash2, MapPin, Tag, 
+  AlertTriangle, Video, Check, XCircle, Users, Link as LinkIcon 
+} from "lucide-react";
+import { scheduleApi, getMyUserIdFromToken } from "../../api/schedule";
 
 // 이벤트 타입별 스타일
 const EVENT_TYPE_STYLES = {
@@ -14,13 +17,37 @@ const EVENT_TYPE_STYLES = {
   trip: { bg: "bg-green-100", text: "text-green-700", label: "출장" },
 };
 
+const LOCATION_TYPE_LABELS = {
+  online: "온라인",
+  offline_room: "오프라인(회의실)",
+  offline_address: "오프라인(주소)",
+};
+
 export default function ScheduleDetail({
   item,
   onEdit,
   onDeleted,
   onClose,
+  onRsvpChanged,
 }) {
   const [deleting, setDeleting] = useState(false);
+  const [rsvpLoading, setRsvpLoading] = useState(false);
+  const [myRsvpStatus, setMyRsvpStatus] = useState(null);
+
+  const myUserId = getMyUserIdFromToken();
+  const isMeeting = item?.event_type === "meeting";
+  const isParticipant = item?.participants?.some(p => p.id === myUserId) || 
+                        item?.attendee_responses?.some(a => a.user === myUserId);
+
+  // 내 RSVP 상태 확인
+  useEffect(() => {
+    if (item?.attendee_responses) {
+      const myResponse = item.attendee_responses.find(a => a.user === myUserId);
+      if (myResponse) {
+        setMyRsvpStatus(myResponse.is_attending);
+      }
+    }
+  }, [item, myUserId]);
 
   if (!item) return null;
 
@@ -53,6 +80,20 @@ export default function ScheduleDetail({
     }
   };
 
+  const handleRsvp = async (isAttending) => {
+    setRsvpLoading(true);
+    try {
+      await scheduleApi.rsvp(item.id, isAttending);
+      setMyRsvpStatus(isAttending);
+      onRsvpChanged?.();
+    } catch (err) {
+      console.error("RSVP 실패:", err);
+      alert("참석 응답에 실패했습니다.");
+    } finally {
+      setRsvpLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* 헤더 */}
@@ -68,6 +109,12 @@ export default function ScheduleDetail({
                 {eventTypeStyle.label}
               </span>
             )}
+            {item.is_urgent && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">
+                <AlertTriangle size={12} />
+                긴급
+              </span>
+            )}
           </div>
           <p className="text-sm text-gray-500 mt-1">일정 상세 정보</p>
         </div>
@@ -75,6 +122,39 @@ export default function ScheduleDetail({
           <X size={20} />
         </button>
       </div>
+
+      {/* RSVP 영역 (회의이고 참석자인 경우) */}
+      {isMeeting && isParticipant && (
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+          <p className="text-sm font-medium text-purple-700 mb-2">참석 여부</p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleRsvp(true)}
+              disabled={rsvpLoading}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                myRsvpStatus === true
+                  ? "bg-green-600 text-white"
+                  : "bg-white border border-gray-300 hover:bg-green-50 text-gray-700"
+              } ${rsvpLoading ? "opacity-50" : ""}`}
+            >
+              <Check size={16} />
+              참석
+            </button>
+            <button
+              onClick={() => handleRsvp(false)}
+              disabled={rsvpLoading}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                myRsvpStatus === false
+                  ? "bg-red-600 text-white"
+                  : "bg-white border border-gray-300 hover:bg-red-50 text-gray-700"
+              } ${rsvpLoading ? "opacity-50" : ""}`}
+            >
+              <XCircle size={16} />
+              불참
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 정보 카드 */}
       <div className="bg-gray-50 rounded-lg p-5 space-y-4">
@@ -108,13 +188,77 @@ export default function ScheduleDetail({
           </div>
         )}
 
-        {/* 장소 */}
+        {/* 회의 장소 구분 */}
+        {isMeeting && item.location_type && (
+          <div className="flex items-start gap-3">
+            <Video className="text-gray-400 mt-0.5" size={18} />
+            <div>
+              <p className="text-sm font-medium text-gray-500">장소 구분</p>
+              <p className="text-gray-900">
+                {item.location_type_display || LOCATION_TYPE_LABELS[item.location_type] || item.location_type}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* 온라인 링크 */}
+        {isMeeting && item.meet_url && (
+          <div className="flex items-start gap-3">
+            <LinkIcon className="text-gray-400 mt-0.5" size={18} />
+            <div>
+              <p className="text-sm font-medium text-gray-500">온라인 링크</p>
+              <a 
+                href={item.meet_url} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:underline break-all"
+              >
+                {item.meet_url}
+              </a>
+            </div>
+          </div>
+        )}
+
+        {/* 회의실 */}
+        {isMeeting && item.resource_name && (
+          <div className="flex items-start gap-3">
+            <MapPin className="text-gray-400 mt-0.5" size={18} />
+            <div>
+              <p className="text-sm font-medium text-gray-500">회의실</p>
+              <p className="text-gray-900">{item.resource_name}</p>
+            </div>
+          </div>
+        )}
+
+        {/* 일반 장소 */}
         {item.location && (
           <div className="flex items-start gap-3">
             <MapPin className="text-gray-400 mt-0.5" size={18} />
             <div>
               <p className="text-sm font-medium text-gray-500">장소</p>
               <p className="text-gray-900">{item.location}</p>
+            </div>
+          </div>
+        )}
+
+        {/* 안건 (회의) */}
+        {isMeeting && item.agenda && (
+          <div className="flex items-start gap-3">
+            <FileText className="text-gray-400 mt-0.5" size={18} />
+            <div>
+              <p className="text-sm font-medium text-gray-500">안건</p>
+              <p className="text-gray-900 whitespace-pre-wrap">{item.agenda}</p>
+            </div>
+          </div>
+        )}
+
+        {/* 회의 결과 */}
+        {isMeeting && item.result && (
+          <div className="flex items-start gap-3">
+            <FileText className="text-gray-400 mt-0.5" size={18} />
+            <div>
+              <p className="text-sm font-medium text-gray-500">회의 결과</p>
+              <p className="text-gray-900 whitespace-pre-wrap">{item.result}</p>
             </div>
           </div>
         )}
@@ -128,21 +272,33 @@ export default function ScheduleDetail({
           </div>
         </div>
 
-        {/* 참여자 (회사 일정일 때만) */}
-        {item.scope === "company" && item.participants?.length > 0 && (
+        {/* 참여자 */}
+        {(item.scope === "company" || isMeeting) && item.participants?.length > 0 && (
           <div className="flex items-start gap-3">
-            <User className="text-gray-400 mt-0.5" size={18} />
+            <Users className="text-gray-400 mt-0.5" size={18} />
             <div>
               <p className="text-sm font-medium text-gray-500">참여자</p>
               <div className="flex flex-wrap gap-2 mt-1">
-                {item.participants.map((p) => (
-                  <span
-                    key={p.id}
-                    className="px-2 py-1 bg-gray-100 rounded-full text-xs text-gray-700"
-                  >
-                    {p.name}
-                  </span>
-                ))}
+                {item.participants.map((p) => {
+                  // 응답 상태 찾기
+                  const attendee = item.attendee_responses?.find(a => a.user === p.id);
+                  const statusColor = attendee?.is_attending === true 
+                    ? "bg-green-100 text-green-700 border-green-300" 
+                    : attendee?.is_attending === false 
+                    ? "bg-red-100 text-red-700 border-red-300"
+                    : "bg-gray-100 text-gray-700 border-gray-300";
+
+                  return (
+                    <span
+                      key={p.id}
+                      className={`px-2 py-1 rounded-full text-xs border ${statusColor}`}
+                    >
+                      {p.name}
+                      {attendee?.is_attending === true && " ✓"}
+                      {attendee?.is_attending === false && " ✗"}
+                    </span>
+                  );
+                })}
               </div>
             </div>
           </div>

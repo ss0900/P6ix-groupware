@@ -2,159 +2,18 @@
 from rest_framework import serializers
 from django.utils import timezone
 from .models import (
-    MeetingRoom, Meeting, MeetingParticipant, 
     Calendar, Schedule, ScheduleAttendee,
     Resource, ResourceReservation
 )
 
 
-class MeetingRoomSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = MeetingRoom
-        fields = [
-            "id", "name", "location", "capacity",
-            "description", "is_active", "color", "order",
-            "created_at", "updated_at"
-        ]
-        read_only_fields = ["id", "created_at", "updated_at"]
-
-
-class MeetingParticipantSerializer(serializers.ModelSerializer):
-    user_id = serializers.IntegerField(source="user.id", read_only=True)
+class ScheduleAttendeeSerializer(serializers.ModelSerializer):
     user_name = serializers.SerializerMethodField()
     position = serializers.CharField(source="user.position", read_only=True, default="")
 
     class Meta:
-        model = MeetingParticipant
-        fields = [
-            "id", "user_id", "user_name", "position",
-            "responded", "is_attending", "responded_at"
-        ]
-        read_only_fields = ["id", "responded_at"]
-
-    def get_user_name(self, obj):
-        if obj.user:
-            return f"{obj.user.last_name}{obj.user.first_name}"
-        return ""
-
-
-class MeetingListSerializer(serializers.ModelSerializer):
-    """회의 목록용"""
-    author_name = serializers.SerializerMethodField()
-    room_name = serializers.CharField(source="meeting_room.name", read_only=True, default="")
-    participant_count = serializers.SerializerMethodField()
-    is_required_for_me = serializers.SerializerMethodField()
-
-    class Meta:
-        model = Meeting
-        fields = [
-            "id", "title", "schedule", "location_type", "location",
-            "meeting_room", "room_name", "is_urgent",
-            "author", "author_name", "participant_count", "is_required_for_me",
-            "created_at"
-        ]
-
-    def get_author_name(self, obj):
-        if obj.author:
-            return f"{obj.author.last_name}{obj.author.first_name}"
-        return ""
-
-    def get_participant_count(self, obj):
-        return obj.participants.count()
-
-    def get_is_required_for_me(self, obj):
-        request = self.context.get("request")
-        if not request or not request.user.is_authenticated:
-            return False
-        return obj.participants.filter(user=request.user).exists()
-
-
-class MeetingDetailSerializer(serializers.ModelSerializer):
-    """회의 상세용"""
-    author_name = serializers.SerializerMethodField()
-    room_name = serializers.CharField(source="meeting_room.name", read_only=True, default="")
-    participants = MeetingParticipantSerializer(many=True, read_only=True)
-    is_required_for_me = serializers.SerializerMethodField()
-
-    class Meta:
-        model = Meeting
-        fields = [
-            "id", "title", "schedule", "location_type", "location",
-            "meeting_room", "room_name", "agenda", "result", "is_urgent",
-            "author", "author_name", "participants", "is_required_for_me",
-            "created_at", "updated_at"
-        ]
-
-    def get_author_name(self, obj):
-        if obj.author:
-            return f"{obj.author.last_name}{obj.author.first_name}"
-        return ""
-
-    def get_is_required_for_me(self, obj):
-        request = self.context.get("request")
-        if not request or not request.user.is_authenticated:
-            return False
-        return obj.participants.filter(user=request.user).exists()
-
-
-class MeetingCreateSerializer(serializers.ModelSerializer):
-    """회의 생성/수정용"""
-    participant_ids = serializers.ListField(
-        child=serializers.IntegerField(),
-        write_only=True,
-        required=False,
-        default=[]
-    )
-
-    class Meta:
-        model = Meeting
-        fields = [
-            "id", "title", "schedule", "location_type", "location",
-            "meeting_room", "agenda", "result", "is_urgent",
-            "participant_ids"
-        ]
-        read_only_fields = ["id"]
-
-    def create(self, validated_data):
-        participant_ids = validated_data.pop("participant_ids", [])
-        meeting = Meeting.objects.create(**validated_data)
-
-        # 참석자 추가
-        for user_id in participant_ids:
-            MeetingParticipant.objects.create(
-                meeting=meeting,
-                user_id=user_id
-            )
-
-        return meeting
-
-    def update(self, instance, validated_data):
-        participant_ids = validated_data.pop("participant_ids", None)
-
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.save()
-
-        # 참석자 업데이트
-        if participant_ids is not None:
-            # 기존 참석자 삭제
-            instance.participants.all().delete()
-            # 새 참석자 추가
-            for user_id in participant_ids:
-                MeetingParticipant.objects.create(
-                    meeting=instance,
-                    user_id=user_id
-                )
-
-        return instance
-
-
-class ScheduleAttendeeSerializer(serializers.ModelSerializer):
-    user_name = serializers.SerializerMethodField()
-
-    class Meta:
         model = ScheduleAttendee
-        fields = ["id", "user", "user_name", "response", "responded_at"]
+        fields = ["id", "user", "user_name", "position", "response", "is_attending", "responded_at"]
         read_only_fields = ["id", "responded_at"]
 
     def get_user_name(self, obj):
@@ -170,6 +29,8 @@ class ScheduleListSerializer(serializers.ModelSerializer):
     participants = serializers.SerializerMethodField()
     calendar_name = serializers.CharField(source="calendar.name", read_only=True, default="")
     event_type_display = serializers.CharField(source="get_event_type_display", read_only=True)
+    resource_name = serializers.CharField(source="resource.name", read_only=True, default="")
+    location_type_display = serializers.CharField(source="get_location_type_display", read_only=True)
 
     class Meta:
         model = Schedule
@@ -178,7 +39,10 @@ class ScheduleListSerializer(serializers.ModelSerializer):
             "start", "end", "is_all_day",
             "owner", "owner_name", "participant_count", "participants",
             "memo", "calendar", "calendar_name",
-            "event_type", "event_type_display", "location", "status", "visibility"
+            "event_type", "event_type_display", "location", "status", "visibility",
+            # 회의 전용 필드
+            "location_type", "location_type_display", "meet_url", "resource", "resource_name",
+            "agenda", "is_urgent"
         ]
 
     def get_owner_name(self, obj):
@@ -205,6 +69,9 @@ class ScheduleDetailSerializer(serializers.ModelSerializer):
     event_type_display = serializers.CharField(source="get_event_type_display", read_only=True)
     status_display = serializers.CharField(source="get_status_display", read_only=True)
     visibility_display = serializers.CharField(source="get_visibility_display", read_only=True)
+    resource_name = serializers.CharField(source="resource.name", read_only=True, default="")
+    location_type_display = serializers.CharField(source="get_location_type_display", read_only=True)
+    is_required_for_me = serializers.SerializerMethodField()
 
     class Meta:
         model = Schedule
@@ -215,8 +82,11 @@ class ScheduleDetailSerializer(serializers.ModelSerializer):
             "event_type", "event_type_display", "location",
             "status", "status_display", "visibility", "visibility_display",
             "owner", "owner_name",
-            "participants", "attendee_responses",
+            "participants", "attendee_responses", "is_required_for_me",
             "is_recurring", "rrule", "reminder_minutes",
+            # 회의 전용 필드
+            "location_type", "location_type_display", "meet_url", "resource", "resource_name",
+            "agenda", "result", "is_urgent",
             "created_at", "updated_at"
         ]
 
@@ -230,6 +100,12 @@ class ScheduleDetailSerializer(serializers.ModelSerializer):
             {"id": u.id, "name": f"{u.last_name}{u.first_name}"}
             for u in obj.participants.all()
         ]
+
+    def get_is_required_for_me(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return False
+        return obj.participants.filter(id=request.user.id).exists()
 
 
 class ScheduleCreateSerializer(serializers.ModelSerializer):
@@ -249,6 +125,8 @@ class ScheduleCreateSerializer(serializers.ModelSerializer):
             "memo", "company", "calendar",
             "event_type", "location", "status", "visibility",
             "is_recurring", "rrule", "reminder_minutes",
+            # 회의 전용 필드
+            "location_type", "meet_url", "resource", "agenda", "result", "is_urgent",
             "participant_ids"
         ]
         read_only_fields = ["id"]
@@ -295,15 +173,18 @@ class CalendarSerializer(serializers.ModelSerializer):
     """캘린더 Serializer"""
     owner_name = serializers.SerializerMethodField()
     category_display = serializers.CharField(source="get_category_display", read_only=True)
+    calendar_type_display = serializers.CharField(source="get_calendar_type_display", read_only=True)
     schedule_count = serializers.SerializerMethodField()
+    sub_calendars = serializers.SerializerMethodField()
 
     class Meta:
         model = Calendar
         fields = [
-            "id", "name", "category", "category_display", "color",
-            "description", "owner", "owner_name", "company",
+            "id", "name", "category", "category_display",
+            "calendar_type", "calendar_type_display", "parent",
+            "color", "description", "owner", "owner_name", "company",
             "is_active", "is_default", "order", "schedule_count",
-            "created_at", "updated_at"
+            "sub_calendars", "created_at", "updated_at"
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
 
@@ -314,6 +195,10 @@ class CalendarSerializer(serializers.ModelSerializer):
 
     def get_schedule_count(self, obj):
         return obj.schedules.count()
+
+    def get_sub_calendars(self, obj):
+        subs = obj.sub_calendars.filter(is_active=True).order_by("order", "name")
+        return CalendarSerializer(subs, many=True).data
 
 
 # ===== 자원 Serializers =====
@@ -327,7 +212,7 @@ class ResourceSerializer(serializers.ModelSerializer):
         model = Resource
         fields = [
             "id", "name", "resource_type", "resource_type_display",
-            "description", "capacity", "location", "color",
+            "description", "capacity", "location", "equipment", "color",
             "is_active", "requires_approval", "order", "reservation_count",
             "created_at", "updated_at"
         ]
@@ -390,4 +275,3 @@ class ResourceReservationSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError("해당 시간에 이미 예약이 있습니다.")
 
         return data
-

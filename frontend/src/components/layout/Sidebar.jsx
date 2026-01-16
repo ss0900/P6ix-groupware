@@ -52,9 +52,8 @@ const menuItems = [
     label: "회의∙일정",
     icon: Calendar,
     children: [
-      { id: "schedule-calendar", label: "일정 관리", path: "/schedule" },
-      { id: "schedule-meeting", label: "회의 관리", path: "/schedule/meeting" },
-      { id: "schedule-room", label: "회의실 관리", path: "/schedule/room" },
+      { id: "schedule-calendar", label: "캘린더", path: "/schedule/calendar" },
+      { id: "schedule-resources", label: "자원 예약", path: "/schedule/resources" },
     ],
   },
   {

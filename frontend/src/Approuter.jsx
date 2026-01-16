@@ -41,8 +41,6 @@ import BoardWrite from "./pages/board/BoardWrite";
 import ScheduleCalendar from "./pages/schedule/ScheduleCalendar";
 import ScheduleForm from "./pages/schedule/ScheduleForm";
 import ScheduleDetail from "./pages/schedule/ScheduleDetail";
-import MeetingCalendar from "./pages/schedule/MeetingCalendar";
-import MeetingRoomManage from "./pages/schedule/MeetingRoomManage";
 import ResourceReservation from "./pages/schedule/ResourceReservation";
 
 // Archive
@@ -177,17 +175,25 @@ function AppRouter() {
 
         {/* 회의/일정 - with sidebar layout */}
         <Route path="schedule" element={<ScheduleLayout />}>
-          <Route index element={<Navigate to="meeting/plan" replace />} />
-          {/* 회의/협업관리 */}
-          <Route path="meeting/plan" element={<MeetingCalendar />} />
-          <Route path="meeting/rooms" element={<MeetingRoomManage />} />
-          {/* 일정 관리 */}
-          <Route path="calendar" element={<ScheduleCalendar />} />
+          <Route index element={<Navigate to="calendar/all" replace />} />
+          {/* 일정관리 - scope별 캘린더 */}
+          <Route path="calendar/all" element={<ScheduleCalendar scope="all" />} />
+          <Route path="calendar/shared" element={<ScheduleCalendar scope="shared" />} />
+          <Route path="calendar/personal" element={<ScheduleCalendar scope="personal" />} />
+          {/* 레거시 calendar 경로 */}
+          <Route path="calendar" element={<Navigate to="all" replace />} />
+          {/* 카테고리별 일정 */}
+          <Route path="category/headquarters" element={<ScheduleCalendar category="headquarters" />} />
+          <Route path="category/:calendarId" element={<ScheduleCalendar />} />
+          {/* 일정 CRUD */}
           <Route path="new" element={<ScheduleForm />} />
           <Route path=":id" element={<ScheduleDetail />} />
           <Route path=":id/edit" element={<ScheduleForm />} />
           {/* 자원 예약 */}
           <Route path="resources" element={<ResourceReservation />} />
+          {/* 레거시 리다이렉트 */}
+          <Route path="meeting/plan" element={<Navigate to="../calendar/all" replace />} />
+          <Route path="meeting/rooms" element={<Navigate to="../resources" replace />} />
         </Route>
 
         {/* 자료실 - with sidebar layout */}

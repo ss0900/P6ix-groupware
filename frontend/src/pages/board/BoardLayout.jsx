@@ -19,28 +19,27 @@ export default function BoardLayout() {
   const fetchBoards = async () => {
     let dynamicBoardItems = [];
     try {
-      const boards = await BoardService.getBoards();
+      // 백엔드에서 필터링: free 타입과 "업무 게시판" 제외
+      const boards = await BoardService.getBoards({
+        excludeNames: "업무 게시판",
+        excludeTypes: "free",
+      });
 
       // 트리 구조를 메뉴 구조로 변환
       const transformBoards = (boardList) => {
-        return boardList
-          .filter(
-            (board) =>
-              board.board_type !== "free" && board.name !== "업무 게시판"
-          )
-          .map((board) => {
-            const children =
-              board.sub_boards && board.sub_boards.length > 0
-                ? transformBoards(board.sub_boards)
-                : [];
+        return boardList.map((board) => {
+          const children =
+            board.sub_boards && board.sub_boards.length > 0
+              ? transformBoards(board.sub_boards)
+              : [];
 
-            return {
-              to: `${board.id}`,
-              label: board.name,
-              items: children,
-              icon: children.length === 0 ? FileText : undefined,
-            };
-          });
+          return {
+            to: `${board.id}`,
+            label: board.name,
+            items: children,
+            icon: children.length === 0 ? FileText : undefined,
+          };
+        });
       };
 
       dynamicBoardItems = transformBoards(boards);
@@ -59,9 +58,8 @@ export default function BoardLayout() {
             ...section.items,
             {
               label: "업무 게시판",
-              to: "work-all",
+              to: dynamicBoardItems.length > 0 ? dynamicBoardItems[0].to : "#",
               items: [
-                { label: "전체 보기", to: "work-all", icon: FileText },
                 ...dynamicBoardItems,
                 {
                   label: "업무 게시판 관리",

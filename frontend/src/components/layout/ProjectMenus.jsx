@@ -81,21 +81,25 @@ export const projectMenus = {
   schedule: {
     title: "회의∙일정",
     base: "/schedule",
-    baseClick: "meeting/plan",
+    baseClick: "calendar/all",
     sections: [
       {
-        title: "회의/협업관리",
+        title: "일정관리",
         items: [
-          { to: "meeting/plan", label: "회의 캘린더" },
-          { to: "meeting/rooms", label: "회의실 관리" },
+          { to: "calendar/all", label: "전체 일정" },
+          { to: "calendar/shared", label: "공유 일정" },
+          { to: "calendar/personal", label: "개인 일정" },
         ],
       },
       {
-        title: "일정 관리",
-        items: [{ to: "calendar", label: "일정 캘린더" }],
+        title: "카테고리별 일정",
+        items: [
+          { to: "category/headquarters", label: "본사일정" },
+          // 사용자 정의 일정은 ScheduleLayout에서 동적으로 추가됨
+        ],
       },
       {
-        title: "자원 예약",
+        title: "자원관리",
         items: [{ to: "resources", label: "자원 예약" }],
       },
     ],
