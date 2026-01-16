@@ -1,340 +1,310 @@
 // src/pages/schedule/ScheduleForm.jsx
-import React, { useEffect, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { format } from "date-fns";
+import { X } from "lucide-react";
+import { scheduleApi } from "../../api/schedule";
 import api from "../../api/axios";
-import { ArrowLeft, Save, Plus, X, User } from "lucide-react";
 
-export default function ScheduleForm() {
-  const navigate = useNavigate();
-  const { id } = useParams();
-  const [searchParams] = useSearchParams();
-  const isEdit = Boolean(id);
-
+export default function ScheduleForm({
+  mode = "create",
+  initial = null,
+  initialDate = new Date(),
+  companyId = null,
+  defaultScope = "personal",
+  onSaved,
+  onClose,
+}) {
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [rooms, setRooms] = useState([]);
   const [users, setUsers] = useState([]);
-  const [showUserSearch, setShowUserSearch] = useState(false);
+  const [participantIds, setParticipantIds] = useState([]);
 
-  const defaultDate = searchParams.get("date") || new Date().toISOString().split("T")[0];
-
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    schedule_type: "personal",
-    start_time: `${defaultDate}T09:00`,
-    end_time: `${defaultDate}T10:00`,
-    is_all_day: false,
-    location: "",
-    meeting_room: "",
-    reminder_minutes: 30,
-    color: "#3B82F6",
-    attendee_ids: [],
+  const [form, setForm] = useState({
+    title: initial?.title || "",
+    scope: initial?.scope || defaultScope,
+    date: initial?.start?.slice(0, 10) || format(initialDate, "yyyy-MM-dd"),
+    time: initial?.start?.slice(11, 16) || "09:00",
+    end_date: initial?.end?.slice(0, 10) || "",
+    end_time: initial?.end?.slice(11, 16) || "",
+    is_all_day: initial?.is_all_day || false,
+    memo: initial?.memo || "",
+    color: initial?.color || "#3B82F6",
   });
 
-  const [selectedAttendees, setSelectedAttendees] = useState([]);
-
-  // 회의실 및 사용자 목록 로드
+  // 사용자 목록 로드
   useEffect(() => {
-    (async () => {
-      try {
-        const [roomsRes, usersRes] = await Promise.all([
-          api.get("meeting/rooms/"),
-          api.get("core/users/"),
-        ]);
-        setRooms(roomsRes.data?.results ?? roomsRes.data ?? []);
-        setUsers(usersRes.data?.results ?? usersRes.data ?? []);
-      } catch (err) {
-        console.error(err);
-      }
-    })();
-  }, []);
-
-  // 편집 모드: 일정 로드
-  useEffect(() => {
-    if (!isEdit) return;
-
-    setLoading(true);
-    (async () => {
-      try {
-        const res = await api.get(`meeting/schedules/${id}/`);
-        const schedule = res.data;
-        setFormData({
-          title: schedule.title || "",
-          description: schedule.description || "",
-          schedule_type: schedule.schedule_type || "personal",
-          start_time: schedule.start_time?.slice(0, 16) || "",
-          end_time: schedule.end_time?.slice(0, 16) || "",
-          is_all_day: schedule.is_all_day || false,
-          location: schedule.location || "",
-          meeting_room: schedule.meeting_room || "",
-          reminder_minutes: schedule.reminder_minutes || 30,
-          color: schedule.color || "#3B82F6",
-          attendee_ids: schedule.attendees || [],
-        });
-        setSelectedAttendees(schedule.attendees_info || []);
-      } catch (err) {
-        console.error(err);
-        alert("일정을 불러올 수 없습니다.");
-        navigate("/schedule");
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [id, isEdit, navigate]);
-
-  // 참석자 추가
-  const addAttendee = (user) => {
-    if (!selectedAttendees.find((a) => a.id === user.id)) {
-      setSelectedAttendees([...selectedAttendees, { id: user.id, name: `${user.last_name}${user.first_name}` }]);
-      setFormData({ ...formData, attendee_ids: [...formData.attendee_ids, user.id] });
+    if (form.scope === "company") {
+      (async () => {
+        try {
+          const res = await api.get("/users/");
+          setUsers(res.data?.results ?? res.data ?? []);
+        } catch (err) {
+          console.error("사용자 목록 로드 실패:", err);
+        }
+      })();
+    } else {
+      setUsers([]);
     }
-    setShowUserSearch(false);
+  }, [form.scope]);
+
+  // 기존 참여자 설정 (수정 모드)
+  useEffect(() => {
+    if (initial?.participants) {
+      setParticipantIds(initial.participants.map((p) => p.id));
+    }
+  }, [initial]);
+
+  const onChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setForm((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
   };
 
-  // 참석자 제거
-  const removeAttendee = (userId) => {
-    setSelectedAttendees(selectedAttendees.filter((a) => a.id !== userId));
-    setFormData({ ...formData, attendee_ids: formData.attendee_ids.filter((id) => id !== userId) });
+  const toggleParticipant = (userId) => {
+    setParticipantIds((prev) =>
+      prev.includes(userId)
+        ? prev.filter((id) => id !== userId)
+        : [...prev, userId]
+    );
   };
 
-  // 저장
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!form.title.trim()) return alert("제목을 입력해주세요.");
+    if (!form.date) return alert("날짜를 선택해주세요.");
 
-    if (!formData.title.trim()) {
-      alert("제목을 입력해주세요.");
-      return;
-    }
-
-    setSaving(true);
+    setLoading(true);
     try {
-      const payload = { ...formData };
-      if (!payload.meeting_room) delete payload.meeting_room;
+      const start = new Date(`${form.date}T${form.time || "00:00"}:00`).toISOString();
+      const end = form.end_date
+        ? new Date(`${form.end_date}T${form.end_time || "23:59"}:00`).toISOString()
+        : null;
 
-      if (isEdit) {
-        await api.patch(`meeting/schedules/${id}/`, payload);
+      const payload = {
+        title: form.title,
+        scope: form.scope,
+        start,
+        end,
+        is_all_day: form.is_all_day,
+        memo: form.memo,
+        color: form.color,
+        company: form.scope === "company" && companyId ? companyId : null,
+        participant_ids: form.scope === "company" ? participantIds : [],
+      };
+
+      if (mode === "create") {
+        await scheduleApi.create(payload);
       } else {
-        await api.post("meeting/schedules/", payload);
+        await scheduleApi.update(initial.id, payload);
       }
-      navigate("/schedule");
+
+      onSaved?.();
     } catch (err) {
-      console.error(err);
-      alert("저장 중 오류가 발생했습니다.");
+      console.error("저장 실패:", err);
+      alert("저장에 실패했습니다.");
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-500 border-t-transparent"></div>
-      </div>
-    );
-  }
-
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="space-y-6">
       {/* 헤더 */}
-      <div className="flex items-center gap-4">
-        <button onClick={() => navigate("/schedule")} className="p-2 hover:bg-gray-100 rounded-lg">
-          <ArrowLeft size={20} />
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold">
+          {mode === "create" ? "일정 등록" : "일정 수정"}
+        </h2>
+        <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
+          <X size={20} />
         </button>
-        <h1 className="text-2xl font-bold text-gray-900">{isEdit ? "일정 수정" : "일정 등록"}</h1>
       </div>
 
-      {/* 폼 */}
-      <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* scope 선택 */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">일정 구분</label>
+          <div className="flex gap-2">
+            {[
+              { value: "personal", label: "개인", color: "green" },
+              { value: "company", label: "회사", color: "red" },
+            ].map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                disabled={mode === "edit"}
+                onClick={() => {
+                  setForm((prev) => ({ ...prev, scope: opt.value }));
+                  setParticipantIds([]);
+                }}
+                className={`
+                  px-4 py-2 rounded-lg border text-sm
+                  ${form.scope === opt.value
+                    ? opt.color === "green"
+                      ? "bg-green-600 text-white border-green-600"
+                      : "bg-red-600 text-white border-red-600"
+                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"}
+                  ${mode === "edit" ? "opacity-50 cursor-not-allowed" : ""}
+                `}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* 제목 */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">제목 *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">제목</label>
           <input
             type="text"
-            value={formData.title}
-            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-            placeholder="일정 제목"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-            required
+            name="title"
+            value={form.title}
+            onChange={onChange}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            placeholder="일정 제목을 입력하세요"
           />
         </div>
 
-        {/* 일정 유형 */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">일정 유형</label>
-            <select
-              value={formData.schedule_type}
-              onChange={(e) => setFormData({ ...formData, schedule_type: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-            >
-              <option value="personal">개인 일정</option>
-              <option value="team">팀 일정</option>
-              <option value="company">전사 일정</option>
-              <option value="meeting">회의</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">색상</label>
+        {/* 종일 */}
+        <div>
+          <label className="flex items-center gap-2 cursor-pointer">
             <input
-              type="color"
-              value={formData.color}
-              onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-              className="w-full h-10 rounded-lg cursor-pointer"
+              type="checkbox"
+              name="is_all_day"
+              checked={form.is_all_day}
+              onChange={onChange}
+              className="rounded text-blue-600"
             />
-          </div>
+            <span className="text-sm text-gray-700">종일</span>
+          </label>
         </div>
 
-        {/* 시간 */}
+        {/* 일시 */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">시작</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">시작 날짜</label>
             <input
-              type="datetime-local"
-              value={formData.start_time}
-              onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-              required
+              type="date"
+              name="date"
+              value={form.date}
+              onChange={onChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">종료</label>
-            <input
-              type="datetime-local"
-              value={formData.end_time}
-              onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-              required
-            />
-          </div>
+          {!form.is_all_day && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">시작 시간</label>
+              <input
+                type="time"
+                name="time"
+                value={form.time}
+                onChange={onChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+          )}
         </div>
 
-        <label className="flex items-center gap-2 cursor-pointer">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">종료 날짜</label>
+            <input
+              type="date"
+              name="end_date"
+              value={form.end_date}
+              onChange={onChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+          {!form.is_all_day && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">종료 시간</label>
+              <input
+                type="time"
+                name="end_time"
+                value={form.end_time}
+                onChange={onChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+          )}
+        </div>
+
+        {/* 색상 */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">색상</label>
           <input
-            type="checkbox"
-            checked={formData.is_all_day}
-            onChange={(e) => setFormData({ ...formData, is_all_day: e.target.checked })}
-            className="w-4 h-4 rounded border-gray-300 text-blue-600"
+            type="color"
+            name="color"
+            value={form.color}
+            onChange={onChange}
+            className="w-16 h-10 border border-gray-300 rounded-lg cursor-pointer"
           />
-          <span className="text-sm text-gray-700">종일</span>
-        </label>
-
-        {/* 장소 / 회의실 */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">장소</label>
-            <input
-              type="text"
-              value={formData.location}
-              onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-              placeholder="장소 입력"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">회의실</label>
-            <select
-              value={formData.meeting_room}
-              onChange={(e) => setFormData({ ...formData, meeting_room: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-            >
-              <option value="">선택 안함</option>
-              {rooms.map((r) => (
-                <option key={r.id} value={r.id}>{r.name} ({r.capacity}명)</option>
-              ))}
-            </select>
-          </div>
         </div>
 
-        {/* 참석자 */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="text-sm font-medium text-gray-700">참석자</label>
-            <button
-              type="button"
-              onClick={() => setShowUserSearch(true)}
-              className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700"
-            >
-              <Plus size={16} />
-              추가
-            </button>
+        {/* 참여자 (회사 일정일 때만) */}
+        {form.scope === "company" && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">참여자</label>
+            <div className="border border-gray-300 rounded-lg p-3 max-h-40 overflow-y-auto">
+              {users.length === 0 ? (
+                <p className="text-gray-400 text-sm">사용자가 없습니다.</p>
+              ) : (
+                <div className="space-y-2">
+                  {users.map((user) => (
+                    <label
+                      key={user.id}
+                      className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={participantIds.includes(user.id)}
+                        onChange={() => toggleParticipant(user.id)}
+                        className="rounded text-blue-600"
+                      />
+                      <span className="text-sm">
+                        {user.last_name}{user.first_name}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {selectedAttendees.map((attendee) => (
-              <span
-                key={attendee.id}
-                className="flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm"
-              >
-                {attendee.name}
-                <button type="button" onClick={() => removeAttendee(attendee.id)} className="hover:text-blue-900">
-                  <X size={14} />
-                </button>
-              </span>
-            ))}
-            {selectedAttendees.length === 0 && (
-              <span className="text-sm text-gray-400">참석자를 추가해주세요</span>
-            )}
-          </div>
-        </div>
+        )}
 
-        {/* 설명 */}
+        {/* 메모 */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">설명</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">메모</label>
           <textarea
-            value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            placeholder="일정 설명"
-            rows={4}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+            name="memo"
+            value={form.memo}
+            onChange={onChange}
+            rows={3}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            placeholder="메모를 입력하세요"
           />
         </div>
 
         {/* 버튼 */}
-        <div className="flex gap-3 pt-4 border-t border-gray-200">
+        <div className="flex justify-end gap-3 pt-4">
           <button
             type="button"
-            onClick={() => navigate("/schedule")}
-            className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
+            onClick={onClose}
+            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
           >
             취소
           </button>
           <button
             type="submit"
-            disabled={saving}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 font-medium"
+            disabled={loading}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
           >
-            <Save size={18} />
-            {saving ? "저장 중..." : "저장"}
+            {loading ? "저장 중..." : mode === "create" ? "등록" : "저장"}
           </button>
         </div>
       </form>
-
-      {/* 사용자 검색 모달 */}
-      {showUserSearch && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 max-h-[70vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold">참석자 추가</h3>
-              <button onClick={() => setShowUserSearch(false)} className="text-gray-400 hover:text-gray-600">✕</button>
-            </div>
-            <div className="space-y-2">
-              {users.filter((u) => !formData.attendee_ids.includes(u.id)).map((user) => (
-                <button
-                  key={user.id}
-                  type="button"
-                  onClick={() => addAttendee(user)}
-                  className="w-full flex items-center gap-3 p-3 hover:bg-blue-50 rounded-lg text-left"
-                >
-                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                    <User size={16} className="text-blue-600" />
-                  </div>
-                  <span>{user.last_name}{user.first_name}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

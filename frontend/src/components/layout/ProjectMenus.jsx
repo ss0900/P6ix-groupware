@@ -81,15 +81,18 @@ export const projectMenus = {
   schedule: {
     title: "회의∙일정",
     base: "/schedule",
-    baseClick: "calendar",
+    baseClick: "meeting/plan",
     sections: [
       {
-        title: "일정 관리",
+        title: "회의/협업관리",
         items: [
-          { to: "calendar", label: "일정 캘린더" },
-          { to: "meeting", label: "회의 관리" },
-          { to: "room", label: "회의실 관리" },
+          { to: "meeting/plan", label: "회의 캘린더" },
+          { to: "meeting/rooms", label: "회의실 관리" },
         ],
+      },
+      {
+        title: "일정 관리",
+        items: [{ to: "calendar", label: "일정 캘린더" }],
       },
     ],
   },
@@ -136,9 +139,7 @@ export const projectMenus = {
       },
       {
         title: "기타",
-        items: [
-          { to: "sales/emails", label: "이메일" },
-        ],
+        items: [{ to: "sales/emails", label: "이메일" }],
       },
     ],
   },
@@ -181,12 +182,12 @@ export const projectMenus = {
 // 상단 메뉴 순서
 export const menuOrder = [
   "dashboard",
+  "operation",
   "timeline",
   "contact",
   "approval",
   "board",
   "schedule",
   "archive",
-  "operation",
   "admin",
 ];

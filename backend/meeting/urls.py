@@ -7,6 +7,7 @@ app_name = "meeting"
 
 router = DefaultRouter()
 router.register("rooms", views.MeetingRoomViewSet, basename="room")
+router.register("meetings", views.MeetingViewSet, basename="meeting")
 router.register("schedules", views.ScheduleViewSet, basename="schedule")
 
 urlpatterns = [

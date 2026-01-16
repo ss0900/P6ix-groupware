@@ -41,6 +41,8 @@ import BoardWrite from "./pages/board/BoardWrite";
 import ScheduleCalendar from "./pages/schedule/ScheduleCalendar";
 import ScheduleForm from "./pages/schedule/ScheduleForm";
 import ScheduleDetail from "./pages/schedule/ScheduleDetail";
+import MeetingCalendar from "./pages/schedule/MeetingCalendar";
+import MeetingRoomManage from "./pages/schedule/MeetingRoomManage";
 
 // Archive
 import ArchiveList from "./pages/archive/ArchiveList";
@@ -174,16 +176,15 @@ function AppRouter() {
 
         {/* 회의/일정 - with sidebar layout */}
         <Route path="schedule" element={<ScheduleLayout />}>
-          <Route index element={<Navigate to="calendar" replace />} />
+          <Route index element={<Navigate to="meeting/plan" replace />} />
+          {/* 회의/협업관리 */}
+          <Route path="meeting/plan" element={<MeetingCalendar />} />
+          <Route path="meeting/rooms" element={<MeetingRoomManage />} />
+          {/* 일정 관리 */}
           <Route path="calendar" element={<ScheduleCalendar />} />
           <Route path="new" element={<ScheduleForm />} />
           <Route path=":id" element={<ScheduleDetail />} />
           <Route path=":id/edit" element={<ScheduleForm />} />
-          <Route path="meeting" element={<ScheduleCalendar />} />
-          <Route
-            path="room"
-            element={<div className="p-6">회의실 관리 (준비 중)</div>}
-          />
         </Route>
 
         {/* 자료실 - with sidebar layout */}
