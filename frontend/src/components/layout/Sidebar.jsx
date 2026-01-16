@@ -1,84 +1,40 @@
 // src/components/layout/Sidebar.jsx
+// ProjectMenus.jsx 데이터를 사용하는 모바일 사이드바
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   FileCheck,
-  MessageSquare as Board,
+  MessageSquare,
   Calendar,
   FolderOpen,
-
   Settings,
   ChevronDown,
   ChevronRight,
   Building,
   History,
+  Briefcase,
+  Mail,
 } from "lucide-react";
+import { projectMenus, menuOrder } from "./ProjectMenus";
 
-const menuItems = [
-  {
-    id: "dashboard",
-    label: "대시보드",
-    icon: LayoutDashboard,
-    path: "/",
-  },
-  {
-    id: "timeline",
-    label: "타임라인",
-    icon: History,
-    path: "/timeline",
-  },
-  {
-    id: "approval",
-    label: "전자결재",
-    icon: FileCheck,
-    children: [
-      { id: "approval-inbox", label: "결재함", path: "/approval" },
-      { id: "approval-draft", label: "기안함", path: "/approval/draft" },
-      { id: "approval-settings", label: "환경설정", path: "/approval/settings" },
-    ],
-  },
-  {
-    id: "board",
-    label: "게시판",
-    icon: Board,
-    children: [
-      { id: "board-notice", label: "공지사항", path: "/board/notice" },
-      { id: "board-list", label: "게시판", path: "/board" },
-    ],
-  },
-  {
-    id: "schedule",
-    label: "회의∙일정",
-    icon: Calendar,
-    children: [
-      { id: "schedule-calendar", label: "캘린더", path: "/schedule/calendar" },
-      { id: "schedule-resources", label: "자원 예약", path: "/schedule/resources" },
-    ],
-  },
-  {
-    id: "archive",
-    label: "자료실",
-    icon: FolderOpen,
-    path: "/archive",
-  },
-
-  {
-    id: "admin",
-    label: "관리자",
-    icon: Settings,
-    children: [
-      { id: "admin-users", label: "사용자 관리", path: "/admin/users" },
-      { id: "admin-org", label: "조직도 관리", path: "/admin/organization" },
-      { id: "admin-positions", label: "직위 관리", path: "/admin/positions" },
-    ],
-  },
-];
+// 메뉴별 아이콘 매핑
+const menuIcons = {
+  dashboard: LayoutDashboard,
+  timeline: History,
+  approval: FileCheck,
+  board: MessageSquare,
+  schedule: Calendar,
+  archive: FolderOpen,
+  operation: Briefcase,
+  contact: Mail,
+  admin: Settings,
+};
 
 function Sidebar({ isOpen, onClose }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const [expandedMenus, setExpandedMenus] = useState(["approval", "board", "schedule", "admin"]);
+  const [expandedMenus, setExpandedMenus] = useState(menuOrder);
 
   const toggleMenu = (menuId) => {
     setExpandedMenus((prev) =>
@@ -97,7 +53,42 @@ function Sidebar({ isOpen, onClose }) {
 
   const handleNavigate = (path) => {
     navigate(path);
+    onClose?.();
   };
+
+  // ProjectMenus 데이터를 기반으로 메뉴 아이템 생성
+  const menuItems = menuOrder.map((menuKey) => {
+    const menu = projectMenus[menuKey];
+    if (!menu) return null;
+
+    const Icon = menuIcons[menuKey] || LayoutDashboard;
+
+    // 하위 항목들 플랫하게 펼치기
+    const children = menu.sections.flatMap((section) =>
+      section.items.map((item) => ({
+        id: `${menuKey}-${item.to}`,
+        label: item.label,
+        path: item.to ? `${menu.base}/${item.to}` : menu.base,
+      }))
+    );
+
+    // 단일 항목만 있으면 children 없이 직접 경로 지정
+    if (children.length === 1) {
+      return {
+        id: menuKey,
+        label: menu.title,
+        icon: Icon,
+        path: children[0].path,
+      };
+    }
+
+    return {
+      id: menuKey,
+      label: menu.title,
+      icon: Icon,
+      children,
+    };
+  }).filter(Boolean);
 
   return (
     <>

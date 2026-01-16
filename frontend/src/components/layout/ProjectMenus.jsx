@@ -79,7 +79,7 @@ export const projectMenus = {
     ],
   },
   schedule: {
-    title: "회의∙일정",
+    title: "일정관리",
     base: "/schedule",
     baseClick: "calendar/all",
     sections: [
