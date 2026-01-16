@@ -43,6 +43,7 @@ import ScheduleForm from "./pages/schedule/ScheduleForm";
 import ScheduleDetail from "./pages/schedule/ScheduleDetail";
 import MeetingCalendar from "./pages/schedule/MeetingCalendar";
 import MeetingRoomManage from "./pages/schedule/MeetingRoomManage";
+import ResourceReservation from "./pages/schedule/ResourceReservation";
 
 // Archive
 import ArchiveList from "./pages/archive/ArchiveList";
@@ -185,6 +186,8 @@ function AppRouter() {
           <Route path="new" element={<ScheduleForm />} />
           <Route path=":id" element={<ScheduleDetail />} />
           <Route path=":id/edit" element={<ScheduleForm />} />
+          {/* 자원 예약 */}
+          <Route path="resources" element={<ResourceReservation />} />
         </Route>
 
         {/* 자료실 - with sidebar layout */}

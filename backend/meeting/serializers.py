@@ -1,7 +1,11 @@
 # backend/meeting/serializers.py
 from rest_framework import serializers
 from django.utils import timezone
-from .models import MeetingRoom, Meeting, MeetingParticipant, Schedule, ScheduleAttendee
+from .models import (
+    MeetingRoom, Meeting, MeetingParticipant, 
+    Calendar, Schedule, ScheduleAttendee,
+    Resource, ResourceReservation
+)
 
 
 class MeetingRoomSerializer(serializers.ModelSerializer):
@@ -164,6 +168,8 @@ class ScheduleListSerializer(serializers.ModelSerializer):
     owner_name = serializers.SerializerMethodField()
     participant_count = serializers.SerializerMethodField()
     participants = serializers.SerializerMethodField()
+    calendar_name = serializers.CharField(source="calendar.name", read_only=True, default="")
+    event_type_display = serializers.CharField(source="get_event_type_display", read_only=True)
 
     class Meta:
         model = Schedule
@@ -171,7 +177,8 @@ class ScheduleListSerializer(serializers.ModelSerializer):
             "id", "title", "scope", "color",
             "start", "end", "is_all_day",
             "owner", "owner_name", "participant_count", "participants",
-            "memo"
+            "memo", "calendar", "calendar_name",
+            "event_type", "event_type_display", "location", "status", "visibility"
         ]
 
     def get_owner_name(self, obj):
@@ -194,16 +201,22 @@ class ScheduleDetailSerializer(serializers.ModelSerializer):
     owner_name = serializers.SerializerMethodField()
     attendee_responses = ScheduleAttendeeSerializer(many=True, read_only=True)
     participants = serializers.SerializerMethodField()
+    calendar_name = serializers.CharField(source="calendar.name", read_only=True, default="")
+    event_type_display = serializers.CharField(source="get_event_type_display", read_only=True)
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+    visibility_display = serializers.CharField(source="get_visibility_display", read_only=True)
 
     class Meta:
         model = Schedule
         fields = [
             "id", "title", "scope", "color",
             "start", "end", "is_all_day",
-            "memo", "company",
+            "memo", "company", "calendar", "calendar_name",
+            "event_type", "event_type_display", "location",
+            "status", "status_display", "visibility", "visibility_display",
             "owner", "owner_name",
             "participants", "attendee_responses",
-            "is_recurring", "recurrence_rule", "reminder_minutes",
+            "is_recurring", "rrule", "reminder_minutes",
             "created_at", "updated_at"
         ]
 
@@ -233,8 +246,9 @@ class ScheduleCreateSerializer(serializers.ModelSerializer):
         fields = [
             "id", "title", "scope", "color",
             "start", "end", "is_all_day",
-            "memo", "company",
-            "is_recurring", "recurrence_rule", "reminder_minutes",
+            "memo", "company", "calendar",
+            "event_type", "location", "status", "visibility",
+            "is_recurring", "rrule", "reminder_minutes",
             "participant_ids"
         ]
         read_only_fields = ["id"]
@@ -273,3 +287,107 @@ class ScheduleCreateSerializer(serializers.ModelSerializer):
                 )
 
         return instance
+
+
+# ===== 캘린더 Serializers =====
+
+class CalendarSerializer(serializers.ModelSerializer):
+    """캘린더 Serializer"""
+    owner_name = serializers.SerializerMethodField()
+    category_display = serializers.CharField(source="get_category_display", read_only=True)
+    schedule_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Calendar
+        fields = [
+            "id", "name", "category", "category_display", "color",
+            "description", "owner", "owner_name", "company",
+            "is_active", "is_default", "order", "schedule_count",
+            "created_at", "updated_at"
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+    def get_owner_name(self, obj):
+        if obj.owner:
+            return f"{obj.owner.last_name}{obj.owner.first_name}"
+        return ""
+
+    def get_schedule_count(self, obj):
+        return obj.schedules.count()
+
+
+# ===== 자원 Serializers =====
+
+class ResourceSerializer(serializers.ModelSerializer):
+    """자원 Serializer"""
+    resource_type_display = serializers.CharField(source="get_resource_type_display", read_only=True)
+    reservation_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Resource
+        fields = [
+            "id", "name", "resource_type", "resource_type_display",
+            "description", "capacity", "location", "color",
+            "is_active", "requires_approval", "order", "reservation_count",
+            "created_at", "updated_at"
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
+    def get_reservation_count(self, obj):
+        return obj.reservations.filter(status__in=["pending", "approved"]).count()
+
+
+class ResourceReservationSerializer(serializers.ModelSerializer):
+    """자원 예약 Serializer"""
+    resource_name = serializers.CharField(source="resource.name", read_only=True)
+    resource_type = serializers.CharField(source="resource.resource_type", read_only=True)
+    reserved_by_name = serializers.SerializerMethodField()
+    approved_by_name = serializers.SerializerMethodField()
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+
+    class Meta:
+        model = ResourceReservation
+        fields = [
+            "id", "resource", "resource_name", "resource_type",
+            "schedule", "start", "end", "purpose",
+            "status", "status_display",
+            "reserved_by", "reserved_by_name",
+            "approved_by", "approved_by_name", "approved_at",
+            "note", "created_at", "updated_at"
+        ]
+        read_only_fields = ["id", "approved_at", "created_at", "updated_at"]
+
+    def get_reserved_by_name(self, obj):
+        if obj.reserved_by:
+            return f"{obj.reserved_by.last_name}{obj.reserved_by.first_name}"
+        return ""
+
+    def get_approved_by_name(self, obj):
+        if obj.approved_by:
+            return f"{obj.approved_by.last_name}{obj.approved_by.first_name}"
+        return ""
+
+    def validate(self, data):
+        """중복 예약 검증"""
+        resource = data.get("resource") or (self.instance.resource if self.instance else None)
+        start = data.get("start") or (self.instance.start if self.instance else None)
+        end = data.get("end") or (self.instance.end if self.instance else None)
+
+        if start and end and start >= end:
+            raise serializers.ValidationError("종료 시간은 시작 시간보다 늦어야 합니다.")
+
+        if resource and start and end:
+            overlapping = ResourceReservation.objects.filter(
+                resource=resource,
+                end__gt=start,
+                start__lt=end,
+            ).exclude(status="rejected")
+
+            if self.instance:
+                overlapping = overlapping.exclude(pk=self.instance.pk)
+
+            if overlapping.exists():
+                raise serializers.ValidationError("해당 시간에 이미 예약이 있습니다.")
+
+        return data
+

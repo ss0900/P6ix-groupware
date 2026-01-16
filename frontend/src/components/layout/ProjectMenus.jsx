@@ -94,6 +94,10 @@ export const projectMenus = {
         title: "일정 관리",
         items: [{ to: "calendar", label: "일정 캘린더" }],
       },
+      {
+        title: "자원 예약",
+        items: [{ to: "resources", label: "자원 예약" }],
+      },
     ],
   },
   archive: {

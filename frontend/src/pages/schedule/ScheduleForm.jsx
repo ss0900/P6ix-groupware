@@ -2,8 +2,17 @@
 import React, { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { X } from "lucide-react";
-import { scheduleApi } from "../../api/schedule";
+import { scheduleApi, calendarApi } from "../../api/schedule";
 import api from "../../api/axios";
+
+const EVENT_TYPES = [
+  { value: "general", label: "일반" },
+  { value: "annual", label: "연차" },
+  { value: "monthly", label: "월차" },
+  { value: "half", label: "반차" },
+  { value: "meeting", label: "회의" },
+  { value: "trip", label: "출장" },
+];
 
 export default function ScheduleForm({
   mode = "create",
@@ -16,11 +25,14 @@ export default function ScheduleForm({
 }) {
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState([]);
+  const [calendars, setCalendars] = useState([]);
   const [participantIds, setParticipantIds] = useState([]);
 
   const [form, setForm] = useState({
     title: initial?.title || "",
     scope: initial?.scope || defaultScope,
+    event_type: initial?.event_type || "general",
+    location: initial?.location || "",
     date: initial?.start?.slice(0, 10) || format(initialDate, "yyyy-MM-dd"),
     time: initial?.start?.slice(11, 16) || "09:00",
     end_date: initial?.end?.slice(0, 10) || "",
@@ -28,6 +40,7 @@ export default function ScheduleForm({
     is_all_day: initial?.is_all_day || false,
     memo: initial?.memo || "",
     color: initial?.color || "#3B82F6",
+    calendar: initial?.calendar || null,
   });
 
   // 사용자 목록 로드
@@ -45,6 +58,18 @@ export default function ScheduleForm({
       setUsers([]);
     }
   }, [form.scope]);
+
+  // 캘린더 목록 로드
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await calendarApi.myCalendars();
+        setCalendars(res.data ?? []);
+      } catch (err) {
+        console.error("캘린더 목록 로드 실패:", err);
+      }
+    })();
+  }, []);
 
   // 기존 참여자 설정 (수정 모드)
   useEffect(() => {
@@ -84,11 +109,14 @@ export default function ScheduleForm({
       const payload = {
         title: form.title,
         scope: form.scope,
+        event_type: form.event_type,
+        location: form.location,
         start,
         end,
         is_all_day: form.is_all_day,
         memo: form.memo,
         color: form.color,
+        calendar: form.calendar || null,
         company: form.scope === "company" && companyId ? companyId : null,
         participant_ids: form.scope === "company" ? participantIds : [],
       };
@@ -153,6 +181,23 @@ export default function ScheduleForm({
           </div>
         </div>
 
+        {/* 일정 유형 */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">일정 유형</label>
+          <select
+            name="event_type"
+            value={form.event_type}
+            onChange={onChange}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          >
+            {EVENT_TYPES.map((type) => (
+              <option key={type.value} value={type.value}>
+                {type.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
         {/* 제목 */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">제목</label>
@@ -163,6 +208,19 @@ export default function ScheduleForm({
             onChange={onChange}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             placeholder="일정 제목을 입력하세요"
+          />
+        </div>
+
+        {/* 장소 */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">장소</label>
+          <input
+            type="text"
+            name="location"
+            value={form.location}
+            onChange={onChange}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            placeholder="장소를 입력하세요 (선택)"
           />
         </div>
 
@@ -230,6 +288,26 @@ export default function ScheduleForm({
             </div>
           )}
         </div>
+
+        {/* 캘린더 선택 */}
+        {calendars.length > 0 && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">캘린더</label>
+            <select
+              name="calendar"
+              value={form.calendar || ""}
+              onChange={(e) => setForm(prev => ({ ...prev, calendar: e.target.value || null }))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="">캘린더 선택 (선택사항)</option>
+              {calendars.map((cal) => (
+                <option key={cal.id} value={cal.id}>
+                  {cal.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* 색상 */}
         <div>

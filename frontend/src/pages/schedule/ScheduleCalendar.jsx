@@ -1,34 +1,84 @@
 // src/pages/schedule/ScheduleCalendar.jsx
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isSameDay, isToday } from "date-fns";
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  eachDayOfInterval,
+  getDay,
+  addMonths,
+  subMonths,
+  isSameDay,
+  isToday,
+  startOfWeek,
+  endOfWeek,
+} from "date-fns";
 import { ko } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Plus, Clock, User } from "lucide-react";
-import { scheduleApi } from "../../api/schedule";
+import {
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  Plus,
+  Printer,
+  Search,
+  Calendar as CalendarIcon,
+  X,
+} from "lucide-react";
+import { scheduleApi, calendarApi } from "../../api/schedule";
 import api from "../../api/axios";
 import ScheduleForm from "./ScheduleForm";
 import ScheduleDetail from "./ScheduleDetail";
+
+// 이벤트 타입별 색상
+const EVENT_TYPE_STYLES = {
+  general: { bg: "bg-gray-100", text: "text-gray-700", label: "일반" },
+  annual: { bg: "bg-yellow-100", text: "text-yellow-800", label: "연차" },
+  monthly: { bg: "bg-orange-100", text: "text-orange-700", label: "월차" },
+  half: { bg: "bg-blue-100", text: "text-blue-700", label: "반차" },
+  meeting: { bg: "bg-purple-100", text: "text-purple-700", label: "회의" },
+  trip: { bg: "bg-green-100", text: "text-green-700", label: "출장" },
+};
+
+// 기본 캘린더 분류
+const DEFAULT_CALENDARS = [
+  { id: "all", name: "전체 일정", category: "all", color: "#3B82F6", checked: true },
+  { id: "shared", name: "공유 일정", category: "shared", color: "#10B981", checked: true },
+  { id: "personal", name: "개인 일정", category: "personal", color: "#8B5CF6", checked: true },
+  { id: "site", name: "현장일정", category: "site", color: "#F59E0B", checked: false },
+  { id: "project", name: "프로젝트", category: "project", color: "#EC4899", checked: false },
+  { id: "development", name: "개발자회의 일정", category: "development", color: "#06B6D4", checked: false },
+  { id: "resource", name: "자원예약", category: "resource", color: "#84CC16", checked: false },
+];
 
 export default function ScheduleCalendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(false);
-  
-  // scope 필터
-  const [selectedScopes, setSelectedScopes] = useState(["personal", "company"]);
-  
-  // 회사 ID (로그인 사용자 기준)
+
+  // 캘린더 체크박스 필터
+  const [calendarFilters, setCalendarFilters] = useState(() => {
+    const saved = localStorage.getItem("scheduleCalendarFilters");
+    return saved ? JSON.parse(saved) : DEFAULT_CALENDARS;
+  });
+
+  // 검색
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // 회사 ID
   const [companyId, setCompanyId] = useState(null);
-  
+
   // 패널 상태
   const [panelOpen, setPanelOpen] = useState(false);
-  const [panelMode, setPanelMode] = useState(null); // 'view' | 'create' | 'edit'
+  const [panelMode, setPanelMode] = useState(null);
   const [activeItem, setActiveItem] = useState(null);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
 
-  // 회사 ID 로드
+  // 사용자 정보 로드
   useEffect(() => {
     (async () => {
       try {
@@ -42,101 +92,102 @@ export default function ScheduleCalendar() {
     })();
   }, []);
 
+  // 캘린더 필터 저장
+  useEffect(() => {
+    localStorage.setItem("scheduleCalendarFilters", JSON.stringify(calendarFilters));
+  }, [calendarFilters]);
+
   // 일정 데이터 로드
   const fetchSchedules = useCallback(async () => {
     setLoading(true);
     try {
-      let all = [];
-      
-      if (selectedScopes.includes("personal")) {
-        const res = await scheduleApi.listPersonal();
-        all = [...all, ...(res.data?.results ?? res.data ?? [])];
-      }
-      
-      if (selectedScopes.includes("company")) {
-        const res = await scheduleApi.listCompany(companyId);
-        all = [...all, ...(res.data?.results ?? res.data ?? [])];
-      }
-      
-      // 중복 제거
-      const uniqueById = new Map();
-      all.forEach((s) => uniqueById.set(s.id, s));
-      setSchedules([...uniqueById.values()]);
+      const start = format(startOfMonth(currentDate), "yyyy-MM-dd");
+      const end = format(endOfMonth(currentDate), "yyyy-MM-dd");
+
+      const res = await scheduleApi.list({
+        date_from: start,
+        date_to: end,
+        search: searchQuery || undefined,
+      });
+
+      const data = res.data?.results ?? res.data ?? [];
+      setSchedules(data);
     } catch (err) {
       console.error("일정 목록 조회 실패:", err);
       setSchedules([]);
     } finally {
       setLoading(false);
     }
-  }, [selectedScopes, companyId]);
+  }, [currentDate, searchQuery]);
 
   useEffect(() => {
     fetchSchedules();
   }, [fetchSchedules]);
 
-  // scope 토글
-  const toggleScope = (scope) => {
-    setSelectedScopes((prev) =>
-      prev.includes(scope)
-        ? prev.filter((s) => s !== scope)
-        : [...prev, scope]
+  // 캘린더 필터 토글
+  const toggleCalendarFilter = (id) => {
+    setCalendarFilters((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, checked: !c.checked } : c))
     );
   };
 
   // 월 이동
+  const goToPrevYear = () => setCurrentDate(addMonths(currentDate, -12));
   const goToPrevMonth = () => setCurrentDate(subMonths(currentDate, 1));
   const goToNextMonth = () => setCurrentDate(addMonths(currentDate, 1));
+  const goToNextYear = () => setCurrentDate(addMonths(currentDate, 12));
   const goToToday = () => {
     const today = new Date();
     setCurrentDate(today);
     setSelectedDate(today);
   };
+  const goToThisWeek = () => {
+    setCurrentDate(new Date());
+  };
 
-  // 캘린더 날짜 생성
+  // 캘린더 날짜 생성 (6주 그리드)
   const calendarDays = useMemo(() => {
-    const start = startOfMonth(currentDate);
-    const end = endOfMonth(currentDate);
-    const days = eachDayOfInterval({ start, end });
-
-    const startDay = getDay(start);
-    const paddedDays = [];
-    for (let i = 0; i < startDay; i++) {
-      paddedDays.push(null);
-    }
-
-    return [...paddedDays, ...days];
+    const monthStart = startOfMonth(currentDate);
+    const monthEnd = endOfMonth(currentDate);
+    const start = startOfWeek(monthStart, { weekStartsOn: 0 });
+    const end = endOfWeek(monthEnd, { weekStartsOn: 0 });
+    return eachDayOfInterval({ start, end });
   }, [currentDate]);
 
   // 날짜별 일정 필터
-  const getSchedulesForDate = useCallback((date) => {
-    if (!date) return [];
-    const dateStr = format(date, "yyyy-MM-dd");
-    return schedules.filter((s) => (s.start || "").slice(0, 10) === dateStr);
-  }, [schedules]);
+  const getSchedulesForDate = useCallback(
+    (date) => {
+      if (!date) return [];
+      const dateStr = format(date, "yyyy-MM-dd");
+      
+      // 체크된 캘린더만 필터
+      const checkedCategories = calendarFilters
+        .filter((c) => c.checked)
+        .map((c) => c.category);
+      
+      return schedules
+        .filter((s) => {
+          const startDate = (s.start || "").slice(0, 10);
+          const endDate = (s.end || s.start || "").slice(0, 10);
+          
+          // 날짜 범위 체크
+          if (startDate > dateStr || endDate < dateStr) return false;
+          
+          // 캘린더 필터 (scope 기반)
+          if (checkedCategories.includes("all")) return true;
+          if (s.scope === "personal" && checkedCategories.includes("personal")) return true;
+          if (s.scope === "company" && (checkedCategories.includes("shared") || checkedCategories.includes("all"))) return true;
+          
+          return checkedCategories.includes("all");
+        })
+        .sort((a, b) => String(a.start || "").localeCompare(String(b.start || "")));
+    },
+    [schedules, calendarFilters]
+  );
 
-  // 날짜별 일정 개수 (scope별 색상)
-  const statusCountsByDate = useMemo(() => {
-    const counts = {};
-    schedules.forEach((s) => {
-      const dateStr = (s.start || "").slice(0, 10);
-      if (!counts[dateStr]) {
-        counts[dateStr] = { personal: 0, company: 0 };
-      }
-      if (s.scope === "personal") counts[dateStr].personal++;
-      else counts[dateStr].company++;
-    });
-    return counts;
-  }, [schedules]);
-
-  // 선택된 날짜의 일정 목록
-  const selectedDateSchedules = useMemo(() => {
-    return getSchedulesForDate(selectedDate).sort((a, b) =>
-      String(a.start || "").localeCompare(String(b.start || ""))
-    );
-  }, [selectedDate, getSchedulesForDate]);
-
-  // 패널 열기 함수들
-  const openCreate = () => {
+  // 패널 함수들
+  const openCreate = (date) => {
+    setSelectedDate(date || new Date());
     setActiveItem(null);
     setPanelMode("create");
     setPanelOpen(true);
@@ -160,89 +211,134 @@ export default function ScheduleCalendar() {
     setActiveItem(null);
   };
 
-  // scope별 색상
-  const getScopeColor = (scope) => {
-    return scope === "personal"
-      ? { bg: "bg-green-100", text: "text-green-700", border: "border-green-300", dot: "bg-green-500" }
-      : { bg: "bg-red-100", text: "text-red-700", border: "border-red-300", dot: "bg-red-500" };
-  };
-
   return (
-    <div className="space-y-6">
-      {/* 헤더 */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">일정 관리</h1>
+    <div className="flex h-full">
+      {/* 좌측 사이드바 - 캘린더 필터 */}
+      <div className="w-48 bg-white border-r border-gray-200 p-4 flex-shrink-0">
+        {/* 일정 쓰기 버튼 */}
         <button
-          onClick={openCreate}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          onClick={() => openCreate()}
+          className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-sky-500 text-white rounded-lg hover:bg-sky-600 mb-4"
         >
           <Plus size={18} />
-          일정 등록
+          일정 쓰기
         </button>
-      </div>
 
-      {/* scope 필터 */}
-      <div className="flex gap-2">
-        {[
-          { key: "personal", label: "개인", color: "green" },
-          { key: "company", label: "회사", color: "red" },
-        ].map((opt) => {
-          const active = selectedScopes.includes(opt.key);
-          return (
-            <button
-              key={opt.key}
-              onClick={() => toggleScope(opt.key)}
-              className={`
-                px-4 py-2 rounded-full border text-sm font-medium transition-all
-                ${active
-                  ? opt.color === "green"
-                    ? "bg-green-100 text-green-700 border-green-400"
-                    : "bg-red-100 text-red-700 border-red-400"
-                  : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"}
-              `}
+        {/* 캘린더 체크박스 목록 */}
+        <div className="space-y-1">
+          {calendarFilters.map((cal) => (
+            <label
+              key={cal.id}
+              className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-gray-50 cursor-pointer text-sm"
             >
-              {opt.label}
-            </button>
-          );
-        })}
-        <button
-          onClick={() => setSelectedScopes([])}
-          className="px-4 py-2 border border-gray-300 rounded-full text-sm text-gray-600 hover:bg-gray-50"
-        >
-          전체 해제
-        </button>
+              <input
+                type="checkbox"
+                checked={cal.checked}
+                onChange={() => toggleCalendarFilter(cal.id)}
+                className="w-4 h-4 rounded border-gray-300"
+                style={{ accentColor: cal.color }}
+              />
+              <span
+                className="w-2 h-2 rounded-full"
+                style={{ backgroundColor: cal.color }}
+              />
+              <span className="text-gray-700">{cal.name}</span>
+            </label>
+          ))}
+        </div>
       </div>
 
-      <div className="flex gap-6 items-start">
-        {/* 좌측: 캘린더 */}
-        <div className="w-[550px] bg-white rounded-xl border border-gray-200 p-4">
-          {/* 캘린더 헤더 */}
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-4">
-              <button onClick={goToPrevMonth} className="p-2 hover:bg-gray-100 rounded-lg">
-                <ChevronLeft size={20} />
+      {/* 메인 캘린더 영역 */}
+      <div className="flex-1 flex flex-col bg-white">
+        {/* 상단 헤더 */}
+        <div className="px-4 py-3 border-b border-gray-200">
+          <div className="flex items-center justify-between">
+            <h1 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+              <span className="text-gray-400">≡</span>
+              전체 일정
+            </h1>
+
+            {/* 액션 버튼들 */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={goToThisWeek}
+                className="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50"
+              >
+                금주일정
               </button>
-              <h2 className="text-xl font-semibold text-gray-900">
-                {year}년 {month + 1}월
-              </h2>
-              <button onClick={goToNextMonth} className="p-2 hover:bg-gray-100 rounded-lg">
-                <ChevronRight size={20} />
+              <button
+                onClick={goToToday}
+                className="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50"
+              >
+                오늘일정
               </button>
+              <button
+                onClick={() => window.print()}
+                className="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50 flex items-center gap-1"
+              >
+                <Printer size={14} />
+                인쇄
+              </button>
+              <button
+                onClick={() => setSearchOpen(!searchOpen)}
+                className="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50 flex items-center gap-1"
+              >
+                <Search size={14} />
+                검색
+              </button>
+
+              {/* 월 네비게이션 */}
+              <div className="flex items-center gap-1 ml-4">
+                <button onClick={goToPrevYear} className="p-1 hover:bg-gray-100 rounded">
+                  <ChevronsLeft size={18} />
+                </button>
+                <button onClick={goToPrevMonth} className="p-1 hover:bg-gray-100 rounded">
+                  <ChevronLeft size={18} />
+                </button>
+                <span className="px-3 text-sm font-medium text-gray-700">
+                  {year}-{String(month + 1).padStart(2, "0")}
+                </span>
+                <button onClick={goToNextMonth} className="p-1 hover:bg-gray-100 rounded">
+                  <ChevronRight size={18} />
+                </button>
+                <button onClick={goToNextYear} className="p-1 hover:bg-gray-100 rounded">
+                  <ChevronsRight size={18} />
+                </button>
+              </div>
             </div>
-            <button
-              onClick={goToToday}
-              className="px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg"
-            >
-              오늘
-            </button>
           </div>
 
+          {/* 검색 입력 */}
+          {searchOpen && (
+            <div className="mt-3 flex items-center gap-2">
+              <input
+                type="text"
+                placeholder="일정 검색..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+              />
+              <button
+                onClick={() => {
+                  setSearchQuery("");
+                  setSearchOpen(false);
+                }}
+                className="p-2 text-gray-500 hover:text-gray-700"
+              >
+                <X size={18} />
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* 캘린더 그리드 */}
+        <div className="flex-1 overflow-auto">
           {/* 요일 헤더 */}
-          <div className="grid grid-cols-7 mb-2">
+          <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-50">
             {["일", "월", "화", "수", "목", "금", "토"].map((day, idx) => (
               <div
                 key={day}
-                className={`py-2 text-center text-sm font-medium ${
+                className={`py-2 text-center text-sm font-medium border-r last:border-r-0 ${
                   idx === 0 ? "text-red-500" : idx === 6 ? "text-blue-500" : "text-gray-600"
                 }`}
               >
@@ -251,94 +347,87 @@ export default function ScheduleCalendar() {
             ))}
           </div>
 
-          {/* 캘린더 그리드 */}
-          <div className="grid grid-cols-7 gap-1">
+          {/* 날짜 그리드 */}
+          <div className="grid grid-cols-7 flex-1">
             {calendarDays.map((date, idx) => {
-              if (!date) {
-                return <div key={`empty-${idx}`} className="h-16" />;
-              }
-
-              const dateStr = format(date, "yyyy-MM-dd");
-              const counts = statusCountsByDate[dateStr] || { personal: 0, company: 0 };
-              const isSelected = isSameDay(date, selectedDate);
+              const isCurrentMonth = date.getMonth() === month;
               const isTodayDate = isToday(date);
+              const isSelected = isSameDay(date, selectedDate);
               const dayOfWeek = getDay(date);
+              const daySchedules = getSchedulesForDate(date);
 
               return (
                 <div
-                  key={dateStr}
+                  key={idx}
                   onClick={() => setSelectedDate(date)}
                   className={`
-                    h-16 p-1 rounded-lg cursor-pointer transition-all
-                    ${isSelected ? "bg-blue-100 ring-2 ring-blue-500" : "hover:bg-gray-50"}
+                    min-h-[100px] border-b border-r border-gray-200 p-1 cursor-pointer transition-colors
+                    ${!isCurrentMonth ? "bg-gray-50" : "bg-white"}
+                    ${isSelected ? "bg-sky-50 ring-1 ring-sky-300 ring-inset" : ""}
+                    hover:bg-gray-50
                   `}
                 >
-                  <div
-                    className={`
-                      text-sm font-medium
-                      ${isTodayDate ? "bg-blue-600 text-white w-6 h-6 rounded-full flex items-center justify-center" : ""}
-                      ${!isTodayDate && dayOfWeek === 0 ? "text-red-500" : ""}
-                      ${!isTodayDate && dayOfWeek === 6 ? "text-blue-500" : ""}
-                    `}
-                  >
-                    {format(date, "d")}
-                  </div>
-                  {/* scope별 dot */}
-                  <div className="mt-1 flex justify-center gap-1">
-                    {counts.personal > 0 && (
-                      <span className="w-2 h-2 rounded-full bg-green-500" />
+                  {/* 날짜 숫자 */}
+                  <div className="flex items-center justify-between mb-1">
+                    <span
+                      className={`
+                        text-sm font-medium px-1
+                        ${!isCurrentMonth ? "text-gray-400" : ""}
+                        ${isTodayDate ? "bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center" : ""}
+                        ${!isTodayDate && dayOfWeek === 0 ? "text-red-500" : ""}
+                        ${!isTodayDate && dayOfWeek === 6 ? "text-blue-500" : ""}
+                      `}
+                    >
+                      {format(date, "d")}
+                    </span>
+                    {isTodayDate && (
+                      <span className="text-xs text-red-500 font-medium">오늘</span>
                     )}
-                    {counts.company > 0 && (
-                      <span className="w-2 h-2 rounded-full bg-red-500" />
+                  </div>
+
+                  {/* 일정 목록 */}
+                  <div className="space-y-0.5 overflow-hidden">
+                    {daySchedules.slice(0, 4).map((schedule) => {
+                      const typeStyle = EVENT_TYPE_STYLES[schedule.event_type] || EVENT_TYPE_STYLES.general;
+                      const time = schedule.is_all_day
+                        ? ""
+                        : format(new Date(schedule.start), "HH:mm");
+
+                      return (
+                        <div
+                          key={schedule.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openView(schedule);
+                          }}
+                          className={`
+                            text-xs px-1 py-0.5 rounded truncate cursor-pointer
+                            hover:opacity-80 transition-opacity
+                            ${typeStyle.bg} ${typeStyle.text}
+                          `}
+                          title={schedule.title}
+                        >
+                          {schedule.event_type !== "general" && (
+                            <span className="font-medium">[{typeStyle.label}] </span>
+                          )}
+                          {time && <span className="text-gray-500">{time} </span>}
+                          {schedule.owner_name && (
+                            <span className="text-gray-600">{schedule.owner_name} </span>
+                          )}
+                          {schedule.title}
+                        </div>
+                      );
+                    })}
+                    {daySchedules.length > 4 && (
+                      <div className="text-xs text-gray-500 px-1">
+                        +{daySchedules.length - 4}건 더보기
+                      </div>
                     )}
                   </div>
                 </div>
               );
             })}
           </div>
-        </div>
-
-        {/* 우측: 일정 목록 */}
-        <div className="flex-1 bg-white rounded-xl border border-gray-200 p-4 max-h-[600px] overflow-y-auto">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">
-            {format(selectedDate, "yyyy년 M월 d일", { locale: ko })} 일정
-          </h3>
-
-          {loading ? (
-            <p className="text-gray-500">로딩 중...</p>
-          ) : selectedDateSchedules.length === 0 ? (
-            <p className="text-gray-400">일정이 없습니다.</p>
-          ) : (
-            <div className="space-y-3">
-              {selectedDateSchedules.map((schedule) => {
-                const scopeStyle = getScopeColor(schedule.scope);
-                return (
-                  <div
-                    key={schedule.id}
-                    onClick={() => openView(schedule)}
-                    className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-2">
-                        <Clock size={16} className="text-gray-400" />
-                        <span className="text-sm text-gray-600">
-                          {format(new Date(schedule.start), "HH:mm")}
-                        </span>
-                      </div>
-                      <span className={`px-2 py-0.5 text-xs rounded-full border ${scopeStyle.bg} ${scopeStyle.text} ${scopeStyle.border}`}>
-                        {schedule.scope === "personal" ? "개인" : "회사"}
-                      </span>
-                    </div>
-                    <h4 className="font-medium text-gray-900 mt-2">{schedule.title}</h4>
-                    <div className="flex items-center gap-2 mt-2 text-sm text-gray-500">
-                      <User size={14} />
-                      <span>{schedule.owner_name}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
         </div>
       </div>
 
@@ -353,7 +442,7 @@ export default function ScheduleCalendar() {
                   mode="create"
                   initialDate={selectedDate}
                   companyId={companyId}
-                  defaultScope={selectedScopes.length === 1 ? selectedScopes[0] : "personal"}
+                  defaultScope="personal"
                   onSaved={() => {
                     fetchSchedules();
                     closePanel();

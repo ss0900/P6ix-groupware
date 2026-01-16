@@ -8,13 +8,19 @@ from django.db import transaction
 from django.db.models import Q
 from datetime import timedelta
 
-from .models import MeetingRoom, Meeting, MeetingParticipant, Schedule, ScheduleAttendee
+from .models import (
+    MeetingRoom, Meeting, MeetingParticipant,
+    Calendar, Schedule, ScheduleAttendee,
+    Resource, ResourceReservation
+)
 from .serializers import (
     MeetingRoomSerializer,
     MeetingListSerializer, MeetingDetailSerializer, MeetingCreateSerializer,
     MeetingParticipantSerializer,
+    CalendarSerializer,
     ScheduleListSerializer, ScheduleDetailSerializer, ScheduleCreateSerializer,
-    ScheduleAttendeeSerializer
+    ScheduleAttendeeSerializer,
+    ResourceSerializer, ResourceReservationSerializer
 )
 
 
@@ -203,7 +209,9 @@ class ScheduleViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        qs = Schedule.objects.select_related("owner", "company").prefetch_related("participants")
+        qs = Schedule.objects.select_related(
+            "owner", "company", "calendar"
+        ).prefetch_related("participants")
 
         # 기본: 내가 만든 일정 + 내가 참여자인 일정 + 회사 일정
         base_q = Q(owner=user) | Q(participants=user) | Q(scope=Schedule.SCOPE_COMPANY)
@@ -219,17 +227,48 @@ class ScheduleViewSet(viewsets.ModelViewSet):
         if company:
             qs = qs.filter(company_id=company)
 
+        # calendar 필터
+        calendar_id = self.request.query_params.get("calendar")
+        if calendar_id:
+            qs = qs.filter(calendar_id=calendar_id)
+
+        # calendar_ids 다중 필터 (체크박스 UI)
+        calendar_ids = self.request.query_params.get("calendar_ids")
+        if calendar_ids:
+            ids = [int(x) for x in calendar_ids.split(",") if x.isdigit()]
+            if ids:
+                qs = qs.filter(calendar_id__in=ids)
+
+        # event_type 필터
+        event_type = self.request.query_params.get("event_type")
+        if event_type:
+            qs = qs.filter(event_type=event_type)
+
         # 날짜 필터
         start = self.request.query_params.get("start")
         end = self.request.query_params.get("end")
         if start and end:
             qs = qs.filter(start__date__range=[start, end])
 
+        date_from = self.request.query_params.get("date_from")
+        date_to = self.request.query_params.get("date_to")
+        if date_from and date_to:
+            qs = qs.filter(start__date__gte=date_from, start__date__lte=date_to)
+
         # 월별 필터
         year = self.request.query_params.get("year")
         month = self.request.query_params.get("month")
         if year and month:
             qs = qs.filter(start__year=year, start__month=month)
+
+        # 검색
+        search = self.request.query_params.get("search")
+        if search:
+            qs = qs.filter(
+                Q(title__icontains=search) |
+                Q(memo__icontains=search) |
+                Q(location__icontains=search)
+            )
 
         return qs.order_by("start")
 
@@ -299,3 +338,194 @@ class ScheduleViewSet(viewsets.ModelViewSet):
             start__lte=week_later
         )[:10]
         return Response(ScheduleListSerializer(qs, many=True).data)
+
+    @action(detail=False, methods=["get"])
+    def this_week(self, request):
+        """금주 일정"""
+        today = timezone.now().date()
+        start_of_week = today - timedelta(days=today.weekday())
+        end_of_week = start_of_week + timedelta(days=6)
+        qs = self.get_queryset().filter(
+            start__date__gte=start_of_week,
+            start__date__lte=end_of_week
+        )
+        return Response(ScheduleListSerializer(qs, many=True).data)
+
+
+class CalendarViewSet(viewsets.ModelViewSet):
+    """캘린더 ViewSet"""
+    serializer_class = CalendarSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        # 내 캘린더 + 공유 캘린더 + 회사 캘린더
+        qs = Calendar.objects.filter(
+            Q(owner=user) |
+            Q(category__in=["all", "shared"]) |
+            Q(company=user.company) if hasattr(user, 'company') else Q(owner=user)
+        ).distinct()
+
+        # category 필터
+        category = self.request.query_params.get("category")
+        if category:
+            qs = qs.filter(category=category)
+
+        # is_active 필터
+        is_active = self.request.query_params.get("is_active")
+        if str(is_active).lower() in ("1", "true", "yes"):
+            qs = qs.filter(is_active=True)
+
+        return qs.order_by("order", "name")
+
+    def perform_create(self, serializer):
+        serializer.save(owner=self.request.user)
+
+    @action(detail=False, methods=["get"])
+    def my_calendars(self, request):
+        """내 캘린더 목록 (사이드바용)"""
+        qs = self.get_queryset().filter(is_active=True)
+        serializer = CalendarSerializer(qs, many=True)
+        return Response(serializer.data)
+
+
+class ResourceViewSet(viewsets.ModelViewSet):
+    """자원 ViewSet"""
+    queryset = Resource.objects.all()
+    serializer_class = ResourceSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+
+        # resource_type 필터
+        resource_type = self.request.query_params.get("resource_type")
+        if resource_type:
+            qs = qs.filter(resource_type=resource_type)
+
+        # is_active 필터
+        is_active = self.request.query_params.get("is_active")
+        if str(is_active).lower() in ("1", "true", "yes"):
+            qs = qs.filter(is_active=True)
+
+        return qs.order_by("order", "name")
+
+    @action(detail=True, methods=["get"])
+    def availability(self, request, pk=None):
+        """자원 가용성 조회"""
+        resource = self.get_object()
+        date_str = request.query_params.get("date")
+        start_str = request.query_params.get("start")
+        end_str = request.query_params.get("end")
+
+        reservations = ResourceReservation.objects.filter(
+            resource=resource,
+            status__in=["pending", "approved"]
+        )
+
+        if date_str:
+            from datetime import datetime
+            try:
+                check_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+                reservations = reservations.filter(start__date=check_date)
+            except ValueError:
+                return Response({"error": "날짜 형식이 올바르지 않습니다."}, status=400)
+
+        if start_str and end_str:
+            reservations = reservations.filter(
+                end__gt=start_str,
+                start__lt=end_str
+            )
+
+        return Response({
+            "resource": ResourceSerializer(resource).data,
+            "reservations": ResourceReservationSerializer(reservations, many=True).data
+        })
+
+    @action(detail=False, methods=["get"])
+    def available(self, request):
+        """특정 시간에 사용 가능한 자원 찾기"""
+        start_str = request.query_params.get("start")
+        end_str = request.query_params.get("end")
+        resource_type = request.query_params.get("resource_type")
+
+        if not start_str or not end_str:
+            return Response({"error": "start와 end 파라미터가 필요합니다."}, status=400)
+
+        # 해당 시간에 예약된 자원 ID
+        reserved_ids = ResourceReservation.objects.filter(
+            end__gt=start_str,
+            start__lt=end_str,
+            status__in=["pending", "approved"]
+        ).values_list("resource_id", flat=True)
+
+        qs = Resource.objects.filter(is_active=True).exclude(id__in=reserved_ids)
+        if resource_type:
+            qs = qs.filter(resource_type=resource_type)
+
+        return Response(ResourceSerializer(qs, many=True).data)
+
+
+class ResourceReservationViewSet(viewsets.ModelViewSet):
+    """자원 예약 ViewSet"""
+    serializer_class = ResourceReservationSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = ResourceReservation.objects.select_related(
+            "resource", "reserved_by", "approved_by"
+        )
+
+        # 기본: 내가 예약한 것 + 승인 대기 목록(관리자용)
+        qs = qs.filter(reserved_by=user)
+
+        # resource 필터
+        resource = self.request.query_params.get("resource")
+        if resource:
+            qs = qs.filter(resource_id=resource)
+
+        # status 필터
+        status_filter = self.request.query_params.get("status")
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+
+        # 날짜 필터
+        date_str = self.request.query_params.get("date")
+        if date_str:
+            qs = qs.filter(start__date=date_str)
+
+        return qs.order_by("-start")
+
+    def perform_create(self, serializer):
+        resource = serializer.validated_data.get("resource")
+        # 승인 불필요 자원은 바로 승인
+        if resource and not resource.requires_approval:
+            serializer.save(
+                reserved_by=self.request.user,
+                status="approved"
+            )
+        else:
+            serializer.save(reserved_by=self.request.user)
+
+    @action(detail=True, methods=["post"])
+    def approve(self, request, pk=None):
+        """예약 승인"""
+        reservation = self.get_object()
+        reservation.status = "approved"
+        reservation.approved_by = request.user
+        reservation.approved_at = timezone.now()
+        reservation.save()
+        return Response(ResourceReservationSerializer(reservation).data)
+
+    @action(detail=True, methods=["post"])
+    def reject(self, request, pk=None):
+        """예약 반려"""
+        reservation = self.get_object()
+        reservation.status = "rejected"
+        reservation.approved_by = request.user
+        reservation.approved_at = timezone.now()
+        reservation.note = request.data.get("reason", "")
+        reservation.save()
+        return Response(ResourceReservationSerializer(reservation).data)
+

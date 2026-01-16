@@ -1,8 +1,18 @@
 // src/pages/schedule/ScheduleDetail.jsx
 import React, { useState } from "react";
 import { format } from "date-fns";
-import { X, Clock, User, FileText, Edit, Trash2 } from "lucide-react";
+import { X, Clock, User, FileText, Edit, Trash2, MapPin, Tag } from "lucide-react";
 import { scheduleApi } from "../../api/schedule";
+
+// 이벤트 타입별 스타일
+const EVENT_TYPE_STYLES = {
+  general: { bg: "bg-gray-100", text: "text-gray-700", label: "일반" },
+  annual: { bg: "bg-yellow-100", text: "text-yellow-800", label: "연차" },
+  monthly: { bg: "bg-orange-100", text: "text-orange-700", label: "월차" },
+  half: { bg: "bg-blue-100", text: "text-blue-700", label: "반차" },
+  meeting: { bg: "bg-purple-100", text: "text-purple-700", label: "회의" },
+  trip: { bg: "bg-green-100", text: "text-green-700", label: "출장" },
+};
 
 export default function ScheduleDetail({
   item,
@@ -26,6 +36,9 @@ export default function ScheduleDetail({
     ? { bg: "bg-green-100", text: "text-green-700", border: "border-green-300" }
     : { bg: "bg-red-100", text: "text-red-700", border: "border-red-300" };
 
+  // event_type 스타일
+  const eventTypeStyle = EVENT_TYPE_STYLES[item.event_type] || EVENT_TYPE_STYLES.general;
+
   const handleDelete = async () => {
     if (!window.confirm("정말 이 일정을 삭제하시겠습니까?")) return;
     setDeleting(true);
@@ -45,11 +58,16 @@ export default function ScheduleDetail({
       {/* 헤더 */}
       <div className="flex items-start justify-between">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-xl font-semibold text-gray-900">{item.title}</h2>
             <span className={`px-2 py-0.5 text-xs rounded-full border ${scopeStyle.bg} ${scopeStyle.text} ${scopeStyle.border}`}>
               {item.scope === "personal" ? "개인" : "회사"}
             </span>
+            {item.event_type && item.event_type !== "general" && (
+              <span className={`px-2 py-0.5 text-xs rounded-full ${eventTypeStyle.bg} ${eventTypeStyle.text}`}>
+                {eventTypeStyle.label}
+              </span>
+            )}
           </div>
           <p className="text-sm text-gray-500 mt-1">일정 상세 정보</p>
         </div>
@@ -76,6 +94,30 @@ export default function ScheduleDetail({
             )}
           </div>
         </div>
+
+        {/* 일정 유형 */}
+        {item.event_type && (
+          <div className="flex items-start gap-3">
+            <Tag className="text-gray-400 mt-0.5" size={18} />
+            <div>
+              <p className="text-sm font-medium text-gray-500">일정 유형</p>
+              <span className={`px-2 py-1 text-sm rounded ${eventTypeStyle.bg} ${eventTypeStyle.text}`}>
+                {item.event_type_display || eventTypeStyle.label}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* 장소 */}
+        {item.location && (
+          <div className="flex items-start gap-3">
+            <MapPin className="text-gray-400 mt-0.5" size={18} />
+            <div>
+              <p className="text-sm font-medium text-gray-500">장소</p>
+              <p className="text-gray-900">{item.location}</p>
+            </div>
+          </div>
+        )}
 
         {/* 작성자 */}
         <div className="flex items-start gap-3">

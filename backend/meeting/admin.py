@@ -1,6 +1,10 @@
 # backend/meeting/admin.py
 from django.contrib import admin
-from .models import MeetingRoom, Meeting, MeetingParticipant, Schedule, ScheduleAttendee
+from .models import (
+    MeetingRoom, Meeting, MeetingParticipant,
+    Calendar, Schedule, ScheduleAttendee,
+    Resource, ResourceReservation
+)
 
 
 @admin.register(MeetingRoom)
@@ -34,6 +38,15 @@ class MeetingParticipantAdmin(admin.ModelAdmin):
     raw_id_fields = ["meeting", "user"]
 
 
+@admin.register(Calendar)
+class CalendarAdmin(admin.ModelAdmin):
+    list_display = ["id", "name", "category", "owner", "is_active", "is_default", "order"]
+    list_filter = ["category", "is_active", "is_default"]
+    search_fields = ["name", "description"]
+    raw_id_fields = ["owner", "company"]
+    ordering = ["order", "name"]
+
+
 class ScheduleAttendeeInline(admin.TabularInline):
     model = ScheduleAttendee
     extra = 0
@@ -42,10 +55,10 @@ class ScheduleAttendeeInline(admin.TabularInline):
 
 @admin.register(Schedule)
 class ScheduleAdmin(admin.ModelAdmin):
-    list_display = ["id", "title", "scope", "start", "end", "owner", "created_at"]
-    list_filter = ["scope", "is_all_day", "is_recurring"]
-    search_fields = ["title", "memo"]
-    raw_id_fields = ["owner", "company"]
+    list_display = ["id", "title", "scope", "event_type", "start", "end", "owner", "created_at"]
+    list_filter = ["scope", "event_type", "status", "is_all_day", "is_recurring"]
+    search_fields = ["title", "memo", "location"]
+    raw_id_fields = ["owner", "company", "calendar"]
     date_hierarchy = "start"
     filter_horizontal = ["participants"]
     inlines = [ScheduleAttendeeInline]
@@ -56,3 +69,21 @@ class ScheduleAttendeeAdmin(admin.ModelAdmin):
     list_display = ["id", "schedule", "user", "response", "responded_at"]
     list_filter = ["response"]
     raw_id_fields = ["schedule", "user"]
+
+
+@admin.register(Resource)
+class ResourceAdmin(admin.ModelAdmin):
+    list_display = ["id", "name", "resource_type", "capacity", "is_active", "requires_approval", "order"]
+    list_filter = ["resource_type", "is_active", "requires_approval"]
+    search_fields = ["name", "description", "location"]
+    ordering = ["order", "name"]
+
+
+@admin.register(ResourceReservation)
+class ResourceReservationAdmin(admin.ModelAdmin):
+    list_display = ["id", "resource", "start", "end", "reserved_by", "status", "created_at"]
+    list_filter = ["status", "resource__resource_type"]
+    search_fields = ["purpose", "note"]
+    raw_id_fields = ["resource", "schedule", "reserved_by", "approved_by"]
+    date_hierarchy = "start"
+
