@@ -45,6 +45,9 @@ import ResourceReservation from "./pages/schedule/ResourceReservation";
 
 // Archive
 import ArchiveList from "./pages/archive/ArchiveList";
+import ArchiveTrash from "./pages/archive/ArchiveTrash";
+import ArchiveAttachments from "./pages/archive/ArchiveAttachments";
+import ArchiveTemporary from "./pages/archive/ArchiveTemporary";
 
 // Help
 import HelpCenter from "./pages/help/HelpCenter";
@@ -200,6 +203,9 @@ function AppRouter() {
         <Route path="archive" element={<ArchiveLayout />}>
           <Route index element={<Navigate to="main" replace />} />
           <Route path="main" element={<ArchiveList />} />
+          <Route path="trash" element={<ArchiveTrash />} />
+          <Route path="attachments" element={<ArchiveAttachments />} />
+          <Route path="temporary" element={<ArchiveTemporary />} />
         </Route>
 
         {/* 관리자 - with sidebar layout */}
