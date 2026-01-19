@@ -15,6 +15,7 @@ import {
   History,
   Briefcase,
   Mail,
+  FolderKanban,
 } from "lucide-react";
 import { projectMenus, menuOrder } from "./ProjectMenus";
 
@@ -28,6 +29,7 @@ const menuIcons = {
   archive: FolderOpen,
   operation: Briefcase,
   contact: Mail,
+  project: FolderKanban,
   admin: Settings,
 };
 

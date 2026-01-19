@@ -125,6 +125,36 @@ export const projectMenus = {
       },
     ],
   },
+  project: {
+    title: "프로젝트",
+    base: "/project",
+    baseClick: "board",
+    sections: [
+      {
+        title: "프로젝트",
+        items: [
+          { to: "board", label: "작업보드" },
+          { to: "manage", label: "프로젝트 구성" },
+          { to: "tasks", label: "업무 관리" },
+        ],
+      },
+      {
+        title: "타임시트",
+        items: [
+          { to: "timesheet/week", label: "타임시트 [주간]" },
+          { to: "timesheet/month", label: "타임시트 [월간]" },
+          { to: "timesheet/summary", label: "타임시트 [집계]" },
+        ],
+      },
+      {
+        title: "업무일지",
+        items: [
+          { to: "diary/week", label: "업무일지 쓰기 [주간]" },
+          { to: "diary/day", label: "업무일지 쓰기 [일일]" },
+        ],
+      },
+    ],
+  },
   operation: {
     title: "영업관리",
     base: "/operation",
@@ -206,6 +236,7 @@ export const menuOrder = [
   "approval",
   "board",
   "schedule",
+  "project",
   "archive",
   "admin",
 ];

@@ -82,6 +82,19 @@ import TenderForm from "./pages/operation/TenderForm";
 import RevenueManagement from "./pages/operation/RevenueManagement";
 import EmailCenter from "./pages/operation/EmailCenter";
 
+// Project (프로젝트 관리)
+import ProjectLayout from "./pages/project/ProjectLayout";
+import ProjectBoard from "./pages/project/ProjectBoard";
+import ProjectManage from "./pages/project/ProjectManage";
+import TaskList from "./pages/project/TaskList";
+import TaskForm from "./pages/project/TaskForm";
+import TaskDetail from "./pages/project/TaskDetail";
+import TimesheetWeek from "./pages/project/TimesheetWeek";
+import TimesheetMonth from "./pages/project/TimesheetMonth";
+import TimesheetSummary from "./pages/project/TimesheetSummary";
+import DiaryWeek from "./pages/project/DiaryWeek";
+import DiaryDay from "./pages/project/DiaryDay";
+
 // Protected Route Wrapper
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
@@ -206,6 +219,24 @@ function AppRouter() {
           <Route path="trash" element={<ArchiveTrash />} />
           <Route path="attachments" element={<ArchiveAttachments />} />
           <Route path="temporary" element={<ArchiveTemporary />} />
+        </Route>
+
+        {/* 프로젝트 - with sidebar layout */}
+        <Route path="project" element={<ProjectLayout />}>
+          <Route index element={<Navigate to="board" replace />} />
+          <Route path="board" element={<ProjectBoard />} />
+          <Route path="manage" element={<ProjectManage />} />
+          <Route path="tasks" element={<TaskList />} />
+          <Route path="tasks/new" element={<TaskForm />} />
+          <Route path="tasks/:id" element={<TaskDetail />} />
+          <Route path="tasks/:id/edit" element={<TaskForm />} />
+          {/* 타임시트 */}
+          <Route path="timesheet/week" element={<TimesheetWeek />} />
+          <Route path="timesheet/month" element={<TimesheetMonth />} />
+          <Route path="timesheet/summary" element={<TimesheetSummary />} />
+          {/* 업무일지 */}
+          <Route path="diary/week" element={<DiaryWeek />} />
+          <Route path="diary/day" element={<DiaryDay />} />
         </Route>
 
         {/* 관리자 - with sidebar layout */}
