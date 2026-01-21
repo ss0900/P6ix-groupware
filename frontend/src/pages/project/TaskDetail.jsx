@@ -266,29 +266,49 @@ export default function TaskDetail() {
               첨부파일 ({task.attachments.length})
             </h3>
             <div className="space-y-2">
-              {task.attachments.map((file) => (
-                <div
-                  key={file.id}
-                  className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded"
-                >
-                  <div className="flex items-center gap-2">
-                    <FileText size={16} className="text-gray-400" />
-                    <span className="text-sm">{file.original_name}</span>
-                    <span className="text-xs text-gray-400">
-                      ({(file.file_size / 1024).toFixed(1)} KB)
-                    </span>
-                  </div>
-                  <a
-                    href={file.file_url || file.file}
-                    download
-                    className="p-1 hover:bg-gray-200 rounded text-gray-600"
-                    target="_blank"
-                    rel="noopener noreferrer"
+              {task.attachments.map((file) => {
+                const handleDownload = async () => {
+                  try {
+                    const fileUrl = file.file_url || file.file;
+                    const response = await fetch(fileUrl);
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = file.original_name || "download";
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                  } catch (err) {
+                    console.error("Download failed", err);
+                    // Fallback: open in new tab
+                    window.open(file.file_url || file.file, "_blank");
+                  }
+                };
+                
+                return (
+                  <div
+                    key={file.id}
+                    className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded"
                   >
-                    <Download size={16} />
-                  </a>
-                </div>
-              ))}
+                    <div className="flex items-center gap-2">
+                      <FileText size={16} className="text-gray-400" />
+                      <span className="text-sm">{file.original_name}</span>
+                      <span className="text-xs text-gray-400">
+                        ({(file.file_size / 1024).toFixed(1)} KB)
+                      </span>
+                    </div>
+                    <button
+                      onClick={handleDownload}
+                      className="p-1 hover:bg-gray-200 rounded text-gray-600"
+                      title="다운로드"
+                    >
+                      <Download size={16} />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
