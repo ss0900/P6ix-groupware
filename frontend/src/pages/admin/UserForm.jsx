@@ -227,7 +227,7 @@ export default function UserForm() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                비밀번호 {!isEdit && "*"}
+                비밀번호 {!isEdit && <span className="text-red-500">*</span>}
               </label>
               <div className="relative">
                 <input

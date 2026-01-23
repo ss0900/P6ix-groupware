@@ -245,7 +245,7 @@ export default function SidebarLayout({ title, base, sections = [], enableToggle
                 onClick={() => navigate("/admin/users")}
                 className="px-2 py-1 rounded hover:bg-gray-100 text-left text-sm"
               >
-                마이페이지
+                내 정보
               </button>
             </div>
           )}

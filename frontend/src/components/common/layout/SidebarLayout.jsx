@@ -375,7 +375,7 @@ export default function SidebarLayout({
                 onClick={() => navigate(`${basePath}/mypage`)}
                 className="px-2 py-1 rounded hover:bg-gray-100 text-left"
               >
-                마이페이지
+                내 정보
               </button>
             </div>
           )}
