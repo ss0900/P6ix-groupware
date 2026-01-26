@@ -13,7 +13,7 @@ from core.serializers import CompanySerializer, DepartmentSerializer, PositionSe
 class CompanyViewSet(viewsets.ModelViewSet):
     queryset = Company.objects.all()
     serializer_class = CompanySerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]
     
     def get_queryset(self):
         qs = super().get_queryset()
@@ -86,7 +86,7 @@ class CompanyViewSet(viewsets.ModelViewSet):
 class DepartmentViewSet(viewsets.ModelViewSet):
     queryset = Department.objects.select_related('company', 'parent').all().order_by('company__name','name')
     serializer_class = DepartmentSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]
     filter_backends = [filters.SearchFilter]
     search_fields = ['name', 'type', 'company__name']
     
@@ -105,7 +105,7 @@ class DepartmentViewSet(viewsets.ModelViewSet):
 class PositionViewSet(viewsets.ModelViewSet):
     queryset = Position.objects.all().order_by('level','name')
     serializer_class = PositionSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]
     
     # def get_queryset(self):
     #     qs = super().get_queryset()
@@ -168,7 +168,7 @@ class UserListSerializer(drf_serializers.ModelSerializer):
 class UserViewSet(viewsets.ModelViewSet):
     queryset = CustomUser.objects.prefetch_related("memberships").all().order_by("-date_joined")
     serializer_class = UserListSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]
 
     def get_queryset(self):
         qs = super().get_queryset()

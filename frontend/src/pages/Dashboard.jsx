@@ -146,7 +146,7 @@ function Dashboard() {
           api.get("approval/documents/stats/"),
           api.get("chat/notifications/unread_count/"),
           api.get("meeting/schedules/today/"),
-          api.get("operation/opportunities/stats/"),
+          api.get("operation/leads/stats/"),
           api.get("approval/documents/?filter=pending"),
           api.get("board/posts/?board=notice")
         ]);

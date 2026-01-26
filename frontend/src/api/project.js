@@ -392,6 +392,32 @@ export const saveDayDiaries = async (date, entries) => {
   return response.data;
 };
 
+// ========================
+// 주간 보고 (Weekly Reports)
+// ========================
+
+/**
+ * 주간 업무 집계 조회 (사람별)
+ * @param {Object} params
+ * @param {string} params.week_start - 조회 주간 시작일 (YYYY-MM-DD)
+ * @param {number} params.project_id - 프로젝트 필터 (선택)
+ * @param {number} params.user_id - 사용자 필터 (선택)
+ */
+export const getWeeklyReport = async (params = {}) => {
+  const response = await api.get(`${BASE_URL}/reports/weekly/`, { params });
+  return response.data;
+};
+
+/**
+ * 영업관리 주간 집계 조회 (관리자 전용)
+ * @param {Object} params
+ * @param {string} params.week_start - 조회 주간 시작일
+ */
+export const getSalesWeeklyReport = async (params = {}) => {
+  const response = await api.get(`${BASE_URL}/reports/sales-weekly/`, { params });
+  return response.data;
+};
+
 // 기본 export
 const ProjectService = {
   // 프로젝트
@@ -434,7 +460,9 @@ const ProjectService = {
   updateDiary,
   deleteDiary,
   saveDayDiaries,
+  // 주간 보고
+  getWeeklyReport,
+  getSalesWeeklyReport,
 };
 
 export default ProjectService;
-

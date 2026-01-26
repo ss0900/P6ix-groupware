@@ -94,6 +94,8 @@ import TimesheetMonth from "./pages/project/TimesheetMonth";
 import TimesheetSummary from "./pages/project/TimesheetSummary";
 import DiaryWeek from "./pages/project/DiaryWeek";
 import DiaryDay from "./pages/project/DiaryDay";
+import WeeklyReport from "./pages/project/WeeklyReport";
+import SalesWeeklyReport from "./pages/project/SalesWeeklyReport";
 
 // Protected Route Wrapper
 const ProtectedRoute = ({ children }) => {
@@ -237,6 +239,9 @@ function AppRouter() {
           {/* 업무일지 */}
           <Route path="diary/week" element={<DiaryWeek />} />
           <Route path="diary/day" element={<DiaryDay />} />
+          {/* 주간업무 */}
+          <Route path="weekly-report" element={<WeeklyReport />} />
+          <Route path="sales-weekly" element={<SalesWeeklyReport />} />
         </Route>
 
         {/* 관리자 - with sidebar layout */}

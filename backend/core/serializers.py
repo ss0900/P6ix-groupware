@@ -22,8 +22,9 @@ class UserSerializer(serializers.ModelSerializer):
             "current_password", "password",
             "sign_file", "profile_picture",  # 🔥 응답 포함
             "is_superuser", # 🔥 Admin 판단용
+            "is_staff",
         ]
-        read_only_fields = ["username", "is_superuser"]
+        read_only_fields = ["username", "is_superuser", "is_staff"]
 
     def get_profile_picture(self, obj):   # 🔥 반드시 이 함수 있어야 함
         if not obj.profile_picture:

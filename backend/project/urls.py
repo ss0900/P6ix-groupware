@@ -7,6 +7,7 @@ from .views import (
     ActivityLogViewSet,
     TimesheetEntryViewSet, WorkDiaryEntryViewSet
 )
+from .reports_views import WeeklyReportView, SalesWeeklyReportView
 
 router = DefaultRouter()
 router.register(r'projects', ProjectViewSet, basename='project')
@@ -19,4 +20,8 @@ router.register(r'diaries', WorkDiaryEntryViewSet, basename='work-diary')
 
 urlpatterns = [
     path('', include(router.urls)),
+    # 주간 보고 API
+    path('reports/weekly/', WeeklyReportView.as_view(), name='weekly-report'),
+    path('reports/sales-weekly/', SalesWeeklyReportView.as_view(), name='sales-weekly-report'),
 ]
+

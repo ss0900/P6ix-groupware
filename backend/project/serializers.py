@@ -333,7 +333,7 @@ class WorkDiaryEntrySerializer(serializers.ModelSerializer):
             'content',
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['created_at', 'updated_at']
+        read_only_fields = ['created_at', 'updated_at', 'user']
 
     def get_user_name(self, obj):
         if obj.user:

@@ -628,16 +628,51 @@ class WorkDiaryEntryViewSet(viewsets.ModelViewSet):
         # 새 항목 생성
         created_entries = []
         for entry_data in entries:
-            if entry_data.get('content', '').strip():
-                entry = WorkDiaryEntry.objects.create(
-                    user=user,
-                    date=date,
-                    project_id=entry_data.get('project') or None,
-                    task_id=entry_data.get('task') or None,
-                    content=entry_data.get('content', '')
-                )
-                created_entries.append(entry)
+            content = entry_data.get('content', '').strip()
+            if not content:
+                continue
+            
+            project_id = entry_data.get('project') or None
+            task_val = entry_data.get('task')
+            task_id = None
+
+            # Task 처리 로직 (ID 또는 이름)
+            if task_val:
+                # 1. ID인 경우 (숫자형 또는 숫자 문자열)
+                if isinstance(task_val, int) or (isinstance(task_val, str) and task_val.isdigit()):
+                    task_id = int(task_val)
+                
+                # 2. 이름 문자열인 경우 (신규 생성 또는 이름 검색) - 프로젝트 필수
+                elif isinstance(task_val, str) and project_id:
+                    # 같은 프로젝트 내 동일 이름 태스크 검색
+                    task_obj = Task.objects.filter(project_id=project_id, title=task_val).first()
+                    if not task_obj:
+                        # 없으면 신규 생성
+                        task_obj = Task.objects.create(
+                            project_id=project_id,
+                            title=task_val,
+                            created_by=user,
+                            status='in_progress', # 자동으로 진행중 상태
+                            start_date=date       # 시작일은 일지 작성일
+                        )
+                        # 로그 남기기
+                        ActivityLog.objects.create(
+                            project_id=project_id,
+                            task=task_obj,
+                            user=user,
+                            action='created',
+                            description=f'업무일지 작성 중 자동 생성된 업무입니다.'
+                        )
+                    task_id = task_obj.id
+
+            entry = WorkDiaryEntry.objects.create(
+                user=user,
+                date=date,
+                project_id=project_id,
+                task_id=task_id,
+                content=content
+            )
+            created_entries.append(entry)
 
         serializer = WorkDiaryEntrySerializer(created_entries, many=True)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
-

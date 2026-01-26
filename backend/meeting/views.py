@@ -69,13 +69,15 @@ class ScheduleViewSet(viewsets.ModelViewSet):
             qs = qs.filter(is_urgent=True)
 
         # 권한: 개인 일정은 본인 것만, 회사 일정 및 공유 일정은 모두
-        qs = qs.filter(
-            Q(scope="company") |
-            Q(owner=user) |
-            Q(participants=user) |
-            Q(visibility="public") |
-            Q(visibility="organization", owner__company=user.company if hasattr(user, 'company') else None)
-        ).distinct()
+        visibility_filter = Q(scope="company") | Q(owner=user) | Q(participants=user) | Q(visibility="public")
+        
+        # organization 공개 일정: 같은 회사 소속인 경우에만
+        if hasattr(user, 'company') and user.company:
+            visibility_filter |= Q(visibility="organization", owner__company=user.company)
+        else:
+            visibility_filter |= Q(visibility="organization")
+        
+        qs = qs.filter(visibility_filter).distinct()
 
         return qs
 

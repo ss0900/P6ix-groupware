@@ -153,6 +153,13 @@ export const projectMenus = {
           { to: "diary/day", label: "업무일지 쓰기 [일일]" },
         ],
       },
+      {
+        title: "주간업무",
+        items: [
+          { to: "weekly-report", label: "주간 업무 집계" },
+          { to: "sales-weekly", label: "영업 주간업무", adminOnly: true },
+        ],
+      },
     ],
   },
   operation: {

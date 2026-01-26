@@ -5,7 +5,7 @@
 from rest_framework import viewsets, status, filters as rf_filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.pagination import PageNumberPagination
@@ -98,7 +98,7 @@ class WorkspaceScopedMixin:
 class CustomerCompanyViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     """고객사 ViewSet"""
     queryset = CustomerCompany.objects.all()
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdminUser]
     filter_backends = [DjangoFilterBackend, rf_filters.SearchFilter, rf_filters.OrderingFilter]
     filterset_class = CustomerCompanyFilter
     search_fields = ['name', 'business_number', 'industry']
@@ -115,7 +115,7 @@ class CustomerContactViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     queryset = CustomerContact.objects.all()
     serializer_class = CustomerContactSerializer
     workspace_field = "company__workspace"
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdminUser]
     filter_backends = [DjangoFilterBackend, rf_filters.SearchFilter]
     filterset_class = CustomerContactFilter
     search_fields = ['name', 'email', 'phone']
@@ -128,7 +128,7 @@ class SalesPipelineViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     """파이프라인 ViewSet"""
     queryset = SalesPipeline.objects.filter(is_active=True)
     serializer_class = SalesPipelineSerializer
-    permission_classes = [IsAuthenticated, IsOperationManagerOrReadOnly]
+    permission_classes = [IsAuthenticated, IsAdminUser, IsOperationManagerOrReadOnly]
     
     @action(detail=True, methods=['get'])
     def stages(self, request, pk=None):
@@ -163,7 +163,7 @@ class SalesStageViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     """영업 단계 ViewSet"""
     queryset = SalesStage.objects.all()
     serializer_class = SalesStageSerializer
-    permission_classes = [IsAuthenticated, IsOperationManagerOrReadOnly]
+    permission_classes = [IsAuthenticated, IsAdminUser, IsOperationManagerOrReadOnly]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['pipeline']
     workspace_field = "pipeline__workspace"
@@ -175,7 +175,7 @@ class SalesStageViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
 class SalesLeadViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     """영업기회 ViewSet"""
     queryset = SalesLead.objects.all()
-    permission_classes = [IsAuthenticated, IsLeadOwnerOrAssignee]
+    permission_classes = [IsAuthenticated, IsAdminUser, IsLeadOwnerOrAssignee]
     filter_backends = [DjangoFilterBackend, rf_filters.SearchFilter, rf_filters.OrderingFilter]
     filterset_class = SalesLeadFilter
     search_fields = ['title', 'description', 'company__name', 'contact__name', 'contact__phone', 'contact__email']
@@ -358,6 +358,40 @@ class SalesLeadViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
             status=status.HTTP_201_CREATED
         )
 
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        """영업기회 통계 (대시보드용)"""
+        from django.db.models import Count, Sum
+        
+        qs = self.get_queryset()
+        
+        # 상태별 집계
+        by_status = list(
+            qs.values('status').annotate(count=Count('id')).order_by('status')
+        )
+        
+        # 단계별 집계
+        by_stage = list(
+            qs.filter(status='active')
+            .values('stage__name')
+            .annotate(count=Count('id'))
+            .order_by('stage__order')
+        )
+        
+        # 금액 집계
+        total_amount = qs.filter(status='active').aggregate(
+            total=Sum('expected_amount')
+        )['total'] or 0
+        
+        return Response({
+            'by_status': by_status,
+            'by_stage': by_stage,
+            'total_expected_amount': total_amount,
+            'active_count': qs.filter(status='active').count(),
+            'won_count': qs.filter(status='won').count(),
+            'lost_count': qs.filter(status='lost').count(),
+        })
+
 
 # ============================================================
 # 활동 로그 / 할 일 / 파일
@@ -366,7 +400,7 @@ class LeadActivityViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     """활동 로그 ViewSet"""
     queryset = LeadActivity.objects.all()
     serializer_class = LeadActivitySerializer
-    permission_classes = [IsAuthenticated, IsRelatedToLead]
+    permission_classes = [IsAuthenticated, IsAdminUser, IsRelatedToLead]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['lead', 'activity_type']
     workspace_field = "lead__workspace"
@@ -383,7 +417,7 @@ class LeadTaskViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     """할 일 ViewSet"""
     queryset = LeadTask.objects.all()
     serializer_class = LeadTaskSerializer
-    permission_classes = [IsAuthenticated, IsRelatedToLead]
+    permission_classes = [IsAuthenticated, IsAdminUser, IsRelatedToLead]
     filter_backends = [DjangoFilterBackend, rf_filters.OrderingFilter]
     filterset_class = LeadTaskFilter
     ordering_fields = ['due_date', 'priority', 'created_at']
@@ -440,7 +474,7 @@ class LeadFileViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     """첨부파일 ViewSet"""
     queryset = LeadFile.objects.all()
     serializer_class = LeadFileSerializer
-    permission_classes = [IsAuthenticated, IsRelatedToLead]
+    permission_classes = [IsAuthenticated, IsAdminUser, IsRelatedToLead]
     parser_classes = [MultiPartParser, FormParser]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['lead']
@@ -469,7 +503,7 @@ class LeadFileViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
 class QuoteViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     """견적서 ViewSet"""
     queryset = Quote.objects.all()
-    permission_classes = [IsAuthenticated, IsRelatedToLead]
+    permission_classes = [IsAuthenticated, IsAdminUser, IsRelatedToLead]
     filter_backends = [DjangoFilterBackend, rf_filters.SearchFilter, rf_filters.OrderingFilter]
     filterset_class = QuoteFilter
     ordering_fields = ['created_at', 'total_amount']
@@ -621,7 +655,7 @@ class QuoteTemplateViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     """견적 템플릿 ViewSet"""
     queryset = QuoteTemplate.objects.all()
     serializer_class = QuoteTemplateSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdminUser]
     workspace_field = "workspace"
 
 
@@ -629,7 +663,7 @@ class SalesContractLinkViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     """계약 연결 ViewSet"""
     queryset = SalesContractLink.objects.all()
     serializer_class = SalesContractLinkSerializer
-    permission_classes = [IsAuthenticated, IsRelatedToLead]
+    permission_classes = [IsAuthenticated, IsAdminUser, IsRelatedToLead]
     filter_backends = [DjangoFilterBackend]
     filterset_class = SalesContractLinkFilter
     workspace_field = "workspace"
@@ -639,7 +673,7 @@ class TenderViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     """입찰 ViewSet"""
     queryset = Tender.objects.all()
     serializer_class = TenderSerializer
-    permission_classes = [IsAuthenticated, IsRelatedToLead]
+    permission_classes = [IsAuthenticated, IsAdminUser, IsRelatedToLead]
     filter_backends = [DjangoFilterBackend, rf_filters.SearchFilter, rf_filters.OrderingFilter]
     filterset_class = TenderFilter
     search_fields = ['title', 'description']
@@ -652,7 +686,7 @@ class RevenueMilestoneViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     """매출 계획 ViewSet"""
     queryset = RevenueMilestone.objects.all()
     serializer_class = RevenueMilestoneSerializer
-    permission_classes = [IsAuthenticated, IsRelatedToLead]
+    permission_classes = [IsAuthenticated, IsAdminUser, IsRelatedToLead]
     filter_backends = [DjangoFilterBackend, rf_filters.OrderingFilter]
     filterset_class = RevenueMilestoneFilter
     ordering_fields = ['planned_date', 'planned_amount', 'created_at']
@@ -664,7 +698,7 @@ class CollectionViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     """수금 ViewSet"""
     queryset = Collection.objects.all()
     serializer_class = CollectionSerializer
-    permission_classes = [IsAuthenticated, IsRelatedToLead]
+    permission_classes = [IsAuthenticated, IsAdminUser, IsRelatedToLead]
     filter_backends = [DjangoFilterBackend, rf_filters.OrderingFilter]
     filterset_class = CollectionFilter
     ordering_fields = ['due_date', 'amount', 'created_at']
@@ -676,7 +710,7 @@ class EmailTemplateViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     """이메일 템플릿 ViewSet"""
     queryset = EmailTemplate.objects.all()
     serializer_class = EmailTemplateSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdminUser]
     workspace_field = "workspace"
 
 
@@ -684,7 +718,7 @@ class EmailSignatureViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     """이메일 서명 ViewSet"""
     queryset = EmailSignature.objects.all()
     serializer_class = EmailSignatureSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdminUser]
     workspace_field = "workspace"
 
 
@@ -692,7 +726,7 @@ class EmailSendLogViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     """이메일 발송 로그 ViewSet"""
     queryset = EmailSendLog.objects.all()
     serializer_class = EmailSendLogSerializer
-    permission_classes = [IsAuthenticated, IsRelatedToLead]
+    permission_classes = [IsAuthenticated, IsAdminUser, IsRelatedToLead]
     filter_backends = [DjangoFilterBackend, rf_filters.OrderingFilter]
     filterset_class = EmailSendLogFilter
     ordering_fields = ['sent_at', 'created_at']
@@ -705,7 +739,7 @@ class EmailSendLogViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
 # ============================================================
 class CalendarFeedView(APIView):
     """통합 캘린더 피드 - TODO + 예상마감일"""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdminUser]
     
     def get(self, request):
         from datetime import datetime, timedelta
@@ -832,7 +866,7 @@ class CalendarFeedView(APIView):
 # ============================================================
 class InboxView(APIView):
     """영업접수함 - 신규/미배정 리드"""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdminUser]
     
     def get(self, request):
         workspace = get_request_workspace(request)
@@ -846,7 +880,7 @@ class InboxView(APIView):
 # ============================================================
 class SalesDashboardView(APIView):
     """영업 대시보드 통계"""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdminUser]
     
     def get(self, request):
         from django.db.models import Sum, Count
@@ -941,7 +975,7 @@ class SalesDashboardView(APIView):
 
 class RevenueSummaryView(APIView):
     """매출/수금 요약"""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdminUser]
 
     def get(self, request):
         from django.db.models import Sum
