@@ -4,7 +4,7 @@
  */
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { FiArrowLeft, FiSave, FiPlus, FiTrash2, FiSend, FiEye, FiCheck, FiX } from "react-icons/fi";
+import { FiArrowLeft, FiSave, FiPlus, FiTrash2, FiSend, FiEye, FiCheck, FiX, FiPrinter } from "react-icons/fi";
 import {
   QuoteService,
   SalesService,
@@ -460,6 +460,14 @@ function QuoteForm() {
             >
               <FiEye className="w-4 h-4" />
               PDF 미리보기
+            </button>
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="btn-basic flex items-center gap-2"
+            >
+              <FiPrinter className="w-4 h-4" />
+              인쇄
             </button>
             {quoteStatus === "draft" && (
               <button
