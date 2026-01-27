@@ -500,19 +500,6 @@ class Quote(models.Model):
     )
     
     quote_number = models.CharField("견적번호", max_length=50, unique=True)
-    revision = models.IntegerField("리비전", default=1)
-    
-    # 날짜 및 유효기간
-    issue_date = models.DateField("견적일자", default=timezone.now)
-    validity_days = models.IntegerField("유효일수", default=30, help_text="견적일로부터 N일간 유효")
-    valid_until = models.DateField("유효기간(만료일)", null=True, blank=True)
-    
-    # 수신처 정보 (Snapshot)
-    recipient_company = models.CharField("수신 회사명", max_length=100, blank=True)
-    recipient_name = models.CharField("수신자명", max_length=100, blank=True)
-    recipient_email = models.EmailField("수신 이메일", blank=True)
-    cc_email = models.CharField("참조 이메일", max_length=500, blank=True, help_text="콤마로 구분")
-
     title = models.CharField("견적 제목", max_length=200)
     
     # 템플릿 정보
@@ -522,33 +509,21 @@ class Quote(models.Model):
     )
     header_text = models.TextField("머리말", blank=True)
     footer_text = models.TextField("꼬리말", blank=True)
-    
-    # 거래/결제 조건
-    terms = models.TextField("거래조건(기존)", blank=True)  # Legacy
-    delivery_terms = models.CharField("납품기한", max_length=200, blank=True)
-    payment_method = models.CharField("결제조건", max_length=200, blank=True)
+    terms = models.TextField("거래조건", blank=True)
     
     # 금액
-    # 금액 및 계산 규칙
-    TAX_MODES = (
-        ('exclusive', 'VAT 별도'),
-        ('inclusive', 'VAT 포함'),
-        ('exempt', '면세/비과세'),
+    subtotal = models.DecimalField(
+        "공급가액", max_digits=15, decimal_places=0, default=0
     )
-    ROUNDING_RULES = (
-        ('round', '반올림'),
-        ('floor', '절사(내림)'),
-        ('ceil', '올림'),
+    tax_rate = models.DecimalField(
+        "세율(%)", max_digits=5, decimal_places=2, default=10
     )
-    
-    tax_mode = models.CharField("과세구분", max_length=20, choices=TAX_MODES, default='exclusive')
-    rounding_rule = models.CharField("단수처리", max_length=20, choices=ROUNDING_RULES, default='floor')
-    rounding_unit = models.IntegerField("절사단위", default=10, help_text="1, 10, 100, 1000 등")
-    
-    subtotal = models.DecimalField("공급가액", max_digits=15, decimal_places=0, default=0)
-    tax_rate = models.DecimalField("세율(%)", max_digits=5, decimal_places=2, default=10)
-    tax_amount = models.DecimalField("세액", max_digits=15, decimal_places=0, default=0)
-    total_amount = models.DecimalField("총액", max_digits=15, decimal_places=0, default=0)
+    tax_amount = models.DecimalField(
+        "세액", max_digits=15, decimal_places=0, default=0
+    )
+    total_amount = models.DecimalField(
+        "총액", max_digits=15, decimal_places=0, default=0
+    )
     
     # 유효기간
     valid_until = models.DateField("견적 유효일", null=True, blank=True)
@@ -559,11 +534,7 @@ class Quote(models.Model):
     )
     sent_at = models.DateTimeField("발송일", null=True, blank=True)
     
-    # 메모
-    notes = models.TextField("비고(Legacy)", blank=True)
-    internal_notes = models.TextField("내부 메모", blank=True, help_text="고객에게 노출되지 않음")
-    customer_notes = models.TextField("고객 비고", blank=True, help_text="견적서 PDF/메일에 포함")
-    show_notes_on_separate_page = models.BooleanField("비고 별도페이지 인쇄", default=False)
+    notes = models.TextField("비고", blank=True)
     
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
@@ -597,7 +568,6 @@ class QuoteItem(models.Model):
     )
     order = models.PositiveIntegerField("순서", default=0)
     
-    section = models.CharField("구분/섹션", max_length=100, blank=True)
     name = models.CharField("품목명", max_length=200)
     description = models.TextField("상세설명", blank=True)
     specification = models.CharField("규격", max_length=100, blank=True)
@@ -609,11 +579,11 @@ class QuoteItem(models.Model):
     unit_price = models.DecimalField(
         "단가", max_digits=15, decimal_places=0, default=0
     )
-    amount = models.DecimalField("금액", max_digits=15, decimal_places=0, default=0)
+    amount = models.DecimalField(
+        "금액", max_digits=15, decimal_places=0, default=0
+    )
     
-    remarks = models.CharField("비고", max_length=200, blank=True)
-    discount_rate = models.DecimalField("할인율", max_digits=5, decimal_places=2, default=0)
-    is_discount_line = models.BooleanField("할인행 여부", default=False)
+    notes = models.CharField("비고", max_length=200, blank=True)
 
     class Meta:
         verbose_name = "견적 항목"
@@ -625,11 +595,7 @@ class QuoteItem(models.Model):
 
     def save(self, *args, **kwargs):
         # 금액 자동 계산
-        base_amount = int(self.quantity * self.unit_price)
-        if self.is_discount_line:
-            self.amount = -abs(base_amount)
-        else:
-            self.amount = base_amount
+        self.amount = int(self.quantity * self.unit_price)
         super().save(*args, **kwargs)
 
 

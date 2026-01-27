@@ -4,7 +4,17 @@
  */
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { FiArrowLeft, FiSave, FiPlus, FiTrash2, FiSend, FiEye, FiCheck, FiX, FiPrinter } from "react-icons/fi";
+import {
+  FiArrowLeft,
+  FiSave,
+  FiPlus,
+  FiTrash2,
+  FiSend,
+  FiEye,
+  FiCheck,
+  FiX,
+  FiPrinter,
+} from "react-icons/fi";
 import {
   QuoteService,
   SalesService,
@@ -31,50 +41,24 @@ function QuoteForm() {
     lead: leadId || "",
     company: "",
     contact: "",
-    recipient_company: "",
-    recipient_name: "",
-    recipient_email: "",
-    cc_email: "",
-    
-    quote_number: "",
-    revision: 1,
-    issue_date: new Date().toISOString().split('T')[0],
-    validity_days: 30,
-    valid_until: "",
-    
     title: "",
     template: "",
-    
     header_text: "",
     footer_text: "",
-    
     terms: "",
-    delivery_terms: "",
-    payment_method: "",
-    
-    tax_mode: "exclusive",
-    rounding_rule: "floor",
-    rounding_unit: 10,
     tax_rate: 10,
-    
-    notes: "", // Legacy
-    internal_notes: "",
-    customer_notes: "",
-    show_notes_on_separate_page: false,
+    valid_until: "",
+    notes: "",
   });
 
   const [items, setItems] = useState([
     {
-      section: "",
       name: "",
       description: "",
       specification: "",
       unit: "EA",
       quantity: 1,
       unit_price: 0,
-      remarks: "",
-      discount_rate: 0,
-      is_discount_line: false,
     },
   ]);
 
@@ -93,7 +77,7 @@ function QuoteForm() {
 
       if (leadId) {
         const lead = (leadsData.results || leadsData).find(
-          (l) => l.id === parseInt(leadId)
+          (l) => l.id === parseInt(leadId),
         );
         if (lead) {
           setFormData((prev) => ({
@@ -102,9 +86,6 @@ function QuoteForm() {
             company: lead.company || "",
             contact: lead.contact || "",
             title: lead.title,
-            // 기본 수신처 정보 세팅
-            recipient_company: lead.company_name || "", // if serializer provides it
-            recipient_name: lead.contact_name || "",
           }));
 
           if (lead.company) {
@@ -130,37 +111,14 @@ function QuoteForm() {
         lead: data.lead || "",
         company: data.company || "",
         contact: data.contact || "",
-        
-        quote_number: data.quote_number || "",
-        revision: data.revision || 1,
-        issue_date: data.issue_date || new Date().toISOString().split('T')[0],
-        validity_days: data.validity_days || 30,
-        valid_until: data.valid_until || "",
-        
-        recipient_company: data.recipient_company || "",
-        recipient_name: data.recipient_name || "",
-        recipient_email: data.recipient_email || "",
-        cc_email: data.cc_email || "",
-
         title: data.title || "",
         template: data.template || "",
-        
         header_text: data.header_text || "",
         footer_text: data.footer_text || "",
-        
         terms: data.terms || "",
-        delivery_terms: data.delivery_terms || "",
-        payment_method: data.payment_method || "",
-
-        tax_mode: data.tax_mode || "exclusive",
-        rounding_rule: data.rounding_rule || "floor",
-        rounding_unit: data.rounding_unit || 10,
         tax_rate: data.tax_rate ?? 10,
-
+        valid_until: data.valid_until || "",
         notes: data.notes || "",
-        internal_notes: data.internal_notes || "",
-        customer_notes: data.customer_notes || "",
-        show_notes_on_separate_page: data.show_notes_on_separate_page || false,
       });
 
       if (data.company) {
@@ -171,28 +129,21 @@ function QuoteForm() {
       const mappedItems =
         data.items?.length > 0
           ? data.items.map((item) => ({
-              section: item.section || "",
               name: item.name || "",
               description: item.description || "",
               specification: item.specification || "",
               unit: item.unit || "EA",
               quantity: Number(item.quantity || 0),
               unit_price: Number(item.unit_price || 0),
-              remarks: item.remarks || "",
-              discount_rate: Number(item.discount_rate || 0),
-              is_discount_line: item.is_discount_line || false,
             }))
           : [
               {
-                section: "",
                 name: "",
                 description: "",
                 specification: "",
                 unit: "EA",
                 quantity: 1,
                 unit_price: 0,
-                remarks: "",
-                is_discount_line: false,
               },
             ];
       setItems(mappedItems);
@@ -282,60 +233,12 @@ function QuoteForm() {
   };
 
   const calculateTotal = () => {
-    // 1. Calculate Sum of Items
-    const sum = items.reduce((acc, item) => {
-      const amount = item.quantity * item.unit_price;
-      return item.is_discount_line ? acc - Math.abs(amount) : acc + amount;
-    }, 0);
-
-    let subtotal = 0;
-    let taxAmount = 0;
-    let total = 0;
-
-    // 2. Apply Tax Mode
-    if (formData.tax_mode === 'inclusive') {
-        // VAT 포함인 경우: 합계에서 세액 역산
-        // Subtotal = Sum / (1 + Rate/100)
-        total = sum;
-        subtotal = Math.round(sum / (1 + formData.tax_rate / 100));
-        taxAmount = total - subtotal;
-    } else if (formData.tax_mode === 'exempt') {
-        // 면세
-        subtotal = sum;
-        taxAmount = 0;
-        total = subtotal;
-    } else {
-        // VAT 별도 (Default)
-        subtotal = sum;
-        taxAmount = Math.floor((subtotal * formData.tax_rate) / 100);
-        total = subtotal + taxAmount;
-    }
-    
-    // 3. Rounding (단수처리) - Total 기준 적용
-    // Rule: floor(내림), round(반올림), ceil(올림)
-    // Unit: 1, 10, 100, 1000
-    const rule = formData.rounding_rule || 'floor';
-    const unit = formData.rounding_unit || 1;
-    
-    if (unit > 1) {
-        if (rule === 'floor') {
-            total = Math.floor(total / unit) * unit;
-        } else if (rule === 'ceil') {
-            total = Math.ceil(total / unit) * unit;
-        } else {
-            total = Math.round(total / unit) * unit;
-        }
-        // 역산 재조정 (세액 = Total - Subtotal) or 공급가 조정?
-        // 통상 총액을 맞추고 세액을 조정함.
-        if (formData.tax_mode === 'exclusive') {
-             // 별도 과세일 때 단수처리는 보통 잘 안하지만, 한다면 세액을 조정?
-             // 또는 총액 Rounding 후 Tax Amount 조정
-             // 여기서는 총액을 깎고, 차액을 세액에서 뺌
-             // (단순화를 위해 Total 변경만 반영)
-        }
-    }
-
-    return { subtotal, taxAmount, total };
+    const subtotal = items.reduce(
+      (sum, item) => sum + item.quantity * item.unit_price,
+      0,
+    );
+    const taxAmount = Math.floor((subtotal * formData.tax_rate) / 100);
+    return { subtotal, taxAmount, total: subtotal + taxAmount };
   };
 
   const handlePreviewPdf = async () => {
@@ -446,9 +349,7 @@ function QuoteForm() {
             <h1 className="text-title">
               {isEdit ? "견적서 수정" : "견적서 생성"}
             </h1>
-            {isEdit && (
-              <p className="text-muted-sm">상태: {quoteStatus}</p>
-            )}
+            {isEdit && <p className="text-muted-sm">상태: {quoteStatus}</p>}
           </div>
         </div>
         {isEdit && (
@@ -508,72 +409,7 @@ function QuoteForm() {
           <h3 className="text-sm font-semibold text-gray-700 mb-4">
             기본 정보
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* 1. 기본 메타데이터 */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                견적번호 (Auto)
-              </label>
-              <input
-                type="text"
-                value={formData.quote_number || "(저장시 생성)"}
-                disabled
-                className="input-base bg-gray-50"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                리비전
-              </label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  value={formData.revision}
-                  disabled
-                  className="input-base bg-gray-50 w-20"
-                />
-                <span className="text-xs text-gray-500">수정 시 자동증가</span>
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                견적일자
-              </label>
-              <input
-                type="date"
-                value={formData.issue_date}
-                onChange={(e) => setFormData({ ...formData, issue_date: e.target.value })}
-                className="input-base"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                유효기간 (일)
-              </label>
-              <div className="flex gap-2">
-                <select
-                  value={formData.validity_days}
-                  onChange={(e) => setFormData({ ...formData, validity_days: Number(e.target.value) })}
-                  className="input-base"
-                >
-                  <option value="15">15일</option>
-                  <option value="30">30일</option>
-                  <option value="60">60일</option>
-                  <option value="90">90일</option>
-                  <option value="0">직접지정</option>
-                </select>
-                {formData.validity_days === 0 && (
-                   <input
-                    type="date"
-                    value={formData.valid_until}
-                    onChange={(e) => setFormData({ ...formData, valid_until: e.target.value })}
-                    className="input-base"
-                  />
-                )}
-              </div>
-            </div>
-
-            {/* 2. 연결 정보 (CRM) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 영업기회 <span className="text-red-500">*</span>
@@ -629,7 +465,7 @@ function QuoteForm() {
                 ))}
               </select>
             </div>
-            <div className="md:col-span-4">
+            <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 견적 제목 <span className="text-red-500">*</span>
               </label>
@@ -660,8 +496,37 @@ function QuoteForm() {
                 ))}
               </select>
             </div>
-            {/* Hidden/Replaced Fields */}
-            {/* 유효기간, 세율 등은 위로 이동됨 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                유효기간
+              </label>
+              <input
+                type="date"
+                value={formData.valid_until}
+                onChange={(e) =>
+                  setFormData({ ...formData, valid_until: e.target.value })
+                }
+                className="input-base"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                세율 (%)
+              </label>
+              <input
+                type="number"
+                value={formData.tax_rate}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    tax_rate: parseFloat(e.target.value) || 0,
+                  })
+                }
+                className="input-base"
+                min="0"
+                max="100"
+              />
+            </div>
           </div>
         </div>
 
@@ -682,38 +547,24 @@ function QuoteForm() {
             <table className="w-full">
               <thead className="doc-thead">
                 <tr>
-                  <th className="doc-th text-center" style={{ width: "8%" }}>구분</th>
-                  <th className="doc-th text-left" style={{ width: "20%" }}>항목명/설명</th>
-                  <th className="doc-th text-left" style={{ width: "12%" }}>규격</th>
-                  <th className="doc-th text-center" style={{ width: "8%" }}>단위</th>
+                  <th className="doc-th text-left" style={{ width: "25%" }}>
+                    항목명
+                  </th>
+                  <th className="doc-th text-left" style={{ width: "15%" }}>
+                    규격
+                  </th>
+                  <th className="doc-th text-center" style={{ width: "8%" }}>
+                    단위
+                  </th>
                   <th className="doc-th text-right col-number">수량</th>
-                  <th className="doc-th text-right col-number">단가/할인율</th>
+                  <th className="doc-th text-right col-number">단가</th>
                   <th className="doc-th text-right col-number">금액</th>
-                  <th className="doc-th text-left" style={{ width: "10%" }}>비고</th>
                   <th className="doc-th-end text-center col-delete">삭제</th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((item, index) => (
                   <tr key={index} className="border-b border-gray-100">
-                    <td className="px-2 py-2 align-top">
-                      <input
-                        type="text"
-                        value={item.section}
-                        onChange={(e) => handleItemChange(index, "section", e.target.value)}
-                        className="input-sm text-center mb-1"
-                        placeholder="섹션"
-                      />
-                      <div className="flex items-center justify-center gap-1">
-                         <input 
-                           type="checkbox" 
-                           checked={item.is_discount_line} 
-                           onChange={(e) => handleItemChange(index, "is_discount_line", e.target.checked)}
-                           title="할인 행 여부"
-                         />
-                         <span className="text-xs text-gray-400">할인</span>
-                      </div>
-                    </td>
                     <td className="px-2 py-2">
                       <input
                         type="text"
@@ -721,31 +572,26 @@ function QuoteForm() {
                         onChange={(e) =>
                           handleItemChange(index, "name", e.target.value)
                         }
-                        className="input-sm font-semibold mb-1"
+                        className="input-sm"
                         placeholder="항목명"
                       />
-                      <textarea
-                        value={item.description}
-                        onChange={(e) =>
-                          handleItemChange(index, "description", e.target.value)
-                        }
-                        className="input-sm text-xs text-gray-600 resize-none"
-                        rows={2}
-                        placeholder="상세 설명"
-                      />
                     </td>
-                    <td className="px-2 py-2 align-top">
+                    <td className="px-2 py-2">
                       <input
                         type="text"
                         value={item.specification}
                         onChange={(e) =>
-                          handleItemChange(index, "specification", e.target.value)
+                          handleItemChange(
+                            index,
+                            "specification",
+                            e.target.value,
+                          )
                         }
                         className="input-sm"
                         placeholder="규격"
                       />
                     </td>
-                    <td className="px-2 py-2 align-top">
+                    <td className="px-2 py-2">
                       <input
                         type="text"
                         value={item.unit}
@@ -755,7 +601,7 @@ function QuoteForm() {
                         className="input-sm text-center"
                       />
                     </td>
-                    <td className="px-2 py-2 align-top">
+                    <td className="px-2 py-2">
                       <input
                         type="number"
                         value={item.quantity}
@@ -763,14 +609,14 @@ function QuoteForm() {
                           handleItemChange(
                             index,
                             "quantity",
-                            parseFloat(e.target.value) || 0
+                            parseFloat(e.target.value) || 0,
                           )
                         }
                         className="input-sm text-right"
                         min="0"
                       />
                     </td>
-                    <td className="px-2 py-2 align-top">
+                    <td className="px-2 py-2">
                       <input
                         type="number"
                         value={item.unit_price}
@@ -778,29 +624,15 @@ function QuoteForm() {
                           handleItemChange(
                             index,
                             "unit_price",
-                            parseFloat(e.target.value) || 0
+                            parseFloat(e.target.value) || 0,
                           )
                         }
-                        className={`input-sm text-right ${item.is_discount_line ? "text-red-500" : ""}`}
-                        placeholder={item.is_discount_line ? "할인율%" : "단가"}
+                        className="input-sm text-right"
+                        min="0"
                       />
                     </td>
-                    <td className="px-2 py-2 text-right text-sm font-medium align-top">
-                      {item.is_discount_line 
-                        ? <span className="text-red-600">-{formatAmount(Math.abs(item.quantity * item.unit_price))}</span>
-                        : formatAmount(item.quantity * item.unit_price)
-                      }
-                    </td>
-                    <td className="px-2 py-2 align-top">
-                      <input
-                        type="text"
-                        value={item.remarks}
-                        onChange={(e) =>
-                          handleItemChange(index, "remarks", e.target.value)
-                        }
-                        className="input-sm"
-                        placeholder="비고"
-                      />
+                    <td className="px-2 py-2 text-right text-sm font-medium">
+                      {formatAmount(item.quantity * item.unit_price)}
                     </td>
                     <td className="px-2 py-2 text-center">
                       <button
@@ -818,7 +650,7 @@ function QuoteForm() {
               <tfoot>
                 <tr className="bg-gray-50">
                   <td
-                    colSpan={7}
+                    colSpan={5}
                     className="px-3 py-2 text-right text-sm font-medium"
                   >
                     공급가액
@@ -830,7 +662,7 @@ function QuoteForm() {
                 </tr>
                 <tr className="bg-gray-50">
                   <td
-                    colSpan={7}
+                    colSpan={5}
                     className="px-3 py-2 text-right text-sm font-medium"
                   >
                     세액 ({formData.tax_rate}%)
@@ -842,7 +674,7 @@ function QuoteForm() {
                 </tr>
                 <tr className="bg-blue-50">
                   <td
-                    colSpan={7}
+                    colSpan={5}
                     className="px-3 py-2 text-right text-sm font-bold text-blue-700"
                   >
                     합계
@@ -888,27 +720,10 @@ function QuoteForm() {
                 rows={3}
               />
             </div>
-            {/* Additional Info Revisions */}
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                거래조건 (Payment Terms & Scope)
+                거래조건
               </label>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-2">
-                <input 
-                  type="text" 
-                  className="input-base" 
-                  placeholder="납품기한 (예: 발주 후 2주)"
-                  value={formData.delivery_terms}
-                  onChange={(e) => setFormData({...formData, delivery_terms: e.target.value})}
-                />
-                <input 
-                  type="text" 
-                  className="input-base" 
-                  placeholder="결제조건 (예: 현금 100%)"
-                  value={formData.payment_method}
-                  onChange={(e) => setFormData({...formData, payment_method: e.target.value})}
-                />
-              </div>
               <textarea
                 value={formData.terms}
                 onChange={(e) =>
@@ -916,47 +731,19 @@ function QuoteForm() {
                 }
                 className="input-base"
                 rows={3}
-                placeholder="상세 거래조건 텍스트"
               />
             </div>
-
-            {/* Notes Split */}
-            <div>
+            <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                고객 비고 (Customer Notes)
+                비고
               </label>
               <textarea
-                value={formData.customer_notes}
+                value={formData.notes}
                 onChange={(e) =>
-                  setFormData({ ...formData, customer_notes: e.target.value })
+                  setFormData({ ...formData, notes: e.target.value })
                 }
                 className="input-base"
-                rows={4}
-                placeholder="견적서 PDF에 출력됩니다."
-              />
-              <div className="flex items-center gap-2 mt-2">
-                <input 
-                  type="checkbox" 
-                  id="sep_page"
-                  checked={formData.show_notes_on_separate_page}
-                  onChange={(e) => setFormData({...formData, show_notes_on_separate_page: e.target.checked})}
-                />
-                <label htmlFor="sep_page" className="text-sm text-gray-600">별도 페이지에 출력</label>
-              </div>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                내부 메모 (Internal Only)
-              </label>
-              <textarea
-                value={formData.internal_notes}
-                onChange={(e) =>
-                  setFormData({ ...formData, internal_notes: e.target.value })
-                }
-                className="input-base bg-yellow-50"
-                rows={4}
-                placeholder="고객에게 보이지 않는 내부 기록용입니다."
+                rows={2}
               />
             </div>
           </div>

@@ -486,9 +486,8 @@ class QuoteItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = QuoteItem
         fields = [
-            'id', 'quote', 'order', 'section', 'name', 'description',
-            'specification', 'unit', 'quantity', 'unit_price', 'amount',
-            'remarks', 'discount_rate', 'is_discount_line'
+            'id', 'quote', 'order', 'name', 'description',
+            'specification', 'unit', 'quantity', 'unit_price', 'amount', 'notes'
         ]
         read_only_fields = ['amount', 'quote']
 
@@ -507,16 +506,11 @@ class QuoteSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'lead', 'lead_title', 'company', 'company_name',
             'contact', 'contact_name',
-            'quote_number', 'revision', 'title', 'template',
-            'issue_date', 'validity_days', 'valid_until',
-            'recipient_company', 'recipient_name', 'recipient_email', 'cc_email',
-            'header_text', 'footer_text',
-            'terms', 'delivery_terms', 'payment_method',
-            'tax_mode', 'rounding_rule', 'rounding_unit',
+            'quote_number', 'title', 'template',
+            'header_text', 'footer_text', 'terms',
             'subtotal', 'tax_rate', 'tax_amount', 'total_amount',
-            'status', 'status_display', 'sent_at',
-            'notes', 'internal_notes', 'customer_notes', 'show_notes_on_separate_page',
-            'items',
+            'valid_until', 'status', 'status_display', 'sent_at',
+            'notes', 'items',
             'created_by', 'created_by_name', 'created_at', 'updated_at'
         ]
         read_only_fields = ['created_by', 'quote_number', 'subtotal', 'tax_amount', 'total_amount']
@@ -536,14 +530,8 @@ class QuoteCreateSerializer(serializers.ModelSerializer):
         model = Quote
         fields = [
             'lead', 'company', 'contact', 'title', 'template',
-            'issue_date', 'validity_days', 'valid_until',
-            'recipient_company', 'recipient_name', 'recipient_email', 'cc_email',
-            'header_text', 'footer_text',
-            'terms', 'delivery_terms', 'payment_method',
-            'tax_mode', 'rounding_rule', 'rounding_unit',
-            'tax_rate',
-            'notes', 'internal_notes', 'customer_notes', 'show_notes_on_separate_page',
-            'items'
+            'header_text', 'footer_text', 'terms',
+            'tax_rate', 'valid_until', 'notes', 'items'
         ]
     
     def validate(self, attrs):

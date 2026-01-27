@@ -588,35 +588,13 @@ class QuoteViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
 
     @action(detail=True, methods=['get'])
     def render_pdf(self, request, pk=None):
-        """견적서 PDF URL 반환"""
+        """견적서 PDF 렌더링 (1차: URL 반환)"""
         quote = self.get_object()
-        # 실제 PDF 생성 엔드포인트 URL 반환
-        pdf_url = request.build_absolute_uri(f"/api/operation/quotes/{quote.id}/pdf/")
         return Response({
             'quote_id': quote.id,
             'quote_number': quote.quote_number,
-            'pdf_url': pdf_url
+            'pdf_url': request.build_absolute_uri(f"/media/quotes/{quote.id}.pdf")
         })
-
-    @action(detail=True, methods=['get'])
-    def pdf(self, request, pk=None):
-        """실제 PDF 생성 및 다운로드"""
-        import io
-        from django.http import FileResponse
-        from .utils.pdf import QuotePDFGenerator
-
-        quote = self.get_object()
-        buffer = io.BytesIO()
-        
-        generator = QuotePDFGenerator(quote)
-        generator.generate(buffer)
-        
-        buffer.seek(0)
-        return FileResponse(
-            buffer, 
-            as_attachment=False, 
-            filename=f"Quote_{quote.quote_number}.pdf"
-        )
 
     @action(detail=True, methods=['post'])
     def accept(self, request, pk=None):
