@@ -440,7 +440,18 @@ class LeadTaskViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
 
     def perform_destroy(self, instance):
         lead = instance.lead
+        task_title = instance.title
+        
+        # 해당 task의 'task_done' 활동 로그 삭제
+        if lead:
+            LeadActivity.objects.filter(
+                lead=lead,
+                activity_type='task_done',
+                title__contains=task_title
+            ).delete()
+        
         instance.delete()
+        
         if lead:
             LeadService.refresh_next_action_due(lead)
     
@@ -460,13 +471,24 @@ class LeadTaskViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'])
     def uncomplete(self, request, pk=None):
-        """완료 취소"""
+        """완료 취소 - 해당 활동 로그도 삭제"""
         task = self.get_object()
+        
+        # 해당 task의 'task_done' 활동 로그 삭제
+        if task.lead_id:
+            LeadActivity.objects.filter(
+                lead_id=task.lead_id,
+                activity_type='task_done',
+                title__contains=task.title
+            ).delete()
+        
         task.is_completed = False
         task.completed_at = None
         task.save()
+        
         if task.lead_id:
             LeadService.refresh_next_action_due(task.lead)
+        
         return Response(LeadTaskSerializer(task).data)
 
 
@@ -518,7 +540,7 @@ class QuoteViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
         LeadService.create_activity(
             lead=quote.lead,
             activity_type='quote_created',
-            title=f"견적 생성: {quote.quote_number}",
+            title=f"견적 등록: {quote.quote_number}",
             content=f"견적 금액: {quote.total_amount:,}원",
             user=self.request.user
         )
@@ -566,12 +588,85 @@ class QuoteViewSet(WorkspaceScopedMixin, viewsets.ModelViewSet):
 
     @action(detail=True, methods=['get'])
     def render_pdf(self, request, pk=None):
-        """견적서 PDF 렌더링 (1차: URL 반환)"""
+        """견적서 PDF URL 반환"""
         quote = self.get_object()
+        # 실제 PDF 생성 엔드포인트 URL 반환
+        pdf_url = request.build_absolute_uri(f"/api/operation/quotes/{quote.id}/pdf/")
         return Response({
             'quote_id': quote.id,
             'quote_number': quote.quote_number,
-            'pdf_url': request.build_absolute_uri(f"/media/quotes/{quote.id}.pdf")
+            'pdf_url': pdf_url
+        })
+
+    @action(detail=True, methods=['get'])
+    def pdf(self, request, pk=None):
+        """실제 PDF 생성 및 다운로드"""
+        import io
+        from django.http import FileResponse
+        from .utils.pdf import QuotePDFGenerator
+
+        quote = self.get_object()
+        buffer = io.BytesIO()
+        
+        generator = QuotePDFGenerator(quote)
+        generator.generate(buffer)
+        
+        buffer.seek(0)
+        return FileResponse(
+            buffer, 
+            as_attachment=False, 
+            filename=f"Quote_{quote.quote_number}.pdf"
+        )
+
+    @action(detail=True, methods=['post'])
+    def accept(self, request, pk=None):
+        """견적서 수락 처리"""
+        quote = self.get_object()
+        
+        # sent 상태일 때만 수락 가능 (또는 draft)
+        # if quote.status not in ['sent']:
+        #     return Response(
+        #         {'error': 'Only sent quotes can be accepted'},
+        #         status=status.HTTP_400_BAD_REQUEST
+        #     )
+            
+        quote.status = 'accepted'
+        quote.save(update_fields=['status'])
+        
+        # Activity Log
+        activity = LeadService.create_activity(
+            lead=quote.lead,
+            activity_type='quote_sent', # 또는 별도 타입 추가 가능하나 기존 타입 활용
+            title=f"견적 수락됨: {quote.quote_number}",
+            content=f"고객이 견적을 수락했습니다. (총액: {quote.total_amount:,}원)",
+            user=request.user
+        )
+        
+        return Response({
+            'quote': QuoteSerializer(quote).data,
+            'activity': LeadActivitySerializer(activity).data
+        })
+
+    @action(detail=True, methods=['post'])
+    def reject(self, request, pk=None):
+        """견적서 거절 처리"""
+        quote = self.get_object()
+        
+        quote.status = 'rejected'
+        quote.save(update_fields=['status'])
+        
+        # Activity Log
+        activity = LeadService.create_activity(
+            lead=quote.lead,
+            activity_type='quote_sent',
+            title=f"견적 거절됨: {quote.quote_number}",
+            content=f"고객이 견적을 거절했습니다.",
+            user=request.user
+        )
+        
+        return Response({
+            'quote': QuoteSerializer(quote).data,
+            'activity': LeadActivitySerializer(activity).data
         })
 
     @action(detail=True, methods=['post'])

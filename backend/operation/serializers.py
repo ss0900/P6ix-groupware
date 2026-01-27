@@ -43,7 +43,7 @@ class CustomerContactSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomerContact
         fields = [
-            'id', 'company', 'company_name', 'name', 'position', 
+            'id', 'company', 'company_name', 'name', 'priority', 'position', 
             'department', 'email', 'phone', 'mobile', 
             'is_primary', 'notes', 'created_at', 'updated_at'
         ]
@@ -183,6 +183,7 @@ class LeadActivitySerializer(serializers.ModelSerializer):
             'id', 'lead', 'activity_type', 'activity_type_display',
             'title', 'content',
             'from_stage', 'from_stage_name', 'to_stage', 'to_stage_name',
+            'activity_date',
             'created_by', 'created_by_name', 'created_at'
         ]
         read_only_fields = ['created_by']
@@ -324,7 +325,7 @@ class SalesLeadDetailSerializer(serializers.ModelSerializer):
     created_by_data = SimpleUserSerializer(source='created_by', read_only=True)
     
     # 관련 데이터
-    activities = LeadActivitySerializer(many=True, read_only=True)
+    activities = serializers.SerializerMethodField()
     tasks = LeadTaskSerializer(many=True, read_only=True)
     files = LeadFileSerializer(many=True, read_only=True)
     
@@ -352,6 +353,13 @@ class SalesLeadDetailSerializer(serializers.ModelSerializer):
     
     def get_quotes_count(self, obj):
         return obj.quotes.count()
+    
+    def get_activities(self, obj):
+        from django.db.models.functions import Coalesce
+        activities = obj.activities.annotate(
+            effective_date=Coalesce('activity_date', 'created_at')
+        ).order_by('-effective_date')
+        return LeadActivitySerializer(activities, many=True).data
 
 
 class SalesLeadCreateSerializer(serializers.ModelSerializer):
@@ -478,8 +486,9 @@ class QuoteItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = QuoteItem
         fields = [
-            'id', 'quote', 'order', 'name', 'description',
-            'specification', 'unit', 'quantity', 'unit_price', 'amount', 'notes'
+            'id', 'quote', 'order', 'section', 'name', 'description',
+            'specification', 'unit', 'quantity', 'unit_price', 'amount',
+            'remarks', 'discount_rate', 'is_discount_line'
         ]
         read_only_fields = ['amount', 'quote']
 
@@ -498,11 +507,16 @@ class QuoteSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'lead', 'lead_title', 'company', 'company_name',
             'contact', 'contact_name',
-            'quote_number', 'title', 'template',
-            'header_text', 'footer_text', 'terms',
+            'quote_number', 'revision', 'title', 'template',
+            'issue_date', 'validity_days', 'valid_until',
+            'recipient_company', 'recipient_name', 'recipient_email', 'cc_email',
+            'header_text', 'footer_text',
+            'terms', 'delivery_terms', 'payment_method',
+            'tax_mode', 'rounding_rule', 'rounding_unit',
             'subtotal', 'tax_rate', 'tax_amount', 'total_amount',
-            'valid_until', 'status', 'status_display', 'sent_at',
-            'notes', 'items',
+            'status', 'status_display', 'sent_at',
+            'notes', 'internal_notes', 'customer_notes', 'show_notes_on_separate_page',
+            'items',
             'created_by', 'created_by_name', 'created_at', 'updated_at'
         ]
         read_only_fields = ['created_by', 'quote_number', 'subtotal', 'tax_amount', 'total_amount']
@@ -522,8 +536,14 @@ class QuoteCreateSerializer(serializers.ModelSerializer):
         model = Quote
         fields = [
             'lead', 'company', 'contact', 'title', 'template',
-            'header_text', 'footer_text', 'terms',
-            'tax_rate', 'valid_until', 'notes', 'items'
+            'issue_date', 'validity_days', 'valid_until',
+            'recipient_company', 'recipient_name', 'recipient_email', 'cc_email',
+            'header_text', 'footer_text',
+            'terms', 'delivery_terms', 'payment_method',
+            'tax_mode', 'rounding_rule', 'rounding_unit',
+            'tax_rate',
+            'notes', 'internal_notes', 'customer_notes', 'show_notes_on_separate_page',
+            'items'
         ]
     
     def validate(self, attrs):

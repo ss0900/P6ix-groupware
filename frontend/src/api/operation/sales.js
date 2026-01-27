@@ -119,6 +119,15 @@ const SalesService = {
     return response.data;
   },
 
+  updateActivity: async (activityId, data) => {
+    const response = await api.patch(`/operation/activities/${activityId}/`, data);
+    return response.data;
+  },
+
+  deleteActivity: async (activityId) => {
+    await api.delete(`/operation/activities/${activityId}/`);
+  },
+
   // ============================================================
   // 할 일 (Tasks)
   // ============================================================

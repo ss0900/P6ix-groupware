@@ -63,13 +63,17 @@ function LeadDetail() {
   // 모달 상태
   const [activityModal, setActivityModal] = useState(false);
   const [taskModal, setTaskModal] = useState(false);
+  const [editingTask, setEditingTask] = useState(null); // 수정 중인 task
+  const [editingActivity, setEditingActivity] = useState(null); // 수정 중인 activity
   const [newActivity, setNewActivity] = useState({
     activity_type: "note",
     title: "",
     content: "",
+    activity_date: "",
   });
   const [newTask, setNewTask] = useState({
     title: "",
+    description: "",
     due_date: "",
     priority: "medium",
     assignee: "",
@@ -92,7 +96,7 @@ function LeadDetail() {
       setLead(data);
       if (data?.owner) {
         setNewTask((prev) =>
-          prev.assignee ? prev : { ...prev, assignee: data.owner }
+          prev.assignee ? prev : { ...prev, assignee: data.owner },
         );
       }
 
@@ -187,15 +191,82 @@ function LeadDetail() {
     }
   };
 
+  const openActivityModal = () => {
+    setEditingActivity(null);
+    setNewActivity({
+      activity_type: "note",
+      title: "",
+      content: "",
+      activity_date: "",
+    });
+    setActivityModal(true);
+  };
+
+  const openActivityEditModal = (activity) => {
+    setEditingActivity(activity);
+    setNewActivity({
+      activity_type: activity.activity_type,
+      title: activity.title,
+      content: activity.content || "",
+      activity_date: activity.activity_date
+        ? activity.activity_date.slice(0, 16)
+        : "",
+    });
+    setActivityModal(true);
+  };
+
   const handleAddActivity = async (e) => {
     e.preventDefault();
+
     try {
-      await SalesService.createActivity(id, newActivity);
+      const payload = {
+        ...newActivity,
+        activity_date: newActivity.activity_date || null,
+      };
+      await SalesService.createActivity(id, payload);
       setActivityModal(false);
-      setNewActivity({ activity_type: "note", title: "", content: "" });
+      setNewActivity({
+        activity_type: "note",
+        title: "",
+        content: "",
+        activity_date: "",
+      });
       fetchLead();
     } catch (error) {
       console.error("Error creating activity:", error);
+    }
+  };
+
+  const handleUpdateActivity = async (e) => {
+    e.preventDefault();
+
+    try {
+      const payload = {
+        ...newActivity,
+        activity_date: newActivity.activity_date || null,
+      };
+      await SalesService.updateActivity(editingActivity.id, payload);
+      setActivityModal(false);
+      setEditingActivity(null);
+      setNewActivity({
+        activity_type: "note",
+        title: "",
+        content: "",
+        activity_date: "",
+      });
+      fetchLead();
+    } catch (error) {
+      console.error("Error updating activity:", error);
+    }
+  };
+
+  const handleDeleteActivity = async (activityId) => {
+    if (!window.confirm("이 활동을 삭제하시겠습니까?")) return;
+    try {
+      await SalesService.deleteActivity(activityId);
+      fetchLead();
+    } catch (error) {
+      console.error("Error deleting activity:", error);
     }
   };
 
@@ -209,7 +280,7 @@ function LeadDetail() {
       };
       await SalesService.createTask(id, payload);
       setTaskModal(false);
-      setNewTask({ title: "", due_date: "", priority: "medium", assignee: "" });
+      setNewTask({ title: "", description: "", due_date: "", priority: "medium", assignee: "" });
       fetchLead();
     } catch (error) {
       console.error("Error creating task:", error);
@@ -217,12 +288,48 @@ function LeadDetail() {
   };
 
   const openTaskModal = () => {
-    if (lead?.owner) {
-      setNewTask((prev) =>
-        prev.assignee ? prev : { ...prev, assignee: lead.owner }
-      );
-    }
+    setEditingTask(null);
+    setNewTask({
+      title: "",
+      description: "",
+      due_date: "",
+      priority: "medium",
+      assignee: lead?.owner || "",
+    });
     setTaskModal(true);
+  };
+
+  const openTaskEditModal = (task) => {
+    setEditingTask(task);
+    setNewTask({
+      title: task.title || "",
+      description: task.description || "",
+      due_date: task.due_date ? task.due_date.slice(0, 16) : "",
+      priority: task.priority || "medium",
+      assignee: task.assignee || "",
+    });
+    setTaskModal(true);
+  };
+
+  const handleUpdateTask = async (e) => {
+    e.preventDefault();
+    if (!editingTask) return;
+    try {
+      const payload = {
+        title: newTask.title,
+        description: newTask.description,
+        due_date: newTask.due_date || null,
+        priority: newTask.priority,
+        assignee: newTask.assignee ? Number(newTask.assignee) : null,
+      };
+      await SalesService.updateTask(editingTask.id, payload);
+      setTaskModal(false);
+      setEditingTask(null);
+      setNewTask({ title: "", description: "", due_date: "", priority: "medium", assignee: "" });
+      fetchLead();
+    } catch (error) {
+      console.error("Error updating task:", error);
+    }
   };
 
   const handleCompleteTask = async (taskId) => {
@@ -231,6 +338,25 @@ function LeadDetail() {
       fetchLead();
     } catch (error) {
       console.error("Error completing task:", error);
+    }
+  };
+
+  const handleUncompleteTask = async (taskId) => {
+    try {
+      await SalesService.uncompleteTask(taskId);
+      fetchLead();
+    } catch (error) {
+      console.error("Error uncompleting task:", error);
+    }
+  };
+
+  const handleDeleteTask = async (taskId) => {
+    if (!window.confirm("할 일을 삭제하시겠습니까?")) return;
+    try {
+      await SalesService.deleteTask(taskId);
+      fetchLead();
+    } catch (error) {
+      console.error("Error deleting task:", error);
     }
   };
 
@@ -356,10 +482,7 @@ function LeadDetail() {
         </div>
         <div className="flex items-center gap-2">
           {isInboxLike() && (
-            <button
-              onClick={openAcceptModal}
-              className="btn-primary"
-            >
+            <button onClick={openAcceptModal} className="btn-primary">
               접수 처리
             </button>
           )}
@@ -404,7 +527,7 @@ function LeadDetail() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Accept Modal */}
+        {/* Accept Modal */}
         <Modal
           isOpen={acceptOpen}
           onClose={() => setAcceptOpen(false)}
@@ -470,7 +593,10 @@ function LeadDetail() {
                 type="checkbox"
                 checked={acceptForm.create_task}
                 onChange={(e) =>
-                  setAcceptForm((p) => ({ ...p, create_task: e.target.checked }))
+                  setAcceptForm((p) => ({
+                    ...p,
+                    create_task: e.target.checked,
+                  }))
                 }
               />
               <span className="text-sm text-gray-700">다음 액션 TODO 생성</span>
@@ -486,7 +612,10 @@ function LeadDetail() {
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
                     value={acceptForm.task_title}
                     onChange={(e) =>
-                      setAcceptForm((p) => ({ ...p, task_title: e.target.value }))
+                      setAcceptForm((p) => ({
+                        ...p,
+                        task_title: e.target.value,
+                      }))
                     }
                   />
                 </div>
@@ -499,7 +628,10 @@ function LeadDetail() {
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"
                     value={acceptForm.task_due_date}
                     onChange={(e) =>
-                      setAcceptForm((p) => ({ ...p, task_due_date: e.target.value }))
+                      setAcceptForm((p) => ({
+                        ...p,
+                        task_due_date: e.target.value,
+                      }))
                     }
                   />
                 </div>
@@ -689,7 +821,7 @@ function LeadDetail() {
               <div>
                 <div className="flex justify-end mb-4">
                   <button
-                    onClick={() => setActivityModal(true)}
+                    onClick={openActivityModal}
                     className="btn-create-sm flex items-center gap-1"
                   >
                     <FiPlus className="w-3 h-3" />
@@ -725,9 +857,33 @@ function LeadDetail() {
                             )}
                             <p className="text-xs text-gray-400 mt-1">
                               {activity.created_by_name} ·{" "}
-                              {formatDateTime(activity.created_at)}
+                              {formatDateTime(activity.activity_date || activity.created_at)}
+                              {activity.show_on_calendar && (
+                                <span className="ml-2 text-purple-500">📅 캘린더</span>
+                              )}
                             </p>
                           </div>
+                          {/* 사용자 직접 추가한 활동만 수정/삭제 가능 */}
+                          {["note", "call", "email", "meeting"].includes(
+                            activity.activity_type
+                          ) && (
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => openActivityEditModal(activity)}
+                                className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded"
+                                title="수정"
+                              >
+                                <FiEdit2 className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteActivity(activity.id)}
+                                className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded"
+                                title="삭제"
+                              >
+                                <FiTrash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          )}
                         </div>
                       );
                     })
@@ -766,9 +922,11 @@ function LeadDetail() {
                           type="checkbox"
                           checked={task.is_completed}
                           onChange={() =>
-                            !task.is_completed && handleCompleteTask(task.id)
+                            task.is_completed
+                              ? handleUncompleteTask(task.id)
+                              : handleCompleteTask(task.id)
                           }
-                          className="w-4 h-4 rounded border-gray-300"
+                          className="w-4 h-4 rounded border-gray-300 cursor-pointer"
                         />
                         <div className="flex-1">
                           <p
@@ -797,12 +955,26 @@ function LeadDetail() {
                             task.priority === "high"
                               ? "bg-red-100 text-red-700"
                               : task.priority === "medium"
-                              ? "bg-yellow-100 text-yellow-700"
-                              : "bg-gray-100 text-gray-700"
+                                ? "bg-yellow-100 text-yellow-700"
+                                : "bg-gray-100 text-gray-700"
                           }`}
                         >
                           {task.priority_display}
                         </span>
+                        <button
+                          onClick={() => openTaskEditModal(task)}
+                          className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600"
+                          title="수정"
+                        >
+                          <FiEdit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteTask(task.id)}
+                          className="p-1 hover:bg-red-100 rounded text-gray-400 hover:text-red-600"
+                          title="삭제"
+                        >
+                          <FiTrash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     ))
                   )}
@@ -864,7 +1036,7 @@ function LeadDetail() {
                     className="btn-create-sm flex items-center gap-1"
                   >
                     <FiPlus className="w-3 h-3" />
-                    견적 작성
+                    견적 등록
                   </button>
                 </div>
                 <div className="space-y-2">
@@ -952,16 +1124,22 @@ function LeadDetail() {
         </div>
       </div>
 
-      {/* 활동 추가 모달 */}
+      {/* 활동 추가/수정 모달 */}
       <Modal
         isOpen={activityModal}
-        onClose={() => setActivityModal(false)}
-        title="활동 추가"
+        onClose={() => {
+          setActivityModal(false);
+          setEditingActivity(null);
+        }}
+        title={editingActivity ? "활동 수정" : "활동 추가"}
       >
-        <form onSubmit={handleAddActivity} className="space-y-4">
+        <form
+          onSubmit={editingActivity ? handleUpdateActivity : handleAddActivity}
+          className="space-y-4"
+        >
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              유형
+              유형 <span className="text-red-500">*</span>
             </label>
             <select
               value={newActivity.activity_type}
@@ -981,7 +1159,7 @@ function LeadDetail() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              제목
+              제목 <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -992,6 +1170,27 @@ function LeadDetail() {
               className="input-base"
               required
             />
+          </div>
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                날짜
+                <span className="text-xs text-gray-500 ml-3">
+                  (지정하지 않으면 현재 시간으로 기록됩니다.)
+                </span>
+              </label>
+              <input
+                type="datetime-local"
+                value={newActivity.activity_date}
+                onChange={(e) =>
+                  setNewActivity({
+                    ...newActivity,
+                    activity_date: e.target.value,
+                  })
+                }
+                className="input-base"
+              />
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1021,16 +1220,22 @@ function LeadDetail() {
         </form>
       </Modal>
 
-      {/* 할 일 추가 모달 */}
+      {/* 할 일 추가/수정 모달 */}
       <Modal
         isOpen={taskModal}
-        onClose={() => setTaskModal(false)}
-        title="할 일 추가"
+        onClose={() => {
+          setTaskModal(false);
+          setEditingTask(null);
+        }}
+        title={editingTask ? "할 일 수정" : "할 일 추가"}
       >
-        <form onSubmit={handleAddTask} className="space-y-4">
+        <form
+          onSubmit={editingTask ? handleUpdateTask : handleAddTask}
+          className="space-y-4"
+        >
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              제목
+              제목 <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -1044,7 +1249,7 @@ function LeadDetail() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              기한
+              기한 <span className="text-red-500">*</span>
             </label>
             <input
               type="datetime-local"
@@ -1053,6 +1258,7 @@ function LeadDetail() {
                 setNewTask({ ...newTask, due_date: e.target.value })
               }
               className="input-base"
+              required
             />
           </div>
           <div>
@@ -1089,6 +1295,20 @@ function LeadDetail() {
               <option value="medium">보통</option>
               <option value="high">높음</option>
             </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              내용
+            </label>
+            <textarea
+              value={newTask.description}
+              onChange={(e) =>
+                setNewTask({ ...newTask, description: e.target.value })
+              }
+              className="input-base"
+              rows={3}
+              placeholder="할 일에 대한 상세 내용을 입력하세요"
+            />
           </div>
           <div className="flex justify-end gap-2">
             <button

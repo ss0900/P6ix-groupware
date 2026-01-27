@@ -28,13 +28,17 @@ function CustomerDetail() {
   const [contactModal, setContactModal] = useState(false);
   const [newContact, setNewContact] = useState({
     name: "",
+    priority: "medium",
     position: "",
     department: "",
     email: "",
     phone: "",
     mobile: "",
+    notes: "",
     is_primary: false,
   });
+  /* 편집 중인 담당자 상태 */
+  const [editingContact, setEditingContact] = useState(null);
   const [saving, setSaving] = useState(false);
 
   const fetchCompany = useCallback(async () => {
@@ -57,30 +61,83 @@ function CustomerDetail() {
     fetchCompany();
   }, [fetchCompany]);
 
-  const handleAddContact = async (e) => {
-    e.preventDefault();
-    setSaving(true);
-
-    try {
-      await CustomerService.createContact({
-        ...newContact,
-        company: parseInt(id),
+  const openContactModal = (contact = null) => {
+    if (contact) {
+      setEditingContact(contact);
+      setNewContact({
+        name: contact.name,
+        priority: contact.priority || "medium",
+        position: contact.position || "",
+        department: contact.department || "",
+        email: contact.email || "",
+        phone: contact.phone || "",
+        mobile: contact.mobile || "",
+        notes: contact.notes || "",
+        is_primary: contact.is_primary || false,
       });
-      setContactModal(false);
+    } else {
+      setEditingContact(null);
       setNewContact({
         name: "",
+        priority: "medium",
         position: "",
         department: "",
         email: "",
         phone: "",
         mobile: "",
+        notes: "",
+        is_primary: false,
+      });
+    }
+    setContactModal(true);
+  };
+
+  const handleSaveContact = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+
+    try {
+      if (editingContact) {
+        // 수정
+        await CustomerService.updateContact(editingContact.id, {
+          ...newContact,
+          company: parseInt(id),
+        });
+      } else {
+        // 추가
+        await CustomerService.createContact({
+          ...newContact,
+          company: parseInt(id),
+        });
+      }
+      setContactModal(false);
+      setEditingContact(null);
+      setNewContact({
+        name: "",
+        priority: "medium",
+        position: "",
+        department: "",
+        email: "",
+        phone: "",
+        mobile: "",
+        notes: "",
         is_primary: false,
       });
       fetchCompany();
     } catch (error) {
-      console.error("Error creating contact:", error);
+      console.error("Error saving contact:", error);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDeleteContact = async (contactId) => {
+    if (!window.confirm("정말 이 담당자 정보를 삭제하시겠습니까?")) return;
+    try {
+      await CustomerService.deleteContact(contactId);
+      fetchCompany();
+    } catch (error) {
+      console.error("Error deleting contact:", error);
     }
   };
 
@@ -216,7 +273,7 @@ function CustomerDetail() {
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-gray-700">담당자</h3>
             <button
-              onClick={() => setContactModal(true)}
+              onClick={() => openContactModal()}
               className="btn-create-sm flex items-center gap-1"
             >
               <FiPlus className="w-3 h-3" />
@@ -230,11 +287,21 @@ function CustomerDetail() {
             </p>
           ) : (
             <div className="space-y-3">
-              {company.contacts?.map((contact) => (
-                <div
-                  key={contact.id}
-                  className="p-3 border border-gray-200 rounded-lg"
-                >
+              {[...company.contacts]
+                .sort((a, b) => {
+                  const priorityScore = { high: 3, medium: 2, low: 1 };
+                  const scoreA = priorityScore[a.priority] || 0;
+                  const scoreB = priorityScore[b.priority] || 0;
+                  if (scoreA !== scoreB) return scoreB - scoreA;
+                  if (a.is_primary !== b.is_primary)
+                    return b.is_primary - a.is_primary;
+                  return a.name.localeCompare(b.name);
+                })
+                .map((contact) => (
+                  <div
+                    key={contact.id}
+                    className="p-3 border border-gray-200 rounded-lg group relative"
+                  >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <FiUser className="w-4 h-4 text-gray-400" />
@@ -266,6 +333,24 @@ function CustomerDetail() {
                         {contact.email}
                       </p>
                     )}
+                  </div>
+
+                  {/* 수정, 삭제 버튼 (hover 시 노출) */}
+                  <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 bg-white pl-2">
+                    <button
+                      onClick={() => openContactModal(contact)}
+                      className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded"
+                      title="수정"
+                    >
+                      <FiEdit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteContact(contact.id)}
+                      className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded"
+                      title="삭제"
+                    >
+                      <FiTrash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 </div>
               ))}
@@ -335,9 +420,9 @@ function CustomerDetail() {
       <Modal
         isOpen={contactModal}
         onClose={() => setContactModal(false)}
-        title="담당자 추가"
+        title={editingContact ? "담당자 수정" : "담당자 추가"}
       >
-        <form onSubmit={handleAddContact} className="space-y-4">
+        <form onSubmit={handleSaveContact} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -355,6 +440,37 @@ function CustomerDetail() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
+                우선순위
+              </label>
+              <select
+                value={newContact.priority}
+                onChange={(e) =>
+                  setNewContact({ ...newContact, priority: e.target.value })
+                }
+                className="input-base"
+              >
+                <option value="high">상</option>
+                <option value="medium">중</option>
+                <option value="low">하</option>
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                부서
+              </label>
+              <input
+                type="text"
+                value={newContact.department}
+                onChange={(e) =>
+                  setNewContact({ ...newContact, department: e.target.value })
+                }
+                className="input-base"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 직위
               </label>
               <input
@@ -367,19 +483,6 @@ function CustomerDetail() {
                 placeholder="예: 과장, 부장"
               />
             </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              부서
-            </label>
-            <input
-              type="text"
-              value={newContact.department}
-              onChange={(e) =>
-                setNewContact({ ...newContact, department: e.target.value })
-              }
-              className="input-base"
-            />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -421,6 +524,18 @@ function CustomerDetail() {
                 className="input-base"
               />
             </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              메모
+            </label>
+            <textarea
+              value={newContact.notes}
+              onChange={(e) =>
+                setNewContact({ ...newContact, notes: e.target.value })
+              }
+              className="input-base resize-none h-20"
+            />
           </div>
           <div className="flex items-center gap-2">
             <input

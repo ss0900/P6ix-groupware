@@ -155,7 +155,7 @@ function PipelineBoard() {
             설정
           </button>
           <button
-            onClick={() => navigate("/operation/leads/new")}
+            onClick={() => navigate("/operation/sales/leads/new")}
             className="btn-create flex items-center gap-2"
           >
             <FiPlus className="w-4 h-4" />새 영업기회

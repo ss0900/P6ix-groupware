@@ -212,7 +212,7 @@ function LeadList() {
             className="btn-create flex items-center gap-2"
           >
             <FiPlus className="w-4 h-4" />
-            영업기회 등록
+            새 영업기회
           </button>
         }
       />
