@@ -40,6 +40,7 @@ function LeadDetail() {
   const [quotes, setQuotes] = useState([]);
   const [contractLinks, setContractLinks] = useState([]);
   const [users, setUsers] = useState([]);
+  const [stageFilter, setStageFilter] = useState(null); // 단계 필터 (null = 전체)
 
   const [contractModal, setContractModal] = useState(false);
   const [newContract, setNewContract] = useState({
@@ -182,13 +183,89 @@ function LeadDetail() {
     }
   };
 
-  const handleStageChange = async (stageId) => {
-    try {
-      await SalesService.moveStage(id, stageId);
-      fetchLead();
-    } catch (error) {
-      console.error("Error moving stage:", error);
+  // 단계별 활동 필터링을 위한 시간 범위들 계산 (같은 단계를 여러 번 거치는 경우 대응)
+  const getStageTimeRanges = (stageId) => {
+    if (!lead?.activities) return { ranges: [], hasEntered: false };
+    
+    // stage_change 활동만 추출하여 시간순 정렬 (won, lost 포함)
+    const stageChanges = lead.activities
+      .filter((a) => ["stage_change", "won", "lost"].includes(a.activity_type))
+      .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    
+    // 해당 단계로 진입한 모든 시점들
+    const entries = stageChanges.filter((a) => a.to_stage === stageId);
+    // 해당 단계에서 나간 모든 시점들
+    const exits = stageChanges.filter((a) => a.from_stage === stageId);
+    
+    // 진입한 적이 없는 단계
+    if (entries.length === 0 && stageId !== lead.stage) {
+      // 첫 단계인 경우 (생성 시점부터 첫 stage_change까지)
+      const firstStage = stages.length > 0 ? stages[0] : null;
+      if (firstStage && firstStage.id === stageId && stageChanges.length > 0) {
+        const firstExit = stageChanges.find((a) => a.from_stage === stageId);
+        return {
+          ranges: [{
+            start: new Date(lead.created_at),
+            end: firstExit ? new Date(firstExit.created_at) : null,
+          }],
+          hasEntered: true,
+        };
+      }
+      return { ranges: [], hasEntered: false };
     }
+    
+    const ranges = [];
+    
+    // 각 진입마다 대응하는 이탈 시점 찾기
+    entries.forEach((entry, idx) => {
+      const entryTime = new Date(entry.created_at);
+      // 이 진입 이후의 첫 번째 이탈 찾기
+      const correspondingExit = exits.find(
+        (exit) => new Date(exit.created_at) > entryTime
+      );
+      
+      ranges.push({
+        start: entryTime,
+        end: correspondingExit ? new Date(correspondingExit.created_at) : null,
+      });
+    });
+    
+    // 현재 단계인 경우, 마지막 범위는 end가 null (진행 중)
+    if (stageId === lead.stage && ranges.length > 0) {
+      ranges[ranges.length - 1].end = null;
+    }
+    
+    // 첫 단계이고 명시적 진입 기록이 없는 경우 (생성 시점부터)
+    if (entries.length === 0 && stageId === lead.stage) {
+      ranges.push({
+        start: new Date(lead.created_at),
+        end: null,
+      });
+    }
+    
+    return { ranges, hasEntered: ranges.length > 0 };
+  };
+
+  // 필터링된 활동 목록
+  const getFilteredActivities = () => {
+    if (!lead?.activities) return [];
+    if (!stageFilter) return lead.activities; // 전체 보기
+    
+    const { ranges, hasEntered } = getStageTimeRanges(stageFilter);
+    
+    // 해당 단계에 진입한 적이 없으면 빈 배열 반환
+    if (!hasEntered) return [];
+    
+    return lead.activities.filter((activity) => {
+      const activityDate = new Date(activity.activity_date || activity.created_at);
+      
+      // 어느 하나의 기간에라도 포함되면 표시
+      return ranges.some((range) => {
+        if (range.start && activityDate < range.start) return false;
+        if (range.end && activityDate >= range.end) return false;
+        return true;
+      });
+    });
   };
 
   const openActivityModal = () => {
@@ -503,26 +580,50 @@ function LeadDetail() {
         </div>
       </div>
 
-      {/* Stage Progress */}
+      {/* Stage Progress - 활동 필터링 용도 */}
       <div className="page-box">
-        <h3 className="text-sm font-semibold text-gray-700 mb-4">영업 단계</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold text-gray-700">영업 단계</h3>
+          <span className="text-xs text-gray-500">클릭하여 해당 단계의 활동 내역 보기</span>
+        </div>
         <div className="flex gap-2 overflow-x-auto pb-2">
-          {stages.map((stage) => (
-            <button
-              key={stage.id}
-              onClick={() => handleStageChange(stage.id)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-                lead.stage === stage.id
-                  ? "text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-              style={
-                lead.stage === stage.id ? { backgroundColor: stage.color } : {}
-              }
-            >
-              {stage.name}
-            </button>
-          ))}
+          {/* 전체 보기 버튼 */}
+          <button
+            onClick={() => setStageFilter(null)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+              stageFilter === null
+                ? "bg-gray-800 text-white"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            }`}
+          >
+            전체
+          </button>
+          {stages.map((stage) => {
+            const isCurrentStage = lead.stage === stage.id;
+            const isFiltered = stageFilter === stage.id;
+            return (
+              <button
+                key={stage.id}
+                onClick={() => setStageFilter(stage.id)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors relative ${
+                  isFiltered
+                    ? "text-white ring-2 ring-offset-2"
+                    : isCurrentStage
+                      ? "text-white"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+                style={{
+                  backgroundColor: isFiltered || isCurrentStage ? stage.color : undefined,
+                  ringColor: isFiltered ? stage.color : undefined,
+                }}
+              >
+                {stage.name}
+                {isCurrentStage && (
+                  <span className="ml-1.5 inline-flex items-center justify-center w-2 h-2 bg-white rounded-full" />
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -819,7 +920,32 @@ function LeadDetail() {
             {/* 활동 탭 */}
             {activeTab === "activities" && (
               <div>
-                <div className="flex justify-end mb-4">
+                <div className="flex items-center justify-between mb-4">
+                  {/* 필터 상태 표시 */}
+                  {stageFilter && (
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium text-white"
+                        style={{
+                          backgroundColor:
+                            stages.find((s) => s.id === stageFilter)?.color ||
+                            "#6B7280",
+                        }}
+                      >
+                        {stages.find((s) => s.id === stageFilter)?.name}
+                        <button
+                          onClick={() => setStageFilter(null)}
+                          className="ml-1 hover:bg-white/20 rounded-full p-0.5"
+                        >
+                          ✕
+                        </button>
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        단계의 활동만 표시 중
+                      </span>
+                    </div>
+                  )}
+                  {!stageFilter && <div />}
                   <button
                     onClick={openActivityModal}
                     className="btn-create-sm flex items-center gap-1"
@@ -829,12 +955,18 @@ function LeadDetail() {
                   </button>
                 </div>
                 <div className="space-y-4">
-                  {lead.activities?.length === 0 ? (
-                    <p className="text-center text-gray-500 py-8">
-                      활동 기록이 없습니다.
-                    </p>
-                  ) : (
-                    lead.activities?.map((activity) => {
+                  {(() => {
+                    const filteredActivities = getFilteredActivities();
+                    if (filteredActivities.length === 0) {
+                      return (
+                        <p className="text-center text-gray-500 py-8">
+                          {stageFilter
+                            ? "이 단계에서의 활동 기록이 없습니다."
+                            : "활동 기록이 없습니다."}
+                        </p>
+                      );
+                    }
+                    return filteredActivities.map((activity) => {
                       const Icon =
                         activityTypeIcon[activity.activity_type] ||
                         FiMessageSquare;
@@ -886,8 +1018,8 @@ function LeadDetail() {
                           )}
                         </div>
                       );
-                    })
-                  )}
+                    });
+                  })()}
                 </div>
               </div>
             )}

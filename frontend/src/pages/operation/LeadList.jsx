@@ -28,7 +28,7 @@ function LeadList() {
     q: searchParams.get("q") || "",
     pipeline: searchParams.get("pipeline") || "",
     stage: searchParams.get("stage") || "",
-    status: searchParams.get("status") || "active",
+    status: searchParams.get("status") || "",
     stalled: searchParams.get("stalled") === "true",
     amount_min: searchParams.get("amount_min") || "",
     amount_max: searchParams.get("amount_max") || "",
