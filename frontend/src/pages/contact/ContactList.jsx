@@ -150,17 +150,16 @@ export default function ContactList() {
     }
   };
 
-  // 시간 포맷
+  // 날짜+시간 포맷 (YYYY/MM/DD HH:mm)
   const formatDate = (dateStr) => {
     if (!dateStr) return "";
     const date = new Date(dateStr);
-    const now = new Date();
-    const isToday = date.toDateString() === now.toDateString();
-
-    if (isToday) {
-      return date.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
-    }
-    return date.toLocaleDateString("ko-KR", { month: "2-digit", day: "2-digit" });
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    return `${year}/${month}/${day} ${hours}:${minutes}`;
   };
 
   return (
@@ -240,6 +239,7 @@ export default function ContactList() {
               )}
             </button>
           </div>
+          <div className="w-12 text-center">번호</div>
           <div className="w-10 text-center">
             <Star size={16} className="inline text-gray-400" />
           </div>
@@ -247,10 +247,10 @@ export default function ContactList() {
           <div className="w-10 text-center">
             <Paperclip size={16} className="inline text-gray-400" />
           </div>
-          <div className="w-24 text-center">{folder === "received" ? "보낸이" : "받는이"}</div>
-          <div className="w-20 text-center">확인</div>
-          <div className="w-24 text-center">보낸시간</div>
-          <div className="w-28 text-center">최근변경</div>
+          <div className="w-24 text-center">보낸이</div>
+          <div className="w-32 text-center">받는이</div>
+          <div className="w-36 text-center whitespace-nowrap">보낸시간</div>
+          <div className="w-36 text-center whitespace-nowrap">최근변경</div>
         </div>
 
         {/* 메시지 목록 */}
@@ -265,7 +265,7 @@ export default function ContactList() {
               <p>메시지가 없습니다.</p>
             </div>
           ) : (
-            messages.map((msg) => (
+            messages.map((msg, index) => (
               <div
                 key={msg.id}
                 className={`flex items-center px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors ${
@@ -288,6 +288,9 @@ export default function ContactList() {
                     )}
                   </button>
                 </div>
+
+                {/* 번호 */}
+                <div className="w-12 text-center text-sm text-gray-500">{index + 1}</div>
 
                 {/* 별표 */}
                 <div className="w-10 text-center">
@@ -327,35 +330,45 @@ export default function ContactList() {
                   )}
                 </div>
 
-                {/* 보낸이/받는이 */}
+                {/* 보낸이 */}
                 <div className="w-24 text-center text-sm text-gray-600 truncate">
                   {msg.sender?.full_name || msg.sender?.username || "-"}
                 </div>
 
-                {/* 읽음 상태 */}
-                <div className="w-20 text-center text-sm">
-                  {msg.total_recipients > 0 ? (
-                    <span
-                      className={`${
-                        msg.read_count === msg.total_recipients
-                          ? "text-green-600"
-                          : "text-orange-500"
-                      }`}
-                    >
-                      {msg.read_status}
-                    </span>
-                  ) : (
-                    <span className="text-gray-400">-</span>
-                  )}
+                {/* 받는이 */}
+                <div className="w-32 text-center text-sm text-gray-600">
+                  {(() => {
+                    const recipientNameList = (msg.recipient_names || "")
+                      .split(",")
+                      .map((name) => name.trim())
+                      .filter(Boolean);
+                    const primaryRecipient = recipientNameList[0] || "-";
+                    const hasMultipleRecipients =
+                      Number(msg.total_recipients || 0) > 1 || recipientNameList.length > 1;
+                    const totalRecipients =
+                      Number(msg.total_recipients || recipientNameList.length || 0);
+                    const displayName = hasMultipleRecipients
+                      ? `${primaryRecipient}+`
+                      : primaryRecipient;
+
+                    return (
+                      <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                        <span>{displayName}</span>
+                        <span className="text-sky-600">
+                          [{msg.read_count || 0}/{totalRecipients}]
+                        </span>
+                      </span>
+                    );
+                  })()}
                 </div>
 
                 {/* 보낸 시간 */}
-                <div className="w-24 text-center text-sm text-gray-500">
+                <div className="w-36 text-center text-sm text-gray-500 whitespace-nowrap">
                   {formatDate(msg.created_at)}
                 </div>
 
                 {/* 최근 변경 */}
-                <div className="w-28 text-center text-sm text-gray-500">
+                <div className="w-36 text-center text-sm text-gray-500 whitespace-nowrap">
                   {formatDate(msg.updated_at)}
                 </div>
               </div>
