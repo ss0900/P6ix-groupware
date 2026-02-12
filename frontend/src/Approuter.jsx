@@ -27,6 +27,7 @@ import UserForm from "./pages/admin/UserForm";
 import OrganizationChart from "./pages/admin/OrganizationChart";
 import PositionManagement from "./pages/admin/PositionManagement";
 import CompanyManagement from "./pages/admin/CompanyManagement";
+import DepartmentManagement from "./pages/admin/DepartmentManagement";
 
 // Approval
 import ApprovalHome from "./pages/approval/ApprovalHome";
@@ -285,6 +286,7 @@ function AppRouter() {
           <Route path="users/:id" element={<SuperuserRoute><UserForm /></SuperuserRoute>} />
           <Route path="companies" element={<SuperuserRoute><CompanyManagement /></SuperuserRoute>} />
           <Route path="organization" element={<OrganizationChart />} />
+          <Route path="departments" element={<DepartmentManagement />} />
           <Route path="positions" element={<PositionManagement />} />
         </Route>
 

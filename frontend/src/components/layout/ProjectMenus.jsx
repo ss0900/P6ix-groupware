@@ -214,6 +214,7 @@ export const projectMenus = {
         title: "조직 관리",
         items: [
           { to: "organization", label: "조직도 관리", permission: "staff" },
+          { to: "departments", label: "부서 관리", permission: "staff" },
           { to: "positions", label: "직위 관리", permission: "staff" },
         ],
       },

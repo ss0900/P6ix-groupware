@@ -158,6 +158,93 @@ class DepartmentViewSet(viewsets.ModelViewSet):
             self._ensure_company_permission(company.id)
         serializer.save()
 
+    @action(detail=False, methods=["get"], url_path="org-chart")
+    def org_chart(self, request):
+        user = request.user
+
+        if user.is_superuser:
+            allowed_company_ids = list(
+                Company.objects.all().values_list("id", flat=True)
+            )
+        else:
+            allowed_company_ids = _get_user_company_ids(user)
+
+        company_param = request.query_params.get("company")
+        selected_company_id = None
+
+        if company_param:
+            try:
+                selected_company_id = int(company_param)
+            except (TypeError, ValueError):
+                return Response({"error": "company 파라미터가 유효하지 않습니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+            if selected_company_id not in allowed_company_ids:
+                raise PermissionDenied("해당 회사 데이터에 접근할 권한이 없습니다.")
+
+            target_company_ids = [selected_company_id]
+        else:
+            target_company_ids = allowed_company_ids
+
+        companies_qs = Company.objects.filter(id__in=allowed_company_ids).order_by("name")
+        departments_qs = (
+            Department.objects.filter(company_id__in=target_company_ids)
+            .select_related("company", "parent")
+            .order_by("company__name", "name")
+        )
+        memberships_qs = (
+            UserMembership.objects.filter(company_id__in=target_company_ids)
+            .select_related("user", "company", "department", "position")
+            .order_by("company__name", "-is_primary", "position__level", "user__last_name", "user__first_name")
+        )
+
+        companies = [{"id": company.id, "name": company.name} for company in companies_qs]
+        departments = [
+            {
+                "id": dept.id,
+                "name": dept.name,
+                "type": dept.type,
+                "company": dept.company_id,
+                "company_name": dept.company.name if dept.company else "",
+                "parent": dept.parent_id,
+            }
+            for dept in departments_qs
+        ]
+        members = []
+
+        for membership in memberships_qs:
+            if not membership.user:
+                continue
+
+            full_name = f"{membership.user.last_name}{membership.user.first_name}".strip()
+            members.append(
+                {
+                    "id": membership.id,
+                    "user_id": membership.user_id,
+                    "name": full_name or membership.user.username,
+                    "username": membership.user.username,
+                    "phone_number": membership.user.phone_number,
+                    "email": membership.user.email,
+                    "company_id": membership.company_id,
+                    "company_name": membership.company.name if membership.company else "",
+                    "department_id": membership.department_id,
+                    "department_name": membership.department.name if membership.department else "",
+                    "position_id": membership.position_id,
+                    "position_name": membership.position.name if membership.position else "",
+                    "position_level": membership.position.level if membership.position else None,
+                    "is_primary": membership.is_primary,
+                }
+            )
+
+        return Response(
+            {
+                "companies": companies,
+                "current_company": selected_company_id,
+                "departments": departments,
+                "members": members,
+            },
+            status=status.HTTP_200_OK,
+        )
+
 # 직급 관리
 class PositionViewSet(viewsets.ModelViewSet):
     queryset = Position.objects.all().order_by('level','name')

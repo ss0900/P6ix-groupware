@@ -27,6 +27,7 @@ urlpatterns += [
     }), name="companies-detail"),
 
     path("departments/", belong_view.DepartmentViewSet.as_view({"get": "list", "post": "create"}), name="departments-list"),
+    path("departments/org-chart/", belong_view.DepartmentViewSet.as_view({"get": "org_chart"}), name="departments-org-chart"),
     path("departments/<int:pk>/", belong_view.DepartmentViewSet.as_view({
         "get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"
     }), name="departments-detail"),
