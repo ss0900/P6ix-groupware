@@ -81,8 +81,8 @@ class MessageViewSet(viewsets.ModelViewSet):
 
         # 읽음 상태 주석
         queryset = queryset.annotate(
-            read_count=Count("recipients", filter=Q(recipients__is_read=True)),
-            total_recipients=Count("recipients")
+            _read_count=Count("recipients", filter=Q(recipients__is_read=True)),
+            _total_recipients=Count("recipients")
         )
 
         return queryset.distinct().order_by("-updated_at")

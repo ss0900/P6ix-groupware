@@ -32,11 +32,15 @@ class Message(models.Model):
     @property
     def read_count(self):
         """읽은 수신자 수"""
+        if hasattr(self, "_read_count"):
+            return self._read_count
         return self.recipients.filter(is_read=True).count()
 
     @property
     def total_recipients(self):
         """전체 수신자 수"""
+        if hasattr(self, "_total_recipients"):
+            return self._total_recipients
         return self.recipients.count()
 
     @property
