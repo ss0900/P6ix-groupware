@@ -1,16 +1,21 @@
 // src/pages/system/UserList.jsx
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Edit, Trash2 } from "lucide-react";
 import api from "../../api/axios";
 import { fetchUsers } from "../../api/users/user";
 import BoardTable from "../../components/common/board/BoardTable"; //Changed
+import { useAuth } from "../../context/AuthContext";
 
 export default function UserList() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isSuperuser = Boolean(user?.is_superuser);
 
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState({});
+  const [deleting, setDeleting] = useState({});
 
   // 필터
   const [q, setQ] = useState("");
@@ -70,6 +75,34 @@ export default function UserList() {
       alert("권한 변경 중 오류가 발생했습니다.");
     } finally {
       setUpdating((prev) => ({ ...prev, [user.id]: false }));
+    }
+  };
+
+  const handleDeleteUser = async (targetUser) => {
+    if (!isSuperuser) return;
+    if (!targetUser?.id) return;
+
+    if (Number(targetUser.id) === Number(user?.id)) {
+      alert("현재 로그인한 본인 계정은 삭제할 수 없습니다.");
+      return;
+    }
+
+    const displayName =
+      `${targetUser.last_name ?? ""}${targetUser.first_name ?? ""}`.trim() ||
+      targetUser.username ||
+      "해당 사용자";
+
+    if (!window.confirm(`"${displayName}" 사용자를 삭제하시겠습니까?`)) return;
+
+    setDeleting((prev) => ({ ...prev, [targetUser.id]: true }));
+    try {
+      await api.delete(`core/users/${targetUser.id}/`);
+      setRows((prev) => prev.filter((row) => row.id !== targetUser.id));
+    } catch (e) {
+      console.error(e);
+      alert("사용자 삭제 중 오류가 발생했습니다.");
+    } finally {
+      setDeleting((prev) => ({ ...prev, [targetUser.id]: false }));
     }
   };
 
@@ -181,6 +214,41 @@ export default function UserList() {
         </label>
       ),
     },
+    ...(isSuperuser
+      ? [
+          {
+            key: "actions",
+            header: "관리",
+            render: (row) => (
+              <div className="inline-flex items-center gap-1">
+                <button
+                  type="button"
+                  className="inline-flex items-center justify-center rounded p-1.5 text-gray-600 hover:bg-gray-100"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/admin/users/${row.id}/edit`);
+                  }}
+                  title="수정"
+                >
+                  <Edit size={16} />
+                </button>
+                <button
+                  type="button"
+                  className="inline-flex items-center justify-center rounded p-1.5 text-red-600 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteUser(row);
+                  }}
+                  disabled={Boolean(deleting[row.id])}
+                  title="삭제"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ),
+          },
+        ]
+      : []),
   ];
 
   return (

@@ -24,6 +24,7 @@ import MyInfo from "./pages/system/MyInfo";
 import MyPage from "./pages/system/MyPage";
 import MyMenuLayout from "./pages/system/MyMenuLayout";
 import UserForm from "./pages/admin/UserForm";
+import UserDetail from "./pages/admin/UserDetail";
 import OrganizationChart from "./pages/admin/OrganizationChart";
 import PositionManagement from "./pages/admin/PositionManagement";
 import CompanyManagement from "./pages/admin/CompanyManagement";
@@ -283,7 +284,8 @@ function AppRouter() {
           <Route index element={<AdminIndexRedirect />} />
           <Route path="users" element={<SuperuserRoute><UserList /></SuperuserRoute>} />
           <Route path="users/add" element={<SuperuserRoute><UserForm /></SuperuserRoute>} />
-          <Route path="users/:id" element={<SuperuserRoute><UserForm /></SuperuserRoute>} />
+          <Route path="users/:id" element={<SuperuserRoute><UserDetail /></SuperuserRoute>} />
+          <Route path="users/:id/edit" element={<SuperuserRoute><UserForm /></SuperuserRoute>} />
           <Route path="companies" element={<SuperuserRoute><CompanyManagement /></SuperuserRoute>} />
           <Route path="organization" element={<OrganizationChart />} />
           <Route path="departments" element={<DepartmentManagement />} />
