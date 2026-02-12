@@ -242,7 +242,7 @@ export default function SidebarLayout({ title, base, sections = [], enableToggle
           {!sidebarCollapsed && userMenuOpen && (
             <div className="bg-white shadow-md border rounded-md mx-2 mb-1 p-2 flex flex-col gap-1">
               <button
-                onClick={() => navigate("/admin/users")}
+                onClick={() => navigate("/my-info")}
                 className="px-2 py-1 rounded hover:bg-gray-100 text-left text-sm"
               >
                 내 정보

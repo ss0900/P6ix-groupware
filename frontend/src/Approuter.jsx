@@ -20,6 +20,7 @@ import AdminLayout from "./pages/admin/AdminLayout";
 
 // Admin
 import UserList from "./pages/system/UserList";
+import MyInfo from "./pages/system/MyInfo";
 import UserForm from "./pages/admin/UserForm";
 import OrganizationChart from "./pages/admin/OrganizationChart";
 import PositionManagement from "./pages/admin/PositionManagement";
@@ -161,6 +162,9 @@ function AppRouter() {
         <Route path="" element={<DashboardLayout />}>
           <Route index element={<Dashboard />} />
         </Route>
+
+        {/* 내 정보 */}
+        <Route path="my-info" element={<MyInfo />} />
 
         {/* 전자결재 - with sidebar layout */}
         <Route path="approval" element={<ApprovalLayout />}>

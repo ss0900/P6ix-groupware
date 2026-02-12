@@ -11,6 +11,8 @@ from django.utils import timezone
 class UserSerializer(serializers.ModelSerializer):
     current_password = serializers.CharField(write_only=True, required=False, allow_blank=True)
     password = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    profile_picture_file = serializers.ImageField(write_only=True, required=False, allow_null=True)
+    clear_sign = serializers.BooleanField(write_only=True, required=False, default=False)
 
     profile_picture = serializers.SerializerMethodField()  # 🔥 추가
 
@@ -20,6 +22,7 @@ class UserSerializer(serializers.ModelSerializer):
             "username", "email", "phone_number",
             "first_name", "last_name",
             "current_password", "password",
+            "profile_picture_file", "clear_sign",
             "sign_file", "profile_picture",  # 🔥 응답 포함
             "is_superuser", # 🔥 Admin 판단용
             "is_staff",
@@ -64,10 +67,28 @@ class UserSerializer(serializers.ModelSerializer):
         # 인증만: 아무 것도 안 바꾸고 반환
         only_verify = (
             "current_password" in validated_data and
-            not any(k in validated_data for k in ["email", "phone_number", "password"])
+            not any(
+                k in validated_data
+                for k in [
+                    "email",
+                    "phone_number",
+                    "first_name",
+                    "last_name",
+                    "password",
+                    "profile_picture_file",
+                    "sign_file",
+                    "clear_sign",
+                ]
+            )
         )
         if only_verify:
             return instance
+
+        # serializer 전용 필드 분리
+        validated_data.pop("current_password", None)
+        profile_picture_file = validated_data.pop("profile_picture_file", None)
+        clear_sign = validated_data.pop("clear_sign", False)
+        sign_file = validated_data.pop("sign_file", None)
 
         # 프로필 변경
         email = validated_data.get("email")
@@ -87,6 +108,17 @@ class UserSerializer(serializers.ModelSerializer):
         new_pw = validated_data.get("password")
         if new_pw:
             instance.set_password(new_pw)
+
+        if profile_picture_file is not None:
+            instance.profile_picture = profile_picture_file
+
+        if sign_file is not None:
+            instance.sign_file = sign_file
+
+        if clear_sign:
+            if instance.sign_file:
+                instance.sign_file.delete(save=False)
+            instance.sign_file = None
 
         instance.save()
         return instance
