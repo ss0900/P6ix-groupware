@@ -15,6 +15,8 @@ import {
   CheckSquare,
   Square,
   RotateCcw,
+  X,
+  ChevronDown,
 } from "lucide-react";
 import ContactApi from "../../api/ContactApi";
 
@@ -39,6 +41,216 @@ const FOLDER_NAMES = {
   trash: "휴지통",
 };
 
+const RECEIPT_PAGE_SIZE = 10;
+
+const formatModalDateTime = (dateStr) => {
+  if (!dateStr) return "-";
+  const date = new Date(dateStr);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day} ${hours}:${minutes}`;
+};
+
+const parseDateOrZero = (dateStr) => {
+  if (!dateStr) return 0;
+  const value = new Date(dateStr).getTime();
+  return Number.isNaN(value) ? 0 : value;
+};
+
+function ReceiptStatusModal({
+  isOpen,
+  loading,
+  detail,
+  error,
+  page,
+  sortDesc,
+  onClose,
+  onPageChange,
+  onToggleSort,
+}) {
+  if (!isOpen) return null;
+
+  const recipients = detail?.recipients || [];
+  const totalRecipients = detail?.total_recipients || recipients.length || 0;
+  const updatedAtValue = parseDateOrZero(detail?.updated_at);
+
+  const sentConfirmedCount = recipients.filter((recipient) => recipient.is_read).length;
+  const changedConfirmedCount = recipients.filter((recipient) => {
+    if (!recipient.read_at || !updatedAtValue) return false;
+    return parseDateOrZero(recipient.read_at) >= updatedAtValue;
+  }).length;
+
+  const sortedRecipients = [...recipients].sort((a, b) => {
+    const aTime = parseDateOrZero(a.read_at);
+    const bTime = parseDateOrZero(b.read_at);
+    if (aTime === bTime) return 0;
+    return sortDesc ? bTime - aTime : aTime - bTime;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(sortedRecipients.length / RECEIPT_PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const startIndex = (safePage - 1) * RECEIPT_PAGE_SIZE;
+  const pageRecipients = sortedRecipients.slice(startIndex, startIndex + RECEIPT_PAGE_SIZE);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-5xl mx-4 max-h-[90vh] bg-white rounded-xl border border-gray-200 shadow-2xl flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 bg-sky-600 text-white rounded-t-xl">
+          <h3 className="text-lg font-semibold">수신 확인</h3>
+          <button
+            onClick={onClose}
+            className="p-1 rounded-lg text-white/80 hover:text-white hover:bg-white/10"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="py-20 flex items-center justify-center">
+            <div className="animate-spin rounded-full h-10 w-10 border-2 border-sky-500 border-t-transparent" />
+          </div>
+        ) : error ? (
+          <div className="p-6 text-sm text-red-600">{error}</div>
+        ) : (
+          <>
+            <div className="px-6 py-4 border-b border-gray-100 bg-sky-50/40">
+              <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+                <div className="grid grid-cols-[96px_1fr] border-b border-gray-100">
+                  <div className="px-4 py-3 bg-gray-50 text-sm font-semibold text-gray-700">
+                    제목
+                  </div>
+                  <div className="px-4 py-3 text-sm font-medium text-gray-900">
+                    {detail?.title || "-"}
+                  </div>
+                </div>
+                <div className="grid grid-cols-[96px_1fr]">
+                  <div className="px-4 py-3 bg-gray-50 text-sm font-semibold text-gray-700">
+                    시간
+                  </div>
+                  <div className="px-4 py-3 text-sm text-gray-700 flex flex-wrap items-center gap-x-6 gap-y-1">
+                    <span>
+                      <span className="text-gray-500">등록 :</span>{" "}
+                      {formatModalDateTime(detail?.created_at)}
+                    </span>
+                    <span>
+                      <span className="text-gray-500">변경 :</span>{" "}
+                      {formatModalDateTime(detail?.updated_at)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 flex-1 min-h-0">
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <div className="grid grid-cols-[100px_1fr_200px_220px] bg-gray-50 border-b border-gray-200 text-sm text-gray-700 font-medium">
+                  <div className="px-3 py-2 text-center">구분</div>
+                  <div className="px-3 py-2">이름</div>
+                  <div className="px-3 py-2 text-center">
+                    보낸글 확인 [{sentConfirmedCount}/{totalRecipients}]
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onToggleSort}
+                    className="px-3 py-2 text-center inline-flex items-center justify-center gap-1 hover:bg-gray-100"
+                  >
+                    변경글 확인 [{changedConfirmedCount}/{totalRecipients}]
+                    <ChevronDown
+                      size={14}
+                      className={`transition-transform ${sortDesc ? "" : "rotate-180"}`}
+                    />
+                  </button>
+                </div>
+
+                <div className="max-h-80 overflow-y-auto">
+                  {pageRecipients.length === 0 ? (
+                    <div className="px-4 py-10 text-center text-sm text-gray-500">
+                      수신자 데이터가 없습니다.
+                    </div>
+                  ) : (
+                    pageRecipients.map((recipient) => {
+                      const recipientName =
+                        recipient.recipient?.full_name || recipient.recipient?.username || "-";
+                      const sentReadAt = recipient.is_read
+                        ? formatModalDateTime(recipient.read_at)
+                        : "-";
+                      const changedReadAt =
+                        recipient.read_at &&
+                        updatedAtValue &&
+                        parseDateOrZero(recipient.read_at) >= updatedAtValue
+                          ? formatModalDateTime(recipient.read_at)
+                          : "-";
+
+                      return (
+                        <div
+                          key={recipient.id}
+                          className="grid grid-cols-[100px_1fr_200px_220px] text-sm border-b last:border-b-0 border-gray-100"
+                        >
+                          <div className="px-3 py-2 text-center text-gray-600">받는이</div>
+                          <div className="px-3 py-2 text-sky-600">{recipientName}</div>
+                          <div className="px-3 py-2 text-center text-gray-700 whitespace-nowrap">
+                            {sentReadAt}
+                          </div>
+                          <div className="px-3 py-2 text-center text-gray-700 whitespace-nowrap">
+                            {changedReadAt}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-4 relative flex items-center justify-center min-h-9">
+                <button
+                  onClick={onClose}
+                  className="absolute left-0 px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  닫기
+                </button>
+
+                <div className="flex items-center gap-1 text-sm">
+                  {Array.from({ length: totalPages }, (_, idx) => idx + 1).map((pageNumber) => (
+                    <button
+                      key={pageNumber}
+                      onClick={() => onPageChange(pageNumber)}
+                      className={`w-8 h-8 rounded ${
+                        safePage === pageNumber
+                          ? "text-sky-600 font-semibold"
+                          : "text-gray-600 hover:bg-gray-100"
+                      }`}
+                    >
+                      {pageNumber}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => onPageChange(Math.min(totalPages, safePage + 1))}
+                    disabled={safePage >= totalPages}
+                    className="w-8 h-8 rounded text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-transparent"
+                  >
+                    {">"}
+                  </button>
+                  <button
+                    onClick={() => onPageChange(totalPages)}
+                    disabled={safePage >= totalPages}
+                    className="w-8 h-8 rounded text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-transparent"
+                  >
+                    {">>"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function ContactList() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -54,6 +266,12 @@ export default function ContactList() {
   const [searchQuery, setSearchQuery] = useState("");
   const [folderCounts, setFolderCounts] = useState({});
   const [selectedIds, setSelectedIds] = useState([]);
+  const [receiptModalOpen, setReceiptModalOpen] = useState(false);
+  const [receiptModalLoading, setReceiptModalLoading] = useState(false);
+  const [receiptModalError, setReceiptModalError] = useState("");
+  const [receiptModalDetail, setReceiptModalDetail] = useState(null);
+  const [receiptModalPage, setReceiptModalPage] = useState(1);
+  const [receiptModalSortDesc, setReceiptModalSortDesc] = useState(true);
 
   // 메시지 목록 로드
   const loadMessages = useCallback(async () => {
@@ -160,6 +378,26 @@ export default function ContactList() {
     const hours = String(date.getHours()).padStart(2, "0");
     const minutes = String(date.getMinutes()).padStart(2, "0");
     return `${year}/${month}/${day} ${hours}:${minutes}`;
+  };
+
+  const openReceiptModal = async (event, messageId) => {
+    event.stopPropagation();
+    setReceiptModalOpen(true);
+    setReceiptModalLoading(true);
+    setReceiptModalError("");
+    setReceiptModalDetail(null);
+    setReceiptModalPage(1);
+    setReceiptModalSortDesc(true);
+
+    try {
+      const data = await ContactApi.getMessage(messageId);
+      setReceiptModalDetail(data);
+    } catch (err) {
+      console.error("Failed to load receipt detail:", err);
+      setReceiptModalError("수신 확인 정보를 불러오지 못했습니다.");
+    } finally {
+      setReceiptModalLoading(false);
+    }
   };
 
   return (
@@ -354,9 +592,13 @@ export default function ContactList() {
                     return (
                       <span className="inline-flex items-center gap-1 whitespace-nowrap">
                         <span>{displayName}</span>
-                        <span className="text-sky-600">
+                        <button
+                          type="button"
+                          onClick={(event) => openReceiptModal(event, msg.id)}
+                          className="text-sky-600 hover:underline"
+                        >
                           [{msg.read_count || 0}/{totalRecipients}]
-                        </span>
+                        </button>
                       </span>
                     );
                   })()}
@@ -376,6 +618,18 @@ export default function ContactList() {
           )}
         </div>
       </div>
+
+      <ReceiptStatusModal
+        isOpen={receiptModalOpen}
+        loading={receiptModalLoading}
+        detail={receiptModalDetail}
+        error={receiptModalError}
+        page={receiptModalPage}
+        sortDesc={receiptModalSortDesc}
+        onClose={() => setReceiptModalOpen(false)}
+        onPageChange={(nextPage) => setReceiptModalPage(nextPage)}
+        onToggleSort={() => setReceiptModalSortDesc((prev) => !prev)}
+      />
     </div>
   );
 }
