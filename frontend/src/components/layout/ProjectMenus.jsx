@@ -201,15 +201,20 @@ export const projectMenus = {
   admin: {
     title: "관리자",
     base: "/admin",
-    baseClick: "users",
+    baseClick: "organization",
     sections: [
       {
         title: "사용자 관리",
         items: [
-          { to: "users", label: "사용자 목록" },
-          { to: "companies", label: "회사(워크스페이스) 관리" },
-          { to: "organization", label: "조직도 관리" },
-          { to: "positions", label: "직위 관리" },
+          { to: "users", label: "사용자 목록", permission: "superuser" },
+          { to: "companies", label: "회사(워크스페이스) 관리", permission: "superuser" },
+        ],
+      },
+      {
+        title: "조직 관리",
+        items: [
+          { to: "organization", label: "조직도 관리", permission: "staff" },
+          { to: "positions", label: "직위 관리", permission: "staff" },
         ],
       },
     ],

@@ -1,5 +1,5 @@
 // src/components/common/SidebarLayout.jsx
-import React, { useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { ChevronRight, ChevronLeft, User, LogOut } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
@@ -163,6 +163,28 @@ export default function SidebarLayout({ title, base, sections = [], enableToggle
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(defaultCollapsed);
 
+  const hasPermission = useMemo(
+    () => (permission) => {
+      if (!permission) return true;
+      if (permission === "superuser") return Boolean(user?.is_superuser);
+      if (permission === "staff") return Boolean(user?.is_staff || user?.is_superuser);
+      return true;
+    },
+    [user?.is_staff, user?.is_superuser],
+  );
+
+  const filteredSections = useMemo(
+    () =>
+      sections
+        .filter((section) => hasPermission(section.permission))
+        .map((section) => ({
+          ...section,
+          items: (section.items || []).filter((item) => hasPermission(item.permission)),
+        }))
+        .filter((section) => section.items.length > 0),
+    [sections, hasPermission],
+  );
+
   const linkCls = (isActive) =>
     `block rounded-md px-3 py-2 text-sm transition-colors duration-200 ${
       isActive ? "bg-gray-700 text-white" : "text-gray-600 hover:bg-gray-200"
@@ -194,12 +216,12 @@ export default function SidebarLayout({ title, base, sections = [], enableToggle
       });
     };
 
-    sections.forEach((section) => {
+    filteredSections.forEach((section) => {
       if (checkMatch(section.items)) {
         setOpenSection(section.title);
       }
     });
-  }, [location.pathname, basePath, sections]);
+  }, [location.pathname, basePath, filteredSections]);
 
   const handleLogout = async () => {
     if (window.confirm("정말 로그아웃 하시겠습니까?")) {
@@ -209,7 +231,7 @@ export default function SidebarLayout({ title, base, sections = [], enableToggle
   };
 
   // sections가 비어있으면 사이드바 없이 렌더링
-  if (!sections || sections.length === 0) {
+  if (!filteredSections || filteredSections.length === 0) {
     return (
       <div className="bg-gray-50 min-h-[calc(100vh-60px)]">
         <main className="p-6">
@@ -247,6 +269,12 @@ export default function SidebarLayout({ title, base, sections = [], enableToggle
               >
                 내 정보
               </button>
+              <button
+                onClick={() => navigate("/my-page")}
+                className="px-2 py-1 rounded hover:bg-gray-100 text-left text-sm"
+              >
+                마이페이지
+              </button>
             </div>
           )}
         </div>
@@ -254,7 +282,7 @@ export default function SidebarLayout({ title, base, sections = [], enableToggle
         {/* Menu Sections */}
         {!sidebarCollapsed && (
           <nav className="flex-1 px-2 py-3 space-y-2 overflow-y-auto">
-            {sections.map((section) => (
+            {filteredSections.map((section) => (
               <RecursiveSection
                 key={section.title}
                 section={section}

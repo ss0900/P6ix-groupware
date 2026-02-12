@@ -4,19 +4,53 @@ from django.db import transaction
 from django.db.models import Q
 from rest_framework import viewsets, permissions, filters, status
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 
 from core.models import Company, Department, Position, UserMembership
 from core.serializers import CompanySerializer, DepartmentSerializer, PositionSerializer
 
+
+def _get_user_company_ids(user):
+    return list(
+        UserMembership.objects.filter(user=user)
+        .values_list("company_id", flat=True)
+        .distinct()
+    )
+
+
+class IsSuperuserOnly(permissions.BasePermission):
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated and request.user.is_superuser)
+
+
+class IsStaffOrSuperuser(permissions.BasePermission):
+    def has_permission(self, request, view):
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and (request.user.is_staff or request.user.is_superuser)
+        )
+
 # 회사 관리
 class CompanyViewSet(viewsets.ModelViewSet):
     queryset = Company.objects.all()
     serializer_class = CompanySerializer
-    permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]
+
+    def get_permissions(self):
+        if self.action in ["create", "update", "partial_update", "destroy", "upload_logo"]:
+            permission_classes = [permissions.IsAuthenticated, IsSuperuserOnly]
+        else:
+            permission_classes = [permissions.IsAuthenticated, IsStaffOrSuperuser]
+        return [permission() for permission in permission_classes]
     
     def get_queryset(self):
         qs = super().get_queryset()
+        user = self.request.user
+
+        if not user.is_superuser:
+            company_ids = _get_user_company_ids(user)
+            qs = qs.filter(id__in=company_ids)
 
         # 검색어 필터 (회사명, 사업자등록번호, 이메일, 전화번호 등)
         search = self.request.query_params.get("search")
@@ -86,13 +120,24 @@ class CompanyViewSet(viewsets.ModelViewSet):
 class DepartmentViewSet(viewsets.ModelViewSet):
     queryset = Department.objects.select_related('company', 'parent').all().order_by('company__name','name')
     serializer_class = DepartmentSerializer
-    permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated, IsStaffOrSuperuser]
     filter_backends = [filters.SearchFilter]
     search_fields = ['name', 'type', 'company__name']
+
+    def _ensure_company_permission(self, company_id):
+        if self.request.user.is_superuser:
+            return
+        if company_id not in _get_user_company_ids(self.request.user):
+            raise PermissionDenied("해당 회사 데이터에 접근할 권한이 없습니다.")
     
     def get_queryset(self):
         # 기본 queryset (= self.queryset) 위에 조건만 얹음
         qs = super().get_queryset()
+        user = self.request.user
+
+        if not user.is_superuser:
+            company_ids = _get_user_company_ids(user)
+            qs = qs.filter(company_id__in=company_ids)
 
         company_id = self.request.query_params.get('company')
 
@@ -101,11 +146,55 @@ class DepartmentViewSet(viewsets.ModelViewSet):
 
         return qs
 
+    def perform_create(self, serializer):
+        company = serializer.validated_data.get("company")
+        if company:
+            self._ensure_company_permission(company.id)
+        serializer.save()
+
+    def perform_update(self, serializer):
+        company = serializer.validated_data.get("company") or serializer.instance.company
+        if company:
+            self._ensure_company_permission(company.id)
+        serializer.save()
+
 # 직급 관리
 class PositionViewSet(viewsets.ModelViewSet):
     queryset = Position.objects.all().order_by('level','name')
     serializer_class = PositionSerializer
-    permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated, IsStaffOrSuperuser]
+    
+    def _ensure_company_permission(self, company_id):
+        if self.request.user.is_superuser:
+            return
+        if company_id not in _get_user_company_ids(self.request.user):
+            raise PermissionDenied("해당 회사 데이터에 접근할 권한이 없습니다.")
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+
+        if not user.is_superuser:
+            company_ids = _get_user_company_ids(user)
+            qs = qs.filter(company_id__in=company_ids)
+
+        company_id = self.request.query_params.get("company")
+        if company_id:
+            qs = qs.filter(company_id=company_id)
+
+        return qs
+
+    def perform_create(self, serializer):
+        company = serializer.validated_data.get("company")
+        if company:
+            self._ensure_company_permission(company.id)
+        serializer.save()
+
+    def perform_update(self, serializer):
+        company = serializer.validated_data.get("company") or serializer.instance.company
+        if company:
+            self._ensure_company_permission(company.id)
+        serializer.save()
     
     # def get_queryset(self):
     #     qs = super().get_queryset()
@@ -168,7 +257,7 @@ class UserListSerializer(drf_serializers.ModelSerializer):
 class UserViewSet(viewsets.ModelViewSet):
     queryset = CustomUser.objects.prefetch_related("memberships").all().order_by("-date_joined")
     serializer_class = UserListSerializer
-    permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated, IsSuperuserOnly]
 
     def get_queryset(self):
         qs = super().get_queryset()

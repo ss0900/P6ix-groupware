@@ -21,6 +21,8 @@ import AdminLayout from "./pages/admin/AdminLayout";
 // Admin
 import UserList from "./pages/system/UserList";
 import MyInfo from "./pages/system/MyInfo";
+import MyPage from "./pages/system/MyPage";
+import MyMenuLayout from "./pages/system/MyMenuLayout";
 import UserForm from "./pages/admin/UserForm";
 import OrganizationChart from "./pages/admin/OrganizationChart";
 import PositionManagement from "./pages/admin/PositionManagement";
@@ -136,6 +138,29 @@ const PublicRoute = ({ children }) => {
   return children;
 };
 
+const SuperuserRoute = ({ children }) => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
+      </div>
+    );
+  }
+
+  if (!user?.is_superuser) {
+    return <Navigate to="/admin/organization" replace />;
+  }
+
+  return children;
+};
+
+const AdminIndexRedirect = () => {
+  const { user } = useAuth();
+  return <Navigate to={user?.is_superuser ? "users" : "organization"} replace />;
+};
+
 function AppRouter() {
   return (
     <Routes>
@@ -163,8 +188,12 @@ function AppRouter() {
           <Route index element={<Dashboard />} />
         </Route>
 
-        {/* 내 정보 */}
-        <Route path="my-info" element={<MyInfo />} />
+        {/* 내 메뉴 - with sidebar layout */}
+        <Route path="" element={<MyMenuLayout />}>
+          <Route path="my-info" element={<MyInfo />} />
+          <Route path="my-page" element={<MyPage />} />
+          <Route path="help" element={<HelpCenter />} />
+        </Route>
 
         {/* 전자결재 - with sidebar layout */}
         <Route path="approval" element={<ApprovalLayout />}>
@@ -250,11 +279,11 @@ function AppRouter() {
 
         {/* 관리자 - with sidebar layout */}
         <Route path="admin" element={<AdminLayout />}>
-          <Route index element={<Navigate to="users" replace />} />
-          <Route path="users" element={<UserList />} />
-          <Route path="users/add" element={<UserForm />} />
-          <Route path="users/:id" element={<UserForm />} />
-          <Route path="companies" element={<CompanyManagement />} />
+          <Route index element={<AdminIndexRedirect />} />
+          <Route path="users" element={<SuperuserRoute><UserList /></SuperuserRoute>} />
+          <Route path="users/add" element={<SuperuserRoute><UserForm /></SuperuserRoute>} />
+          <Route path="users/:id" element={<SuperuserRoute><UserForm /></SuperuserRoute>} />
+          <Route path="companies" element={<SuperuserRoute><CompanyManagement /></SuperuserRoute>} />
           <Route path="organization" element={<OrganizationChart />} />
           <Route path="positions" element={<PositionManagement />} />
         </Route>
@@ -396,8 +425,6 @@ function AppRouter() {
           />
         </Route>
 
-        {/* 도움말 */}
-        <Route path="help" element={<HelpCenter />} />
       </Route>
 
       {/* 404 */}

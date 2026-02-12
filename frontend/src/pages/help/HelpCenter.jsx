@@ -2,19 +2,38 @@
 import React, { useState, useEffect, useCallback } from "react";
 import api from "../../api/axios";
 import { useAuth } from "../../context/AuthContext";
-import { Plus, Search, MessageCircle, CheckCircle, Clock, Send } from "lucide-react";
+import {
+  Plus,
+  Search,
+  MessageCircle,
+  CheckCircle,
+  Clock,
+  Send,
+} from "lucide-react";
 
 // 상태 뱃지
 const StatusBadge = ({ status }) => {
   const config = {
-    pending: { bg: "bg-yellow-100", text: "text-yellow-600", icon: Clock, label: "답변대기" },
-    answered: { bg: "bg-green-100", text: "text-green-600", icon: CheckCircle, label: "답변완료" },
+    pending: {
+      bg: "bg-yellow-100",
+      text: "text-yellow-600",
+      icon: Clock,
+      label: "답변대기",
+    },
+    answered: {
+      bg: "bg-green-100",
+      text: "text-green-600",
+      icon: CheckCircle,
+      label: "답변완료",
+    },
   };
   const c = config[status] || config.pending;
   const Icon = c.icon;
 
   return (
-    <span className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${c.bg} ${c.text}`}>
+    <span
+      className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${c.bg} ${c.text}`}
+    >
       <Icon size={12} />
       {c.label}
     </span>
@@ -75,22 +94,22 @@ export default function HelpCenter() {
   };
 
   // 검색 필터
-  const filteredQuestions = questions.filter(q =>
-    q.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    q.content.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredQuestions = questions.filter(
+    (q) =>
+      q.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      q.content.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   return (
     <div className="space-y-6">
       {/* 헤더 */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">P6ix 해결사</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Q&A</h1>
         <button
           onClick={() => setShowNewForm(true)}
           className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
         >
-          <Plus size={18} />
-          새 질문하기
+          <Plus size={18} />새 질문하기
         </button>
       </div>
 
@@ -111,7 +130,9 @@ export default function HelpCenter() {
           </div>
           <div>
             <p className="text-sm text-gray-500">답변완료</p>
-            <p className="text-2xl font-bold text-green-600">{stats.answered}</p>
+            <p className="text-2xl font-bold text-green-600">
+              {stats.answered}
+            </p>
           </div>
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-4">
@@ -120,7 +141,9 @@ export default function HelpCenter() {
           </div>
           <div>
             <p className="text-sm text-gray-500">답변대기</p>
-            <p className="text-2xl font-bold text-yellow-600">{stats.pending}</p>
+            <p className="text-2xl font-bold text-yellow-600">
+              {stats.pending}
+            </p>
           </div>
         </div>
       </div>
@@ -128,7 +151,10 @@ export default function HelpCenter() {
       {/* 검색 */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-4">
         <div className="relative flex-1">
-          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <Search
+            size={18}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+          />
           <input
             type="text"
             value={searchQuery}
@@ -137,7 +163,9 @@ export default function HelpCenter() {
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
           />
         </div>
-        <button className="px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200">검색</button>
+        <button className="px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200">
+          검색
+        </button>
       </div>
 
       {/* 질문 목록 */}
@@ -146,10 +174,18 @@ export default function HelpCenter() {
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="text-left px-4 py-3 text-sm font-medium text-gray-600 w-16">번호</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">제목</th>
-                <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 w-24">상태</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-gray-600 w-32">등록일</th>
+                <th className="text-left px-4 py-3 text-sm font-medium text-gray-600 w-16">
+                  번호
+                </th>
+                <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">
+                  제목
+                </th>
+                <th className="text-center px-4 py-3 text-sm font-medium text-gray-600 w-24">
+                  상태
+                </th>
+                <th className="text-left px-4 py-3 text-sm font-medium text-gray-600 w-32">
+                  등록일
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -168,16 +204,20 @@ export default function HelpCenter() {
               ) : (
                 filteredQuestions.map((q, idx) => (
                   <tr key={q.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-gray-600">{filteredQuestions.length - idx}</td>
+                    <td className="px-4 py-3 text-gray-600">
+                      {filteredQuestions.length - idx}
+                    </td>
                     <td className="px-4 py-3">
                       <p className="font-medium text-gray-900">{q.title}</p>
-                      <p className="text-sm text-gray-500 line-clamp-1">{q.content}</p>
+                      <p className="text-sm text-gray-500 line-clamp-1">
+                        {q.content}
+                      </p>
                     </td>
                     <td className="px-4 py-3 text-center">
                       <StatusBadge status={q.status} />
                     </td>
                     <td className="px-4 py-3 text-gray-600">
-                      {new Date(q.created_at).toLocaleDateString('ko-KR')}
+                      {new Date(q.created_at).toLocaleDateString("ko-KR")}
                     </td>
                   </tr>
                 ))
@@ -199,20 +239,28 @@ export default function HelpCenter() {
             <h2 className="text-lg font-semibold mb-4">새 질문하기</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">제목</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  제목
+                </label>
                 <input
                   type="text"
                   value={newQuestion.title}
-                  onChange={(e) => setNewQuestion({ ...newQuestion, title: e.target.value })}
+                  onChange={(e) =>
+                    setNewQuestion({ ...newQuestion, title: e.target.value })
+                  }
                   placeholder="질문 제목"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">내용</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  내용
+                </label>
                 <textarea
                   value={newQuestion.content}
-                  onChange={(e) => setNewQuestion({ ...newQuestion, content: e.target.value })}
+                  onChange={(e) =>
+                    setNewQuestion({ ...newQuestion, content: e.target.value })
+                  }
                   placeholder="질문 내용을 입력하세요"
                   rows={5}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none"

@@ -18,6 +18,7 @@ import {
   FolderKanban,
 } from "lucide-react";
 import { projectMenus, menuOrder } from "./ProjectMenus";
+import { useAuth } from "../../context/AuthContext";
 
 // 메뉴별 아이콘 매핑
 const menuIcons = {
@@ -36,7 +37,15 @@ const menuIcons = {
 function Sidebar({ isOpen, onClose }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
   const [expandedMenus, setExpandedMenus] = useState(menuOrder);
+
+  const hasPermission = (permission) => {
+    if (!permission) return true;
+    if (permission === "superuser") return Boolean(user?.is_superuser);
+    if (permission === "staff") return Boolean(user?.is_staff || user?.is_superuser);
+    return true;
+  };
 
   const toggleMenu = (menuId) => {
     setExpandedMenus((prev) =>
@@ -60,19 +69,33 @@ function Sidebar({ isOpen, onClose }) {
 
   // ProjectMenus 데이터를 기반으로 메뉴 아이템 생성
   const menuItems = menuOrder.map((menuKey) => {
+    if ((menuKey === "operation" || menuKey === "admin") && !(user?.is_staff || user?.is_superuser)) {
+      return null;
+    }
+
     const menu = projectMenus[menuKey];
     if (!menu) return null;
 
     const Icon = menuIcons[menuKey] || LayoutDashboard;
 
+    const filteredSections = (menu.sections || [])
+      .filter((section) => hasPermission(section.permission))
+      .map((section) => ({
+        ...section,
+        items: (section.items || []).filter((item) => hasPermission(item.permission)),
+      }))
+      .filter((section) => section.items.length > 0);
+
     // 하위 항목들 플랫하게 펼치기
-    const children = menu.sections.flatMap((section) =>
+    const children = filteredSections.flatMap((section) =>
       section.items.map((item) => ({
         id: `${menuKey}-${item.to}`,
         label: item.label,
         path: item.to ? `${menu.base}/${item.to}` : menu.base,
       }))
     );
+
+    if (children.length === 0) return null;
 
     // 단일 항목만 있으면 children 없이 직접 경로 지정
     if (children.length === 1) {
