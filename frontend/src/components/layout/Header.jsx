@@ -87,8 +87,8 @@ function Header({ onMenuClick }) {
 
   return (
     <>
-      <header className="sticky top-0 z-50 bg-[#1e1e2f] shadow-md">
-        <div className="w-full px-6 py-3 flex items-center">
+      <header className="sticky top-0 z-50 bg-[#1e1e2f] shadow-md h-[60px]">
+        <div className="w-full h-full px-6 flex items-center">
           {/* Left Section - Logo */}
           <div className="flex items-center gap-4 shrink-0">
             <button

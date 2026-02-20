@@ -127,7 +127,7 @@ function Sidebar({ isOpen, onClose }) {
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-[60px] left-0 h-[calc(100vh-60px)] w-64 bg-white border-r border-gray-200 z-40 transition-transform duration-300 overflow-y-auto ${
+        className={`fixed top-[60px] left-0 h-[calc(100dvh-60px)] w-64 bg-white border-r border-gray-200 z-40 transition-transform duration-300 overflow-y-auto ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
