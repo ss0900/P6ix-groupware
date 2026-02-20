@@ -1,4 +1,10 @@
-import React, { useState, useMemo, useEffect } from "react";
+﻿import React, {
+  useState,
+  useMemo,
+  useEffect,
+  useCallback,
+  useRef,
+} from "react";
 import api from "../../api/axios";
 import { useAuth } from "../../context/AuthContext";
 
@@ -29,7 +35,13 @@ const normalizeList = (payload) => {
   return [];
 };
 
-const normalizeUsersForOrg = (rows, selectedCompany, strictCompanyFilter = false) =>
+const AUTO_REFRESH_INTERVAL_MS = 5000;
+
+const normalizeUsersForOrg = (
+  rows,
+  selectedCompany,
+  strictCompanyFilter = false,
+) =>
   (rows || [])
     .map((row) => {
       const companyId = row.company_id || row.company?.id || null;
@@ -66,7 +78,9 @@ const normalizeUsersForOrg = (rows, selectedCompany, strictCompanyFilter = false
       last_name: row.last_name,
       phone_number: row.phone_number || "",
       company:
-        typeof row.company === "object" ? row.company?.name || "" : row.company || "",
+        typeof row.company === "object"
+          ? row.company?.name || ""
+          : row.company || "",
       position:
         typeof row.position === "object"
           ? row.position?.name || ""
@@ -74,18 +88,117 @@ const normalizeUsersForOrg = (rows, selectedCompany, strictCompanyFilter = false
       profile_picture: row.profile_picture || "",
     }));
 
+const HEAD_TITLE_KEYWORDS = ["대표", "ceo", "chief executive", "사장"];
+
+const hasHeadTitleKeyword = (personNode) => {
+  const title = String(personNode?.user_position || personNode?.position || "")
+    .trim()
+    .toLowerCase();
+  return HEAD_TITLE_KEYWORDS.some((keyword) => title.includes(keyword));
+};
+
+const isExecutiveDepartment = (name) => {
+  const text = String(name || "")
+    .trim()
+    .toLowerCase();
+  return text.includes("대표") || text.includes("ceo");
+};
+
+const getPositionLevel = (personNode) => {
+  const parsed = Number(personNode?.position_level);
+  return Number.isFinite(parsed) ? parsed : Number.MAX_SAFE_INTEGER;
+};
+
+const pickDepartmentHead = (people) => {
+  if (!Array.isArray(people) || people.length === 0) return null;
+
+  const titledHead = people.find((person) => hasHeadTitleKeyword(person));
+  if (titledHead) return titledHead;
+
+  return people.reduce(
+    (best, current) =>
+      getPositionLevel(current) < getPositionLevel(best) ? current : best,
+    people[0],
+  );
+};
+
+const nestSubDepartmentsUnderHead = (node) => {
+  if (!node || !Array.isArray(node.children) || node.children.length === 0) {
+    return node;
+  }
+
+  const normalizedChildren = node.children.map((child) =>
+    nestSubDepartmentsUnderHead(child),
+  );
+
+  if (node.type !== "dept") {
+    return { ...node, children: normalizedChildren };
+  }
+
+  const departmentChildren = normalizedChildren.filter(
+    (child) => child?.type === "dept",
+  );
+  const peopleChildren = normalizedChildren.filter(
+    (child) => child?.type === "person",
+  );
+
+  const shouldRestructure =
+    departmentChildren.length > 0 &&
+    peopleChildren.length > 0 &&
+    (isExecutiveDepartment(node.name) ||
+      peopleChildren.some((person) => hasHeadTitleKeyword(person)));
+
+  if (!shouldRestructure) {
+    return { ...node, children: normalizedChildren };
+  }
+
+  const headNode = pickDepartmentHead(peopleChildren);
+  if (!headNode) {
+    return { ...node, children: normalizedChildren };
+  }
+
+  const mergedHeadChildren = [...(headNode.children || [])];
+  const existingChildIds = new Set(
+    mergedHeadChildren.map((child) => child?.id).filter(Boolean),
+  );
+
+  departmentChildren.forEach((deptChild) => {
+    if (!existingChildIds.has(deptChild.id)) {
+      mergedHeadChildren.push(deptChild);
+      existingChildIds.add(deptChild.id);
+    }
+  });
+
+  const updatedHeadNode = {
+    ...headNode,
+    children: mergedHeadChildren,
+  };
+  const remainingPeople = peopleChildren.filter(
+    (person) => person.id !== updatedHeadNode.id,
+  );
+
+  return {
+    ...node,
+    children: [updatedHeadNode, ...remainingPeople],
+  };
+};
+
 const buildAutoTreeFromOrgChart = (payload, users, selectedCompany) => {
-  const departments = Array.isArray(payload?.departments) ? payload.departments : [];
+  const departments = Array.isArray(payload?.departments)
+    ? payload.departments
+    : [];
   const members = Array.isArray(payload?.members) ? payload.members : [];
   const companies = Array.isArray(payload?.companies) ? payload.companies : [];
 
   const companyName =
     companies.find((company) => String(company.id) === String(selectedCompany))
       ?.name ||
-    departments.find((department) => String(department.company) === String(selectedCompany))
-      ?.company_name ||
-    members.find((member) => String(member.company_id) === String(selectedCompany))
-      ?.company_name ||
+    departments.find(
+      (department) => String(department.company) === String(selectedCompany),
+    )?.company_name ||
+    members.find(
+      (member) => String(member.company_id) === String(selectedCompany),
+    )?.company_name ||
     "조직도";
 
   const root = {
@@ -134,13 +247,6 @@ const buildAutoTreeFromOrgChart = (payload, users, selectedCompany) => {
       }
     });
 
-  const unassignedDept = {
-    id: "dept-unassigned",
-    type: "dept",
-    name: "미지정 부서",
-    children: [],
-  };
-
   Array.from(uniqueMembers.values()).forEach((member) => {
     const user = userMap.get(String(member.user_id)) || {};
     const fullName =
@@ -160,6 +266,7 @@ const buildAutoTreeFromOrgChart = (payload, users, selectedCompany) => {
       user_id: member.user_id || null,
       name: fullName,
       position,
+      position_level: member.position_level ?? null,
       phone,
       company,
       user_name: fullName,
@@ -174,14 +281,12 @@ const buildAutoTreeFromOrgChart = (payload, users, selectedCompany) => {
       departmentNodes.get(member.department_id).children.push(personNode);
       return;
     }
-    unassignedDept.children.push(personNode);
+    // 미지정(부서 미연결) 인원은 조직도에서 숨김 처리
+    return;
   });
 
-  if (unassignedDept.children.length > 0) {
-    root.children.push(unassignedDept);
-  }
-
-  return root.children.length > 0 ? root : null;
+  const structuredRoot = nestSubDepartmentsUnderHead(root);
+  return structuredRoot.children.length > 0 ? structuredRoot : null;
 };
 
 // 트리 평탄화 함수 (비상연락망용) - 부서(dept) 제외
@@ -663,6 +768,8 @@ const OrgNode = ({
 const OrganizationChart = () => {
   const { user } = useAuth();
   const isSuperuser = Boolean(user?.is_superuser);
+  const isMountedRef = useRef(true);
+  const requestSeqRef = useRef(0);
 
   const [companies, setCompanies] = useState([]);
   const [selectedCompany, setSelectedCompany] = useState("");
@@ -680,7 +787,10 @@ const OrganizationChart = () => {
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
   const selectedCompanyInfo = useMemo(
-    () => companies.find((company) => String(company.id) === String(selectedCompany)),
+    () =>
+      companies.find(
+        (company) => String(company.id) === String(selectedCompany),
+      ),
     [companies, selectedCompany],
   );
   const contactList = useMemo(() => flattenTree(data), [data]);
@@ -711,6 +821,13 @@ const OrganizationChart = () => {
       window.removeEventListener("mouseup", handleDragEnd);
     };
   }, [isDragging, dragOffset]);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -746,18 +863,19 @@ const OrganizationChart = () => {
     };
   }, []);
 
-  useEffect(() => {
-    if (!selectedCompany) {
-      setLoading(false);
-      setData(null);
-      setOrgId(null);
-      setUsers([]);
-      return;
-    }
+  const fetchOrganizationData = useCallback(
+    async ({ silent = false } = {}) => {
+      if (!selectedCompany) {
+        if (!silent) setLoading(false);
+        setData(null);
+        setOrgId(null);
+        setUsers([]);
+        return;
+      }
 
-    let active = true;
-    (async () => {
-      setLoading(true);
+      const requestSeq = ++requestSeqRef.current;
+      if (!silent) setLoading(true);
+
       try {
         const orgPromise = api.get("core/organizations/", {
           params: { company: selectedCompany },
@@ -767,54 +885,85 @@ const OrganizationChart = () => {
           : api.get("core/organizations/available-users/", {
               params: { company: selectedCompany },
             });
-        const [orgRes, usersRes] = await Promise.all([orgPromise, usersPromise]);
+        const [orgRes, usersRes] = await Promise.all([
+          orgPromise,
+          usersPromise,
+        ]);
 
-        if (!active) return;
+        if (!isMountedRef.current || requestSeq !== requestSeqRef.current)
+          return;
         const orgRows = normalizeList(orgRes.data);
         const userRows = isSuperuser
-          ? normalizeUsersForOrg(normalizeList(usersRes.data), selectedCompany, true)
-          : normalizeUsersForOrg(normalizeList(usersRes.data), selectedCompany, false);
+          ? normalizeUsersForOrg(
+              normalizeList(usersRes.data),
+              selectedCompany,
+              true,
+            )
+          : normalizeUsersForOrg(
+              normalizeList(usersRes.data),
+              selectedCompany,
+              false,
+            );
+
+        let generatedTree = null;
+        try {
+          const orgChartRes = await api.get("core/departments/org-chart/", {
+            params: { company: selectedCompany },
+          });
+          if (!isMountedRef.current || requestSeq !== requestSeqRef.current)
+            return;
+          generatedTree = buildAutoTreeFromOrgChart(
+            orgChartRes.data,
+            userRows,
+            selectedCompany,
+          );
+        } catch (autoError) {
+          console.error(
+            "Failed to auto-generate organization chart from memberships:",
+            autoError,
+          );
+        }
 
         if (orgRows.length > 0) {
           setOrgId(orgRows[0].id);
-          setData(orgRows[0].tree || null);
         } else {
-          let generatedTree = null;
-          try {
-            const orgChartRes = await api.get("core/departments/org-chart/", {
-              params: { company: selectedCompany },
-            });
-            if (!active) return;
-            generatedTree = buildAutoTreeFromOrgChart(
-              orgChartRes.data,
-              userRows,
-              selectedCompany,
-            );
-          } catch (autoError) {
-            console.error(
-              "Failed to auto-generate organization chart from memberships:",
-              autoError,
-            );
-          }
           setOrgId(null);
-          setData(generatedTree);
         }
+        setData(generatedTree || orgRows[0]?.tree || null);
         setUsers(userRows);
       } catch (error) {
         console.error("Failed to fetch organization chart:", error);
-        if (!active) return;
+        if (!isMountedRef.current || requestSeq !== requestSeqRef.current)
+          return;
         setData(null);
         setOrgId(null);
         setUsers([]);
       } finally {
-        if (active) setLoading(false);
+        if (
+          !silent &&
+          isMountedRef.current &&
+          requestSeq === requestSeqRef.current
+        ) {
+          setLoading(false);
+        }
       }
-    })();
+    },
+    [selectedCompany, isSuperuser],
+  );
 
-    return () => {
-      active = false;
-    };
-  }, [selectedCompany, isSuperuser]);
+  useEffect(() => {
+    fetchOrganizationData();
+  }, [fetchOrganizationData]);
+
+  useEffect(() => {
+    if (!selectedCompany || isEditMode) return;
+
+    const intervalId = window.setInterval(() => {
+      fetchOrganizationData({ silent: true });
+    }, AUTO_REFRESH_INTERVAL_MS);
+
+    return () => window.clearInterval(intervalId);
+  }, [selectedCompany, isEditMode, fetchOrganizationData]);
 
   const handleUpdate = (id, field, value) => {
     setData((prev) => updateNode(prev, id, field, value));
@@ -953,7 +1102,7 @@ const OrganizationChart = () => {
             현재 등록된 조직도가 없습니다.
           </p>
           <p className="text-slate-400 text-xs mb-6">
-            현장 조직도를 만들어 체계적으로 관리하세요.
+            회사 조직도를 만들어 체계적으로 관리하세요.
           </p>
         </div>
       </div>
@@ -1005,7 +1154,7 @@ const OrganizationChart = () => {
                 : "text-gray-500 hover:text-gray-700"
             }`}
           >
-            현장 조직도
+            회사 조직도
             {activeTab === "org" && (
               <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-t-full"></div>
             )}
