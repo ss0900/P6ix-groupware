@@ -343,8 +343,12 @@ export default function OrganizationChart() {
   }, [loadOrganizationData]);
 
   const departmentTree = useMemo(() => {
+    const visibleDepartments = departments.filter(
+      (department) => (department.name || "").trim() !== "대표이사",
+    );
+
     const nodeMap = {};
-    departments.forEach((department) => {
+    visibleDepartments.forEach((department) => {
       nodeMap[department.id] = {
         ...department,
         children: [],
@@ -352,7 +356,7 @@ export default function OrganizationChart() {
     });
 
     const roots = [];
-    departments.forEach((department) => {
+    visibleDepartments.forEach((department) => {
       const node = nodeMap[department.id];
       if (department.parent && nodeMap[department.parent]) {
         nodeMap[department.parent].children.push(node);
@@ -370,27 +374,47 @@ export default function OrganizationChart() {
     return roots;
   }, [departments]);
 
+  const hasValue = useCallback((value) => {
+    if (value === null || value === undefined) return false;
+    if (typeof value === "string") return value.trim() !== "";
+    return true;
+  }, []);
+
+  const membersWithOrganizationInfo = useMemo(
+    () =>
+      members.filter(
+        (member) =>
+          hasValue(member.company_name) &&
+          hasValue(member.department_name) &&
+          hasValue(member.position_name),
+      ),
+    [members, hasValue],
+  );
+
   const memberMap = useMemo(() => {
     const grouped = {};
-    members.forEach((member) => {
+    membersWithOrganizationInfo.forEach((member) => {
       if (!member.department_id) return;
       if (!grouped[member.department_id]) grouped[member.department_id] = [];
       grouped[member.department_id].push(member);
     });
     Object.values(grouped).forEach((list) => list.sort(sortMembers));
     return grouped;
-  }, [members]);
+  }, [membersWithOrganizationInfo]);
 
   const chiefMember = useMemo(() => {
-    const unassigned = members.filter((member) => !member.department_id);
-    const pool = unassigned.length > 0 ? unassigned : members;
+    const unassigned = membersWithOrganizationInfo.filter(
+      (member) => !member.department_id,
+    );
+    const pool =
+      unassigned.length > 0 ? unassigned : membersWithOrganizationInfo;
     if (pool.length === 0) return null;
     return pool.slice().sort(sortMembers)[0];
-  }, [members]);
+  }, [membersWithOrganizationInfo]);
 
   const emergencyRows = useMemo(() => {
     const normalized = keyword.trim().toLowerCase();
-    const base = members.slice().sort(sortMembers);
+    const base = membersWithOrganizationInfo.slice().sort(sortMembers);
     if (!normalized) return base;
 
     return base.filter((member) => {
@@ -406,7 +430,31 @@ export default function OrganizationChart() {
         .toLowerCase();
       return fields.includes(normalized);
     });
-  }, [members, keyword]);
+  }, [membersWithOrganizationInfo, keyword]);
+
+  const showCompanyColumn = useMemo(
+    () =>
+      membersWithOrganizationInfo.length > 0 &&
+      membersWithOrganizationInfo.every((member) => hasValue(member.company_name)),
+    [membersWithOrganizationInfo, hasValue],
+  );
+  const showDepartmentColumn = useMemo(
+    () =>
+      membersWithOrganizationInfo.length > 0 &&
+      membersWithOrganizationInfo.every((member) => hasValue(member.department_name)),
+    [membersWithOrganizationInfo, hasValue],
+  );
+  const showPositionColumn = useMemo(
+    () =>
+      membersWithOrganizationInfo.length > 0 &&
+      membersWithOrganizationInfo.every((member) => hasValue(member.position_name)),
+    [membersWithOrganizationInfo, hasValue],
+  );
+  const emergencyColumnCount =
+    3 +
+    (showCompanyColumn ? 1 : 0) +
+    (showDepartmentColumn ? 1 : 0) +
+    (showPositionColumn ? 1 : 0);
 
   const selectedCompanyInfo = useMemo(
     () => companies.find((company) => String(company.id) === String(selectedCompany)),
@@ -598,9 +646,9 @@ export default function OrganizationChart() {
                   <tr className="text-sm text-gray-700">
                     <th className="px-3 py-3 text-center w-16">번호</th>
                     <th className="px-3 py-3 text-left">이름</th>
-                    <th className="px-3 py-3 text-left">회사</th>
-                    <th className="px-3 py-3 text-left">부서</th>
-                    <th className="px-3 py-3 text-left">직위</th>
+                    {showCompanyColumn && <th className="px-3 py-3 text-left">회사</th>}
+                    {showDepartmentColumn && <th className="px-3 py-3 text-left">부서</th>}
+                    {showPositionColumn && <th className="px-3 py-3 text-left">직위</th>}
                     <th className="px-3 py-3 text-left">연락처</th>
                   </tr>
                 </thead>
@@ -608,7 +656,7 @@ export default function OrganizationChart() {
                   {loading ? (
                     <tr>
                       <td
-                        colSpan={6}
+                        colSpan={emergencyColumnCount}
                         className="px-3 py-10 text-center text-sm text-gray-500"
                       >
                         로딩 중입니다.
@@ -617,7 +665,7 @@ export default function OrganizationChart() {
                   ) : emergencyRows.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={6}
+                        colSpan={emergencyColumnCount}
                         className="px-3 py-10 text-center text-sm text-gray-500"
                       >
                         표시할 연락처가 없습니다.
@@ -632,15 +680,21 @@ export default function OrganizationChart() {
                         <td className="px-3 py-3 font-medium text-gray-900">
                           {member.name}
                         </td>
-                        <td className="px-3 py-3 text-gray-700">
-                          {member.company_name || "-"}
-                        </td>
-                        <td className="px-3 py-3 text-gray-700">
-                          {member.department_name || "-"}
-                        </td>
-                        <td className="px-3 py-3 text-gray-700">
-                          {member.position_name || "-"}
-                        </td>
+                        {showCompanyColumn && (
+                          <td className="px-3 py-3 text-gray-700">
+                            {member.company_name || "-"}
+                          </td>
+                        )}
+                        {showDepartmentColumn && (
+                          <td className="px-3 py-3 text-gray-700">
+                            {member.department_name || "-"}
+                          </td>
+                        )}
+                        {showPositionColumn && (
+                          <td className="px-3 py-3 text-gray-700">
+                            {member.position_name || "-"}
+                          </td>
+                        )}
                         <td className="px-3 py-3 text-gray-700">
                           {member.phone_number || "-"}
                         </td>

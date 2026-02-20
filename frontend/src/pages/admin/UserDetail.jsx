@@ -7,7 +7,7 @@ const FieldRow = ({ label, value }) => (
   <div>
     <p className="mb-1 text-sm font-medium text-gray-600">{label}</p>
     <div className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900">
-      {value || "-"}
+      {value ?? ""}
     </div>
   </div>
 );

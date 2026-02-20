@@ -401,15 +401,19 @@ class UserViewSet(viewsets.ModelViewSet):
         user.save()
 
         # 소속 업데이트
-        company_id = data.get("company")
-        if company_id:
-            membership, _ = UserMembership.objects.get_or_create(
-                user=user, is_primary=True,
-                defaults={"company_id": company_id}
-            )
-            membership.company_id = company_id
-            membership.department_id = data.get("department") or None
-            membership.position_id = data.get("position") or None
-            membership.save()
+        # company가 명시적으로 null/빈값이면 주 소속 해제(멤버십 삭제)
+        if "company" in data:
+            company_id = data.get("company")
+            if company_id:
+                membership, _ = UserMembership.objects.get_or_create(
+                    user=user, is_primary=True,
+                    defaults={"company_id": company_id}
+                )
+                membership.company_id = company_id
+                membership.department_id = data.get("department") or None
+                membership.position_id = data.get("position") or None
+                membership.save()
+            else:
+                UserMembership.objects.filter(user=user, is_primary=True).delete()
 
         return Response(UserListSerializer(user).data)

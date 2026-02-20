@@ -138,10 +138,10 @@ export default function UserForm() {
         payload.password = formData.password;
       }
 
-      // 소속 정보
-      if (formData.company) payload.company = formData.company;
-      if (formData.department) payload.department = formData.department;
-      if (formData.position) payload.position = formData.position;
+      // 소속 정보: 미선택은 null로 명시 저장
+      payload.company = formData.company || null;
+      payload.department = formData.department || null;
+      payload.position = formData.position || null;
 
       if (isEdit) {
         await api.patch(`core/users/${id}/`, payload);

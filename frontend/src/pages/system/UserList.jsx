@@ -165,13 +165,13 @@ export default function UserList() {
       key: "company",
       header: "회사",
       // width: 140,
-      render: (row) => row.company?.name ?? row.company ?? "-",
+      render: (row) => row.company?.name ?? row.company ?? "",
     },
     {
       key: "department",
       header: "부서",
       // width: 140,
-      render: (row) => row.department?.name ?? row.department ?? "-",
+      render: (row) => row.department?.name ?? row.department ?? "",
     },
     {
       key: "position",
@@ -184,7 +184,7 @@ export default function UserList() {
         }
         return Number.MAX_SAFE_INTEGER;
       },
-      render: (row) => row.position?.name ?? row.position ?? "-",
+      render: (row) => row.position?.name ?? row.position ?? "",
     },
     {
       key: "phone_number",
