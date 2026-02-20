@@ -20,6 +20,9 @@ export default function BoardTable({
   const sizeClass =
     size === "lg" ? "text-base" : size === "sm" ? "text-xs" : "text-sm";
 
+  const isColumnSortable = (col) =>
+    sortable && !col.rowNumber && col.sortable !== false;
+
   const handleSort = (key) => {
     // 정렬 비활성 시 바로 리턴
     if (!sortable) return;
@@ -60,11 +63,19 @@ export default function BoardTable({
     if (!col) return rows;
 
     const getValue = (row) => {
+      if (typeof col.sortValue === "function") {
+        return col.sortValue(row);
+      }
+
       if (col.render) {
         const rendered = col.render(row);
 
-        if (typeof rendered === "string" || typeof rendered === "number") {
-          return String(rendered);
+        if (
+          typeof rendered === "string" ||
+          typeof rendered === "number" ||
+          typeof rendered === "boolean"
+        ) {
+          return rendered;
         }
         return String(rendered?.props?.children ?? "");
       }
@@ -79,9 +90,16 @@ export default function BoardTable({
       if (x == null) return -1;
       if (y == null) return 1;
 
-      return sortOrder === "asc"
-        ? String(x).localeCompare(String(y), undefined, { numeric: true })
-        : String(y).localeCompare(String(x), undefined, { numeric: true });
+      let compared = 0;
+      if (typeof x === "number" && typeof y === "number") {
+        compared = x - y;
+      } else {
+        compared = String(x).localeCompare(String(y), undefined, {
+          numeric: true,
+        });
+      }
+
+      return sortOrder === "asc" ? compared : -compared;
     });
   }, [rows, sortKey, sortOrder, sortable]);
 
@@ -103,7 +121,7 @@ export default function BoardTable({
                 className={[
                   "px-3 py-2 select-none border-l first:border-l-0",
                   // 정렬 가능한 컬럼만 pointer/hover
-                  sortable && !col.rowNumber
+                  isColumnSortable(col)
                     ? "cursor-pointer hover:bg-gray-100"
                     : "",
                   col.rowNumber ? "bg-gray-50 text-gray-700 font-semibold" : "",
@@ -115,11 +133,7 @@ export default function BoardTable({
                     : "text-center",
                 ].join(" ")}
                 style={col.width ? { width: col.width } : undefined}
-                onClick={
-                  sortable && !col.rowNumber
-                    ? () => handleSort(col.key)
-                    : undefined
-                }
+                onClick={isColumnSortable(col) ? () => handleSort(col.key) : undefined}
               >
                 <div
                   className={[
@@ -134,7 +148,7 @@ export default function BoardTable({
                 >
                   <span>{col.header}</span>
                   {/* 정렬이 켜져 있고 번호 컬럼이 아닐 때만 아이콘 표시 */}
-                  {sortable && !col.rowNumber && getSortIcon(col.key)}
+                  {isColumnSortable(col) && getSortIcon(col.key)}
                 </div>
               </th>
             ))}

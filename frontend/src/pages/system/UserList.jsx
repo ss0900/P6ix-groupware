@@ -1,5 +1,5 @@
 // src/pages/system/UserList.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Edit, Trash2 } from "lucide-react";
 import api from "../../api/axios";
@@ -140,6 +140,14 @@ export default function UserList() {
     loadUsers();
   }, [q, company, department, position]);
 
+  const positionLevelMap = useMemo(() => {
+    const map = new Map();
+    positions.forEach((p) => {
+      map.set(String(p.id), Number(p.level ?? 999));
+    });
+    return map;
+  }, [positions]);
+
   // ======================= Columns ===========================
   const columns = [
     {
@@ -169,6 +177,13 @@ export default function UserList() {
       key: "position",
       header: "직책",
       // width: 120,
+      sortValue: (row) => {
+        const positionId = row.position_id ?? row.position?.id ?? row.position;
+        if (positionId != null && positionLevelMap.has(String(positionId))) {
+          return positionLevelMap.get(String(positionId));
+        }
+        return Number.MAX_SAFE_INTEGER;
+      },
       render: (row) => row.position?.name ?? row.position ?? "-",
     },
     {
@@ -183,6 +198,7 @@ export default function UserList() {
     },
     {
       key: "is_active",
+      sortable: false,
       header: "활성화",
       render: (row) => (
         <label
@@ -205,6 +221,7 @@ export default function UserList() {
     },
     {
       key: "is_staff",
+      sortable: false,
       header: "관리자 권한",
       render: (row) => (
         <label
@@ -229,6 +246,7 @@ export default function UserList() {
       ? [
           {
             key: "actions",
+            sortable: false,
             header: "관리",
             render: (row) => (
               <div className="inline-flex items-center gap-1">
@@ -333,7 +351,7 @@ export default function UserList() {
         keyField="id"
         emptyText="등록된 사용자가 없습니다."
         onRowClick={(row) => navigate(`/admin/users/${row.id}`)}
-        sortable={false}
+        sortable
       />
     </div>
   );
