@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import api from "../../api/axios";
 import ContactApi from "../../api/ContactApi";
+import { useAuth } from "../../context/AuthContext";
 
 const getUserDisplayName = (user) =>
   `${user?.last_name || ""}${user?.first_name || ""}`.trim() ||
@@ -55,6 +56,8 @@ const RecipientSelectModal = ({
   onClose,
   users,
   initialSelectedIds,
+  currentUserId,
+  currentUsername,
   onSave,
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -62,9 +65,19 @@ const RecipientSelectModal = ({
 
   useEffect(() => {
     if (!isOpen) return;
-    setSelectedIds(initialSelectedIds);
+    setSelectedIds(
+      initialSelectedIds.filter((userId) => {
+        const targetUser = users.find((u) => String(u.id) === String(userId));
+        const isCurrentById =
+          currentUserId != null && String(userId) === String(currentUserId);
+        const isCurrentByUsername =
+          Boolean(currentUsername) &&
+          targetUser?.username === currentUsername;
+        return !(isCurrentById || isCurrentByUsername);
+      }),
+    );
     setSearchQuery("");
-  }, [isOpen, initialSelectedIds]);
+  }, [isOpen, initialSelectedIds, currentUserId, currentUsername, users]);
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -90,6 +103,11 @@ const RecipientSelectModal = ({
   const normalizedQuery = searchQuery.trim().toLowerCase();
 
   const filteredUsers = users.filter((user) => {
+    const isCurrentById =
+      currentUserId != null && String(user.id) === String(currentUserId);
+    const isCurrentByUsername =
+      Boolean(currentUsername) && user.username === currentUsername;
+    if (isCurrentById || isCurrentByUsername) return false;
     if (selectedIdSet.has(user.id)) return false;
     if (!normalizedQuery) return true;
     return getUserSearchText(user).includes(normalizedQuery);
@@ -317,6 +335,7 @@ const RecipientSelectModal = ({
 export default function ContactForm() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const isEdit = Boolean(id);
 
   const [title, setTitle] = useState("");
@@ -363,6 +382,20 @@ export default function ContactForm() {
     loadUsers();
     loadMessage();
   }, [loadUsers, loadMessage]);
+
+  useEffect(() => {
+    if (!user) return;
+    setRecipientIds((prev) =>
+      prev.filter((idValue) => {
+        const targetUser = users.find((u) => String(u.id) === String(idValue));
+        const isCurrentById =
+          user.id != null && String(idValue) === String(user.id);
+        const isCurrentByUsername =
+          Boolean(user.username) && targetUser?.username === user.username;
+        return !(isCurrentById || isCurrentByUsername);
+      }),
+    );
+  }, [user, users]);
 
   const removeRecipient = (userId) => {
     setRecipientIds((prev) => prev.filter((idValue) => idValue !== userId));
@@ -612,6 +645,8 @@ export default function ContactForm() {
         onClose={() => setShowRecipientModal(false)}
         users={users}
         initialSelectedIds={recipientIds}
+        currentUserId={user?.id}
+        currentUsername={user?.username}
         onSave={(nextRecipientIds) => {
           setRecipientIds(nextRecipientIds);
           setShowRecipientModal(false);
