@@ -94,15 +94,27 @@ export default function UserForm() {
       String(p.company_id || p.company) === String(formData.company),
   );
 
+  const formatPhoneNumber = (digits) => {
+    const onlyDigits = digits.slice(0, 11);
+
+    if (onlyDigits.length <= 3) return onlyDigits;
+    if (onlyDigits.length <= 7) {
+      return `${onlyDigits.slice(0, 3)}-${onlyDigits.slice(3)}`;
+    }
+    return `${onlyDigits.slice(0, 3)}-${onlyDigits.slice(3, 7)}-${onlyDigits.slice(7)}`;
+  };
+
   const handlePhoneNumberChange = (e) => {
     const value = e.target.value;
+    const valueWithoutHyphen = value.replace(/-/g, "");
 
-    if (!isEdit && /[^0-9]/.test(value)) {
+    if (!isEdit && /[^0-9]/.test(valueWithoutHyphen)) {
       alert("숫자만 입력해주세요.");
       return;
     }
 
-    setFormData({ ...formData, phone_number: value });
+    const digits = value.replace(/\D/g, "");
+    setFormData({ ...formData, phone_number: formatPhoneNumber(digits) });
   };
 
   // 저장
@@ -116,7 +128,7 @@ export default function UserForm() {
         email: formData.email,
         first_name: formData.first_name,
         last_name: formData.last_name,
-        phone_number: formData.phone_number,
+        phone_number: formData.phone_number.replace(/\D/g, ""),
         is_active: formData.is_active,
         is_staff: formData.is_staff,
       };
@@ -283,7 +295,7 @@ export default function UserForm() {
                 value={formData.phone_number}
                 onChange={handlePhoneNumberChange}
                 inputMode="numeric"
-                pattern="[0-9]*"
+                pattern="[0-9-]*"
                 placeholder="010-0000-0000"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                 required
