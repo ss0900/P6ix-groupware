@@ -746,7 +746,7 @@ const OrganizationChart = () => {
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-900">조직도 조회</h1>
           <div className="flex items-center gap-2">
-            {(isSuperuser || companies.length > 1) && (
+            {isSuperuser && companies.length > 1 && (
               <select
                 value={selectedCompany}
                 onChange={(event) => handleCompanyChange(event.target.value)}
@@ -784,7 +784,7 @@ const OrganizationChart = () => {
   return (
     <div className="p-6 pt-0 relative animate-in fade-in duration-500">
       <div className="flex justify-end mb-4 items-center gap-2">
-        {(isSuperuser || companies.length > 1) && (
+        {isSuperuser && companies.length > 1 && (
           <select
             value={selectedCompany}
             onChange={(event) => handleCompanyChange(event.target.value)}
