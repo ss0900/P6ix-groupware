@@ -7,8 +7,8 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 
-from core.models import Company, Department, Position, UserMembership
-from core.serializers import CompanySerializer, DepartmentSerializer, PositionSerializer
+from core.models import Company, Department, Position, UserMembership, Organization, CustomUser
+from core.serializers import CompanySerializer, DepartmentSerializer, PositionSerializer, OrganizationSerializer
 
 
 def _get_user_company_ids(user):
@@ -245,6 +245,164 @@ class DepartmentViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
+
+class OrganizationViewSet(viewsets.ModelViewSet):
+    queryset = Organization.objects.select_related("company").all().order_by("company__name")
+    serializer_class = OrganizationSerializer
+    permission_classes = [permissions.IsAuthenticated, IsStaffOrSuperuser]
+
+    def _ensure_company_permission(self, company_id):
+        if self.request.user.is_superuser:
+            return
+        if company_id not in _get_user_company_ids(self.request.user):
+            raise PermissionDenied("해당 회사 데이터에 접근할 권한이 없습니다.")
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+
+        if not user.is_superuser:
+            company_ids = _get_user_company_ids(user)
+            qs = qs.filter(company_id__in=company_ids)
+
+        company_id = self.request.query_params.get("company")
+        if company_id:
+            qs = qs.filter(company_id=company_id)
+
+        return qs
+
+    def perform_create(self, serializer):
+        company = serializer.validated_data.get("company")
+        if company:
+            self._ensure_company_permission(company.id)
+        serializer.save()
+
+    def perform_update(self, serializer):
+        company = serializer.validated_data.get("company") or serializer.instance.company
+        if company:
+            self._ensure_company_permission(company.id)
+        serializer.save()
+
+    def _build_profile_picture_url(self, user):
+        if not user.profile_picture:
+            return None
+        request = self.request
+        return request.build_absolute_uri(user.profile_picture.url) if request else user.profile_picture.url
+
+    def _enrich_tree_with_user_info(self, tree):
+        if not isinstance(tree, dict):
+            return tree
+
+        def enrich_node(node):
+            if not isinstance(node, dict):
+                return node
+
+            user_id = node.get("user_id")
+            if user_id:
+                try:
+                    user = CustomUser.objects.get(pk=user_id)
+                    node["profile_picture_url"] = self._build_profile_picture_url(user)
+                    node["user_name"] = (
+                        f"{user.last_name or ''}{user.first_name or ''}".strip() or user.username
+                    )
+                    node["user_phone"] = user.phone_number or ""
+
+                    primary_membership = (
+                        UserMembership.objects.filter(user=user, is_primary=True)
+                        .select_related("company", "position")
+                        .first()
+                    )
+                    membership = primary_membership or (
+                        UserMembership.objects.filter(user=user)
+                        .select_related("company", "position")
+                        .first()
+                    )
+                    node["user_company"] = membership.company.name if membership and membership.company else ""
+                    node["user_position"] = membership.position.name if membership and membership.position else ""
+                except CustomUser.DoesNotExist:
+                    node["profile_picture_url"] = None
+                    node["user_name"] = None
+                    node["user_phone"] = None
+                    node["user_company"] = None
+                    node["user_position"] = None
+
+            children = node.get("children", [])
+            if isinstance(children, list):
+                node["children"] = [enrich_node(child) for child in children]
+
+            return node
+
+        return enrich_node(tree)
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            data = serializer.data
+            for item in data:
+                if item.get("tree"):
+                    item["tree"] = self._enrich_tree_with_user_info(item["tree"])
+            return self.get_paginated_response(data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        data = serializer.data
+        for item in data:
+            if item.get("tree"):
+                item["tree"] = self._enrich_tree_with_user_info(item["tree"])
+        return Response(data)
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        data = serializer.data
+        if data.get("tree"):
+            data["tree"] = self._enrich_tree_with_user_info(data["tree"])
+        return Response(data)
+
+    @action(detail=False, methods=["get"], url_path="available-users")
+    def available_users(self, request):
+        company_param = request.query_params.get("company")
+        if not company_param:
+            return Response({"error": "company 파라미터가 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            company_id = int(company_param)
+        except (TypeError, ValueError):
+            return Response({"error": "company 파라미터가 유효하지 않습니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+        self._ensure_company_permission(company_id)
+
+        memberships_qs = (
+            UserMembership.objects.filter(company_id=company_id)
+            .select_related("user", "company", "position")
+            .order_by("-is_primary", "position__level", "user__last_name", "user__first_name")
+        )
+
+        rows = []
+        seen_user_ids = set()
+        for membership in memberships_qs:
+            user = membership.user
+            if not user or user.id in seen_user_ids:
+                continue
+
+            seen_user_ids.add(user.id)
+            rows.append(
+                {
+                    "id": user.id,
+                    "username": user.username,
+                    "first_name": user.first_name,
+                    "last_name": user.last_name,
+                    "phone_number": user.phone_number,
+                    "company": membership.company.name if membership.company else "",
+                    "position": membership.position.name if membership.position else "",
+                    "profile_picture": self._build_profile_picture_url(user),
+                }
+            )
+
+        return Response(rows, status=status.HTTP_200_OK)
+
 # 직급 관리
 class PositionViewSet(viewsets.ModelViewSet):
     queryset = Position.objects.all().order_by('level','name')
@@ -294,7 +452,6 @@ class PositionViewSet(viewsets.ModelViewSet):
 
 
 # 사용자 관리
-from core.models import CustomUser
 from rest_framework import serializers as drf_serializers
 
 class UserListSerializer(drf_serializers.ModelSerializer):

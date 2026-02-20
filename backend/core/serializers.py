@@ -3,7 +3,7 @@ from rest_framework import serializers
 from django.contrib.auth import authenticate
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.tokens import RefreshToken
-from .models import CustomUser, UserMembership, Company, Department, Position
+from .models import CustomUser, UserMembership, Company, Department, Position, Organization
 import os                             
 from django.utils import timezone
 
@@ -231,6 +231,22 @@ class DepartmentSerializer(serializers.ModelSerializer):
         fields = ["id", "company", "company_name", "name", "type", "parent",
                   "created_at", "updated_at"]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class OrganizationSerializer(serializers.ModelSerializer):
+    company_name = serializers.CharField(source="company.name", read_only=True)
+
+    class Meta:
+        model = Organization
+        fields = [
+            "id",
+            "company",
+            "company_name",
+            "tree",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at", "company_name"]
 
 # 직급
 class PositionSerializer(serializers.ModelSerializer):

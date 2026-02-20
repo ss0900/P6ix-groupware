@@ -37,6 +37,12 @@ urlpatterns += [
         "get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"
     }), name="departments-detail"),
 
+    path("organizations/", belong_view.OrganizationViewSet.as_view({"get": "list", "post": "create"}), name="organizations-list"),
+    path("organizations/available-users/", belong_view.OrganizationViewSet.as_view({"get": "available_users"}), name="organizations-available-users"),
+    path("organizations/<int:pk>/", belong_view.OrganizationViewSet.as_view({
+        "get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"
+    }), name="organizations-detail"),
+
     path("positions/", belong_view.PositionViewSet.as_view({"get": "list", "post": "create"}), name="positions-list"),
     path("positions/<int:pk>/", belong_view.PositionViewSet.as_view({
         "get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"

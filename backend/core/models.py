@@ -137,3 +137,31 @@ class UserMembership(models.Model):
                 name="uniq_user_primary_membership",
             ),
         ]
+
+
+class Organization(models.Model):
+    company = models.ForeignKey(
+        Company,
+        on_delete=models.CASCADE,
+        related_name="organizations",
+        verbose_name="회사",
+    )
+    tree = models.JSONField(null=True, blank=True, verbose_name="조직도")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="생성일시")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="수정일시")
+
+    class Meta:
+        verbose_name = "조직도"
+        verbose_name_plural = "조직도"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["company"],
+                name="uniq_company_organization",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["company"], name="org_company_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.company_id} 조직도"

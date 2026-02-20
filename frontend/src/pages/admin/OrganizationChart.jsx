@@ -1,729 +1,1036 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import api from "../../api/axios";
 import { useAuth } from "../../context/AuthContext";
-import {
-  Edit3,
-  Plus,
-  Trash2,
-  UserRound,
-  Phone,
-} from "lucide-react";
 
-const EMPTY_DEPARTMENT_MESSAGE = "부서 구성원이 없습니다.";
-
-const sortMembers = (a, b) => {
-  const aLevel = Number.isFinite(a.position_level) ? a.position_level : 9999;
-  const bLevel = Number.isFinite(b.position_level) ? b.position_level : 9999;
-  if (aLevel !== bLevel) return aLevel - bLevel;
-  return (a.name || "").localeCompare(b.name || "", "ko");
+// 초기 템플릿 데이터 (생성 시 사용)
+const TEMPLATE_DATA = {
+  id: "root",
+  type: "dept", // 'dept' | 'person'
+  name: "프로젝트 총괄",
+  position: "", // dept 타입일 때 미사용 가능
+  phone: "",
+  company: "",
+  children: [
+    {
+      id: "t1",
+      type: "person",
+      name: "현장소장",
+      position: "소장",
+      phone: "010-0000-0000",
+      company: "메인건설",
+      children: [],
+    },
+  ],
 };
 
-function PersonCard({ person, highlighted = false }) {
-  return (
-    <div
-      className={`w-[220px] bg-white rounded-xl border overflow-hidden shadow-sm ${
-        highlighted ? "border-[#1e1e2f]/20" : "border-gray-200"
-      }`}
-    >
-      <div className="grid grid-cols-[56px_1fr] min-h-[96px]">
-        <div className="bg-gray-100 flex items-center justify-center">
-          <UserRound size={20} className="text-indigo-700" />
-        </div>
-        <div className="px-3 py-2">
-          <p className="text-xs text-gray-500">
-            {person.position_name || "구성원"}
-          </p>
-          <p className="text-base font-semibold text-gray-900 leading-6">
-            {person.name}
-          </p>
-          <p className="text-xs text-gray-500">{person.company_name}</p>
-          <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-            <Phone size={12} />
-            {person.phone_number || "-"}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
+const normalizeList = (payload) => {
+  if (Array.isArray(payload?.results)) return payload.results;
+  if (Array.isArray(payload)) return payload;
+  return [];
+};
 
-function DepartmentNode({
+// 트리 평탄화 함수 (비상연락망용) - 부서(dept) 제외
+const flattenTree = (node, list = [], parentDept = "") => {
+  if (!node) return list;
+
+  // 현재 노드가 부서라면, 자식들에게 물려줄 부서명은 현재 노드의 이름
+  // 현재 노드가 사람이라면(보통 말단이지만), 부모 부서명을 그대로 전달 (단, 사람이 하위 조직을 가질 일은 드뭄)
+  let nextParentDept = parentDept;
+  if (node.type === "dept") {
+    nextParentDept = node.name;
+  }
+
+  // type이 person인 경우에만 리스트에 추가 (상속 부서 정보 포함)
+  if (node.type === "person") {
+    list.push({ ...node, inheritedDept: parentDept });
+  }
+
+  if (node.children) {
+    node.children.forEach((child) => flattenTree(child, list, nextParentDept));
+  }
+  return list;
+};
+
+// 노드 업데이트 재귀 함수
+const updateNode = (node, id, field, value) => {
+  if (node.id === id) {
+    return { ...node, [field]: value };
+  }
+  if (node.children) {
+    return {
+      ...node,
+      children: node.children.map((child) =>
+        updateNode(child, id, field, value),
+      ),
+    };
+  }
+  return node;
+};
+
+// 자식 추가 재귀 함수
+const addChildNode = (node, parentId, newChild) => {
+  if (node.id === parentId) {
+    return {
+      ...node,
+      children: [...(node.children || []), newChild],
+    };
+  }
+  if (node.children) {
+    return {
+      ...node,
+      children: node.children.map((child) =>
+        addChildNode(child, parentId, newChild),
+      ),
+    };
+  }
+  return node;
+};
+
+// 노드 삭제 재귀 함수 (부모가 자식을 필터링하게 함)
+const deleteNodeFromTree = (node, targetId) => {
+  if (node.id === targetId) return null;
+
+  if (node.children) {
+    return {
+      ...node,
+      children: node.children
+        .filter((child) => child.id !== targetId)
+        .map((child) => deleteNodeFromTree(child, targetId))
+        .filter((child) => child !== null),
+    };
+  }
+  return node;
+};
+
+// 재귀적 트리 노드 컴포넌트
+const OrgNode = ({
   node,
-  memberMap,
-  editMode,
-  onAddChild,
-  onEdit,
+  isEdit,
+  onUpdate,
+  onAdd,
   onDelete,
-}) {
-  const members = (memberMap[node.id] || []).slice().sort(sortMembers);
-  const children = node.children || [];
+  onNodeClick,
+  parentDept,
+  users,
+}) => {
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [userSearchTerm, setUserSearchTerm] = useState("");
 
-  return (
-    <div className="flex flex-col items-center min-w-[240px]">
-      <div className="relative px-6 py-4 bg-slate-700 text-white rounded-xl shadow min-w-[150px] text-center font-semibold">
-        {node.name}
-        {editMode && (
-          <div className="absolute -top-2 -right-2 flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => onAddChild(node)}
-              className="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700"
-              title="하위 부서 추가"
-            >
-              <Plus size={14} />
-            </button>
-            <button
-              type="button"
-              onClick={() => onEdit(node)}
-              className="w-7 h-7 rounded-full bg-gray-700 text-white flex items-center justify-center hover:bg-gray-800"
-              title="부서 수정"
-            >
-              <Edit3 size={13} />
-            </button>
-            <button
-              type="button"
-              onClick={() => onDelete(node)}
-              className="w-7 h-7 rounded-full bg-red-600 text-white flex items-center justify-center hover:bg-red-700"
-              title="부서 삭제"
-            >
-              <Trash2 size={13} />
-            </button>
-          </div>
-        )}
-      </div>
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    let newValue = value;
 
-      <div className="w-px h-5 bg-gray-300" />
-
-      <div className="space-y-3">
-        {members.length === 0 ? (
-          <div className="w-[220px] text-center text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-4">
-            {EMPTY_DEPARTMENT_MESSAGE}
-          </div>
-        ) : (
-          members.map((member) => <PersonCard key={member.id} person={member} />)
-        )}
-      </div>
-
-      {children.length > 0 && (
-        <div className="mt-6 w-full flex flex-col items-center">
-          <div className="w-px h-5 bg-gray-300" />
-          <div className="w-full border-t border-gray-300 mb-6" />
-          <div className="flex items-start justify-center gap-8">
-            {children.map((child) => (
-              <DepartmentNode
-                key={child.id}
-                node={child}
-                memberMap={memberMap}
-                editMode={editMode}
-                onAddChild={onAddChild}
-                onEdit={onEdit}
-                onDelete={onDelete}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function DepartmentFormModal({
-  isOpen,
-  onClose,
-  onSave,
-  canSelectCompany,
-  companies,
-  departments,
-  selectedCompanyId,
-  editingDepartment,
-  parentDepartment,
-  saving,
-}) {
-  const [formData, setFormData] = useState({
-    name: "",
-    type: "",
-    company: "",
-    parent: "",
-  });
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    if (editingDepartment) {
-      setFormData({
-        name: editingDepartment.name || "",
-        type: editingDepartment.type || "",
-        company: String(editingDepartment.company || ""),
-        parent: editingDepartment.parent ? String(editingDepartment.parent) : "",
-      });
-      return;
+    // 연락처 자동 하이픈 로직
+    if (name === "phone") {
+      const numbers = value.replace(/[^0-9]/g, "");
+      if (numbers.length <= 3) {
+        newValue = numbers;
+      } else if (numbers.length <= 7) {
+        newValue = `${numbers.slice(0, 3)}-${numbers.slice(3)}`;
+      } else {
+        newValue = `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7, 11)}`;
+      }
     }
 
-    setFormData({
-      name: "",
-      type: "",
-      company:
-        String(parentDepartment?.company || selectedCompanyId || companies?.[0]?.id || ""),
-      parent: parentDepartment?.id ? String(parentDepartment.id) : "",
-    });
-  }, [
-    isOpen,
-    editingDepartment,
-    parentDepartment,
-    selectedCompanyId,
-    companies,
-  ]);
+    onUpdate(node.id, name, newValue);
+  };
 
-  const parentOptions = useMemo(
-    () =>
-      departments.filter(
-        (dept) =>
-          String(dept.company) === String(formData.company) &&
-          String(dept.id) !== String(editingDepartment?.id),
-      ),
-    [departments, formData.company, editingDepartment],
-  );
+  // 사용자 선택 핸들러
+  const handleSelectUser = (user) => {
+    onUpdate(node.id, "user_id", user.id);
+    // 사용자 정보로 자동 채우기 (프리뷰 및 저장용)
+    onUpdate(
+      node.id,
+      "name",
+      `${user.last_name || ""}${user.first_name || ""}`.trim() || user.username,
+    );
+    onUpdate(node.id, "phone", user.phone_number || "");
+    // 소속 및 직위 정보도 함께 업데이트
+    onUpdate(node.id, "company", user.company || "");
+    onUpdate(node.id, "position", user.position || "");
+    // 백엔드에서 조회 시 사용할 user_* 필드도 프리뷰용으로 설정
+    onUpdate(
+      node.id,
+      "user_name",
+      `${user.last_name || ""}${user.first_name || ""}`.trim() || user.username,
+    );
+    onUpdate(node.id, "user_phone", user.phone_number || "");
+    onUpdate(node.id, "user_company", user.company || "");
+    onUpdate(node.id, "user_position", user.position || "");
+    onUpdate(node.id, "profile_picture_url", user.profile_picture || "");
+    setShowUserDropdown(false);
+    setUserSearchTerm("");
+  };
 
-  if (!isOpen) return null;
+  // 사용자 연결 해제
+  const handleClearUser = () => {
+    onUpdate(node.id, "user_id", null);
+  };
+
+  // 사용자 검색 필터
+  const filteredUsers =
+    users?.filter((u) => {
+      const fullName =
+        `${u.last_name || ""}${u.first_name || ""}`.toLowerCase();
+      const searchLower = userSearchTerm.toLowerCase();
+      return (
+        fullName.includes(searchLower) ||
+        (u.username || "").toLowerCase().includes(searchLower) ||
+        (u.phone_number || "").includes(userSearchTerm)
+      );
+    }) || [];
+
+  const nodeType = node.type || "person";
+  // 부서 노드면 자신의 이름을 자식에게 물려줄 부서명으로 사용, 아니면 상위에서 받은거 그대로 전달
+  const nextParentDept = nodeType === "dept" ? node.name : parentDept;
+
+  // 화면에 표시할 소속: user_company가 있으면 우선, 없으면 입력된 company, 없으면 상위 부서명
+  const displayAffiliation =
+    node.user_company || node.company || parentDept || "-";
+
+  // 사진 URL: 사용자 연결 시 profile_picture_url 사용
+  const photoUrl = node.profile_picture_url;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-xl border border-gray-200 shadow-2xl w-full max-w-md p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">
-          {editingDepartment ? "조직도 수정" : "조직도 등록"}
-        </h3>
-        <form
-          className="space-y-4"
-          onSubmit={(event) => {
-            event.preventDefault();
-            onSave(formData, editingDepartment?.id);
-          }}
-        >
-          <div>
-            {canSelectCompany && (
-              <>
-                <label className="block text-sm text-gray-700 mb-1">회사</label>
-                <select
-                  value={formData.company}
-                  onChange={(event) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      company: event.target.value,
-                      parent: "",
-                    }))
+    <div className="flex flex-col items-center">
+      {/* 노드 카드 */}
+      <div
+        className={`relative transition-all duration-300 z-10 group
+                    ${
+                      nodeType === "dept"
+                        ? "bg-slate-700 text-white rounded-lg shadow-md hover:bg-slate-800"
+                        : "bg-white text-gray-800 rounded-xl shadow-md border border-slate-200 hover:shadow-xl hover:border-blue-300"
+                    }
+                    ${
+                      isEdit
+                        ? "p-4 border-2 border-dashed border-blue-400"
+                        : "cursor-pointer hover:-translate-y-1"
+                    }
+                    ${nodeType === "dept" ? "min-w-[140px] px-4 py-3" : "w-48"}
+                `}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (!isEdit) onNodeClick({ ...node, inheritedDept: parentDept }); // 상세보기를 위해 상속 부서 정보 전달
+        }}
+      >
+        {/* 편집 모드: 추가/삭제 버튼 */}
+        {isEdit && (
+          <div className="absolute -top-3 left-1/2 -translate-x-1/2 flex space-x-1 z-20 whitespace-nowrap">
+            <div className="flex bg-white rounded-md shadow-sm border border-slate-200 overflow-hidden">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAdd(node.id, "dept");
+                }}
+                title="하위 부서 추가"
+                className="px-2 py-1 bg-slate-50 text-slate-600 text-[10px] font-bold hover:bg-slate-100 border-r border-slate-200 transition-colors"
+              >
+                +부서
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAdd(node.id, "person");
+                }}
+                title="하위 인원 추가"
+                className="px-2 py-1 bg-blue-50 text-blue-600 text-[10px] font-bold hover:bg-blue-100 transition-colors"
+              >
+                +인원
+              </button>
+            </div>
+
+            {node.id !== "root" && node.id !== TEMPLATE_DATA.id && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (
+                    window.confirm(
+                      `'${node.name}' 및 하위 조직을 모두 삭제하시겠습니까?`,
+                    )
+                  ) {
+                    onDelete(node.id);
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  required
-                >
-                  <option value="">선택</option>
-                  {companies.map((company) => (
-                    <option key={company.id} value={company.id}>
-                      {company.name}
-                    </option>
-                  ))}
-                </select>
+                }}
+                className="bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs shadow hover:bg-red-600 transition-colors ml-1"
+              >
+                X
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* 편집 모드: 입력 폼 */}
+        {isEdit ? (
+          <div className="flex flex-col space-y-2 mt-1">
+            {nodeType === "dept" ? (
+              <input
+                type="text"
+                name="name"
+                value={node.name}
+                onChange={handleChange}
+                className="text-body-bold text-white text-center w-full bg-transparent focus:outline-none placeholder-white/50"
+                placeholder="부서명"
+                onClick={(e) => e.stopPropagation()}
+              />
+            ) : (
+              <>
+                {/* 사용자 연결 UI */}
+                <div className="mb-2 relative">
+                  {node.user_id ? (
+                    <div className="flex items-center gap-2 p-1.5 bg-blue-50 rounded border border-blue-200">
+                      {photoUrl && (
+                        <img
+                          src={photoUrl}
+                          alt="프로필"
+                          className="w-8 h-8 rounded object-cover border border-slate-200"
+                        />
+                      )}
+                      <span className="text-xs text-blue-700 flex-1 truncate">
+                        {node.user_name || node.name} (연결됨)
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleClearUser();
+                        }}
+                        className="text-[10px] text-red-500 hover:text-red-700"
+                      >
+                        해제
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowUserDropdown(!showUserDropdown);
+                        }}
+                        className="w-full text-[10px] py-1.5 border border-dashed border-slate-300 rounded text-slate-400 hover:border-blue-400 hover:text-blue-500 transition-colors"
+                      >
+                        사용자 연결
+                      </button>
+                      {showUserDropdown && (
+                        <div
+                          className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded shadow-lg z-50 max-h-48 overflow-auto"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <input
+                            type="text"
+                            value={userSearchTerm}
+                            onChange={(e) => setUserSearchTerm(e.target.value)}
+                            className="w-full px-2 py-1 text-xs border-b border-slate-200 focus:outline-none"
+                            placeholder="이름 또는 연락처 검색..."
+                            autoFocus
+                          />
+                          {filteredUsers.slice(0, 10).map((user) => (
+                            <div
+                              key={user.id}
+                              onClick={() => handleSelectUser(user)}
+                              className="px-2 py-1.5 text-xs hover:bg-blue-50 cursor-pointer flex items-center gap-2"
+                            >
+                              <span className="font-medium">
+                                {`${user.last_name || ""}${user.first_name || ""}`.trim() ||
+                                  user.username}
+                              </span>
+                              <span className="text-slate-400 text-[10px]">
+                                {user.phone_number}
+                              </span>
+                            </div>
+                          ))}
+                          {filteredUsers.length === 0 && (
+                            <div className="px-2 py-2 text-xs text-slate-400 text-center">
+                              검색 결과 없음
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                {/* 직책 입력 */}
+                <input
+                  type="text"
+                  name="position"
+                  value={node.position || ""}
+                  onChange={handleChange}
+                  className="input-sm text-center mb-1 transition-colors bg-slate-50 focus:bg-white"
+                  placeholder="직책 (예: 공사팀장)"
+                  onClick={(e) => e.stopPropagation()}
+                />
+                {/* 성명 입력 */}
+                <input
+                  type="text"
+                  name="name"
+                  value={node.name || ""}
+                  onChange={handleChange}
+                  className="input-sm text-center font-bold mb-1 transition-colors focus:bg-white"
+                  placeholder="성명"
+                  onClick={(e) => e.stopPropagation()}
+                />
+                {/* 소속 입력 */}
+                <input
+                  type="text"
+                  name="company"
+                  value={node.company || ""}
+                  onChange={handleChange}
+                  className="input-sm text-center text-xs mb-1 transition-colors bg-slate-50 focus:bg-white"
+                  placeholder={`소속 (${parentDept || "미지정"})`}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                {/* 연락처 입력 */}
+                <input
+                  type="text"
+                  name="phone"
+                  value={node.phone || ""}
+                  onChange={handleChange}
+                  className="input-sm text-center text-xs text-slate-500 transition-colors focus:text-slate-800"
+                  placeholder="연락처"
+                  onClick={(e) => e.stopPropagation()}
+                />
               </>
             )}
           </div>
-
-          <div>
-            <label className="block text-sm text-gray-700 mb-1">
-              부서명 <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(event) =>
-                setFormData((prev) => ({ ...prev, name: event.target.value }))
-              }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm text-gray-700 mb-1">구분</label>
-            <input
-              type="text"
-              value={formData.type}
-              onChange={(event) =>
-                setFormData((prev) => ({ ...prev, type: event.target.value }))
-              }
-              placeholder="예: 본사, 현장, 지원"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm text-gray-700 mb-1">상위 부서</label>
-            <select
-              value={formData.parent}
-              onChange={(event) =>
-                setFormData((prev) => ({ ...prev, parent: event.target.value }))
-              }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-            >
-              <option value="">없음(최상위)</option>
-              {parentOptions.map((department) => (
-                <option key={department.id} value={department.id}>
-                  {department.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex justify-end gap-2 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              취소
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="px-4 py-2 bg-[#1e1e2f] text-white rounded-lg hover:bg-[#13131f] disabled:opacity-50"
-            >
-              {saving ? "저장 중..." : "저장"}
-            </button>
-          </div>
-        </form>
+        ) : (
+          // 조회 모드: 뷰
+          <>
+            {nodeType === "dept" ? (
+              <div className="flex items-center justify-center min-h-[40px]">
+                <span className="text-body-bold text-white tracking-wide">
+                  {node.name}
+                </span>
+              </div>
+            ) : (
+              <div className="flex min-h-[90px]">
+                {/* 왼쪽: 사진 (3.5cm x 4.5cm 비율, 카드 높이에 맞춤) */}
+                <div className="w-[70px] bg-slate-100 flex items-center justify-center overflow-hidden flex-shrink-0 self-stretch">
+                  {photoUrl ? (
+                    <img
+                      src={photoUrl}
+                      alt={node.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="text-slate-300 text-2xl">인</div>
+                  )}
+                </div>
+                {/* 오른쪽: 정보 */}
+                <div className="flex flex-col flex-1 min-w-0">
+                  {/* 상단: 직책 + 소속 */}
+                  <div className="bg-slate-50 border-b border-slate-100 px-3 py-1.5 text-center rounded-tr-xl">
+                    <div className="text-body-bold text-slate-600">
+                      {node.user_position || node.position || "-"}
+                    </div>
+                    <div className="text-muted truncate">
+                      {displayAffiliation}
+                    </div>
+                  </div>
+                  {/* 본문: 이름 */}
+                  <div className="flex-1 flex items-center justify-center py-2 px-2">
+                    <div className="text-highlight text-gray-800">
+                      {node.user_name || node.name}
+                    </div>
+                  </div>
+                  {/* 하단: 전화번호 (있을때만) */}
+                  {(node.user_phone || node.phone) && (
+                    <div className="border-t border-slate-100 py-1 px-2 bg-white rounded-br-xl">
+                      <div className="text-muted text-center">
+                        {node.user_phone || node.phone}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
+
+      {/* 자식이 있을 경우 하위 트리 렌더링 */}
+      {node.children &&
+        node.children.length > 0 &&
+        (() => {
+          // 현재 노드가 부서이고, 모든 자식이 사람인 경우 세로 정렬
+          const allChildrenArePeople =
+            nodeType === "dept" &&
+            node.children.every((child) => child.type === "person");
+
+          return (
+            <div className="flex flex-col items-center">
+              {/* 부모와 자식 그룹을 잇는 수직선 */}
+              <div className="h-6 w-px bg-slate-300"></div>
+
+              {/* 자식들 배치: 모든 자식이 사람이면 세로, 아니면 가로 */}
+              <div
+                className={`relative ${allChildrenArePeople ? "flex flex-col items-center" : "flex"}`}
+              >
+                {node.children.map((child, index) => (
+                  <div
+                    key={child.id}
+                    className={`flex flex-col items-center relative ${allChildrenArePeople ? "py-1" : "px-3 md:px-6"}`}
+                  >
+                    {/* 수직선 (부모 연결선과 만나는 지점) */}
+                    <div
+                      className={`w-px bg-slate-300 ${allChildrenArePeople ? "h-3" : "h-6"}`}
+                    ></div>
+
+                    {/* 가로선 로직 (가로 배치일 때만) */}
+                    {!allChildrenArePeople && node.children.length > 1 && (
+                      <>
+                        <div
+                          className={`absolute top-0 left-0 w-1/2 h-px bg-slate-300 ${index === 0 ? "hidden" : "block"}`}
+                        ></div>
+                        <div
+                          className={`absolute top-0 right-0 w-1/2 h-px bg-slate-300 ${index === node.children.length - 1 ? "hidden" : "block"}`}
+                        ></div>
+                      </>
+                    )}
+
+                    <OrgNode
+                      node={child}
+                      isEdit={isEdit}
+                      onUpdate={onUpdate}
+                      onAdd={onAdd}
+                      onDelete={onDelete}
+                      onNodeClick={onNodeClick}
+                      parentDept={nextParentDept}
+                      users={users}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
     </div>
   );
-}
+};
 
-export default function OrganizationChart() {
+const OrganizationChart = () => {
   const { user } = useAuth();
   const isSuperuser = Boolean(user?.is_superuser);
-  const [activeTab, setActiveTab] = useState("org");
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [editMode, setEditMode] = useState(false);
+
   const [companies, setCompanies] = useState([]);
   const [selectedCompany, setSelectedCompany] = useState("");
-  const [departments, setDepartments] = useState([]);
-  const [members, setMembers] = useState([]);
-  const [keyword, setKeyword] = useState("");
+  const [data, setData] = useState(null);
+  const [orgId, setOrgId] = useState(null);
+  const [activeTab, setActiveTab] = useState("org");
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [selectedNode, setSelectedNode] = useState(null);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  const [formOpen, setFormOpen] = useState(false);
-  const [editingDepartment, setEditingDepartment] = useState(null);
-  const [parentDepartment, setParentDepartment] = useState(null);
-
-  const loadOrganizationData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = selectedCompany ? { company: selectedCompany } : undefined;
-      const response = await api.get("core/departments/org-chart/", { params });
-      const payload = response.data || {};
-
-      const nextCompanies = payload.companies || [];
-      const nextDepartments = payload.departments || [];
-      const nextMembers = payload.members || [];
-
-      setCompanies(nextCompanies);
-      setDepartments(nextDepartments);
-      setMembers(nextMembers);
-
-      if (!selectedCompany && nextCompanies.length > 0) {
-        setSelectedCompany(String(nextCompanies[0].id));
-      }
-    } catch (error) {
-      console.error("Failed to load organization chart:", error);
-      setDepartments([]);
-      setMembers([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedCompany]);
-
-  useEffect(() => {
-    loadOrganizationData();
-  }, [loadOrganizationData]);
-
-  const departmentTree = useMemo(() => {
-    const visibleDepartments = departments.filter(
-      (department) => (department.name || "").trim() !== "대표이사",
-    );
-
-    const nodeMap = {};
-    visibleDepartments.forEach((department) => {
-      nodeMap[department.id] = {
-        ...department,
-        children: [],
-      };
-    });
-
-    const roots = [];
-    visibleDepartments.forEach((department) => {
-      const node = nodeMap[department.id];
-      if (department.parent && nodeMap[department.parent]) {
-        nodeMap[department.parent].children.push(node);
-      } else {
-        roots.push(node);
-      }
-    });
-
-    const sortByName = (list) => {
-      list.sort((a, b) => (a.name || "").localeCompare(b.name || "", "ko"));
-      list.forEach((item) => sortByName(item.children));
-    };
-    sortByName(roots);
-
-    return roots;
-  }, [departments]);
-
-  const hasValue = useCallback((value) => {
-    if (value === null || value === undefined) return false;
-    if (typeof value === "string") return value.trim() !== "";
-    return true;
-  }, []);
-
-  const membersWithOrganizationInfo = useMemo(
-    () =>
-      members.filter(
-        (member) =>
-          hasValue(member.company_name) &&
-          hasValue(member.department_name) &&
-          hasValue(member.position_name),
-      ),
-    [members, hasValue],
-  );
-
-  const memberMap = useMemo(() => {
-    const grouped = {};
-    membersWithOrganizationInfo.forEach((member) => {
-      if (!member.department_id) return;
-      if (!grouped[member.department_id]) grouped[member.department_id] = [];
-      grouped[member.department_id].push(member);
-    });
-    Object.values(grouped).forEach((list) => list.sort(sortMembers));
-    return grouped;
-  }, [membersWithOrganizationInfo]);
-
-  const chiefMember = useMemo(() => {
-    const unassigned = membersWithOrganizationInfo.filter(
-      (member) => !member.department_id,
-    );
-    const pool =
-      unassigned.length > 0 ? unassigned : membersWithOrganizationInfo;
-    if (pool.length === 0) return null;
-    return pool.slice().sort(sortMembers)[0];
-  }, [membersWithOrganizationInfo]);
-
-  const emergencyRows = useMemo(() => {
-    const normalized = keyword.trim().toLowerCase();
-    const base = membersWithOrganizationInfo.slice().sort(sortMembers);
-    if (!normalized) return base;
-
-    return base.filter((member) => {
-      const fields = [
-        member.name,
-        member.company_name,
-        member.department_name,
-        member.position_name,
-        member.phone_number,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      return fields.includes(normalized);
-    });
-  }, [membersWithOrganizationInfo, keyword]);
-
-  const showCompanyColumn = useMemo(
-    () =>
-      membersWithOrganizationInfo.length > 0 &&
-      membersWithOrganizationInfo.every((member) => hasValue(member.company_name)),
-    [membersWithOrganizationInfo, hasValue],
-  );
-  const showDepartmentColumn = useMemo(
-    () =>
-      membersWithOrganizationInfo.length > 0 &&
-      membersWithOrganizationInfo.every((member) => hasValue(member.department_name)),
-    [membersWithOrganizationInfo, hasValue],
-  );
-  const showPositionColumn = useMemo(
-    () =>
-      membersWithOrganizationInfo.length > 0 &&
-      membersWithOrganizationInfo.every((member) => hasValue(member.position_name)),
-    [membersWithOrganizationInfo, hasValue],
-  );
-  const emergencyColumnCount =
-    3 +
-    (showCompanyColumn ? 1 : 0) +
-    (showDepartmentColumn ? 1 : 0) +
-    (showPositionColumn ? 1 : 0);
+  const [popupPosition, setPopupPosition] = useState({ x: 300, y: 245 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
   const selectedCompanyInfo = useMemo(
     () => companies.find((company) => String(company.id) === String(selectedCompany)),
     [companies, selectedCompany],
   );
+  const contactList = useMemo(() => flattenTree(data), [data]);
 
-  const openCreateDepartment = () => {
-    setEditingDepartment(null);
-    setParentDepartment(null);
-    setFormOpen(true);
+  const handleDragStart = (event) => {
+    setIsDragging(true);
+    setDragOffset({
+      x: event.clientX - popupPosition.x,
+      y: event.clientY - popupPosition.y,
+    });
   };
 
-  const openAddChildDepartment = (department) => {
-    setEditingDepartment(null);
-    setParentDepartment(department);
-    setFormOpen(true);
-  };
+  useEffect(() => {
+    if (!isDragging) return;
 
-  const openEditDepartment = (department) => {
-    setEditingDepartment(department);
-    setParentDepartment(null);
-    setFormOpen(true);
-  };
+    const handleDrag = (event) => {
+      setPopupPosition({
+        x: event.clientX - dragOffset.x,
+        y: event.clientY - dragOffset.y,
+      });
+    };
+    const handleDragEnd = () => setIsDragging(false);
 
-  const handleDeleteDepartment = async (department) => {
-    if (!window.confirm(`"${department.name}" 부서를 삭제하시겠습니까?`)) return;
-    try {
-      await api.delete(`core/departments/${department.id}/`);
-      await loadOrganizationData();
-    } catch (error) {
-      console.error("Failed to delete department:", error);
-      alert("부서 삭제 중 오류가 발생했습니다.");
+    window.addEventListener("mousemove", handleDrag);
+    window.addEventListener("mouseup", handleDragEnd);
+    return () => {
+      window.removeEventListener("mousemove", handleDrag);
+      window.removeEventListener("mouseup", handleDragEnd);
+    };
+  }, [isDragging, dragOffset]);
+
+  useEffect(() => {
+    let active = true;
+
+    (async () => {
+      try {
+        const response = await api.get("core/companies/");
+        const rows = normalizeList(response.data);
+        if (!active) return;
+
+        setCompanies(rows);
+        if (rows.length === 0) {
+          setSelectedCompany("");
+          return;
+        }
+
+        setSelectedCompany((prev) => {
+          if (prev && rows.some((row) => String(row.id) === String(prev))) {
+            return prev;
+          }
+          return String(rows[0].id);
+        });
+      } catch (error) {
+        console.error("Failed to fetch companies:", error);
+        if (!active) return;
+        setCompanies([]);
+        setSelectedCompany("");
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedCompany) {
+      setLoading(false);
+      setData(null);
+      setOrgId(null);
+      setUsers([]);
+      return;
     }
+
+    let active = true;
+    (async () => {
+      setLoading(true);
+      try {
+        const [orgRes, usersRes] = await Promise.all([
+          api.get("core/organizations/", { params: { company: selectedCompany } }),
+          api.get("core/organizations/available-users/", { params: { company: selectedCompany } }),
+        ]);
+
+        if (!active) return;
+        const orgRows = normalizeList(orgRes.data);
+        const userRows = normalizeList(usersRes.data);
+
+        if (orgRows.length > 0) {
+          setOrgId(orgRows[0].id);
+          setData(orgRows[0].tree || null);
+        } else {
+          setOrgId(null);
+          setData(null);
+        }
+        setUsers(userRows);
+      } catch (error) {
+        console.error("Failed to fetch organization chart:", error);
+        if (!active) return;
+        setData(null);
+        setOrgId(null);
+        setUsers([]);
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [selectedCompany]);
+
+  const handleUpdate = (id, field, value) => {
+    setData((prev) => updateNode(prev, id, field, value));
   };
 
-  const handleSaveDepartment = async (payload, departmentId) => {
+  const handleAddChild = (parentId, type) => {
+    const newId = `node-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    // 타입에 따른 기본 데이터
+    const newChild =
+      type === "dept"
+        ? {
+            id: newId,
+            type: "dept",
+            name: "새 부서",
+            children: [],
+          }
+        : {
+            id: newId,
+            type: "person",
+            name: "홍길동",
+            position: "직책",
+            phone: "",
+            company: selectedCompanyInfo?.name || "",
+            children: [],
+          };
+
+    setData((prev) => addChildNode(prev, parentId, newChild));
+  };
+
+  const handleDeleteNode = (nodeId) => {
+    // Root Node protection logic
+    if (nodeId === TEMPLATE_DATA.id || nodeId === "root") {
+      alert("최상위 조직은 삭제할 수 없습니다.");
+      return;
+    }
+    setData((prev) => deleteNodeFromTree(prev, nodeId));
+  };
+
+  const handleNodeClick = (node) => {
+    setSelectedNode(node);
+  };
+
+  const handleSave = async () => {
+    if (!selectedCompany) {
+      alert("회사를 먼저 선택해주세요.");
+      return;
+    }
+    if (!window.confirm("저장하시겠습니까?")) return;
+
     setSaving(true);
     try {
-      const requestData = {
-        name: payload.name,
-        type: payload.type || "",
-        company: payload.company,
-        parent: payload.parent || null,
-      };
-
-      if (departmentId) {
-        await api.patch(`core/departments/${departmentId}/`, requestData);
+      const payload = { company: selectedCompany, tree: data };
+      if (orgId) {
+        await api.put(`core/organizations/${orgId}/`, payload);
       } else {
-        await api.post("core/departments/", requestData);
+        const response = await api.post("core/organizations/", payload);
+        setOrgId(response.data?.id || null);
       }
 
-      setFormOpen(false);
-      setEditingDepartment(null);
-      setParentDepartment(null);
-      await loadOrganizationData();
+      const refresh = await api.get("core/organizations/", {
+        params: { company: selectedCompany },
+      });
+      const rows = normalizeList(refresh.data);
+      if (rows.length > 0) {
+        setOrgId(rows[0].id);
+        setData(rows[0].tree || null);
+      }
+
+      alert("저장되었습니다.");
+      setIsEditMode(false);
     } catch (error) {
-      console.error("Failed to save department:", error);
-      alert("부서 저장 중 오류가 발생했습니다.");
+      console.error("Failed to save organization chart:", error);
+      alert("저장 중 오류가 발생했습니다.");
     } finally {
       setSaving(false);
     }
   };
 
-  return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">조직도 조회</h1>
-        <div className="flex items-center gap-2">
-          {isSuperuser && companies.length > 1 && (
-            <select
-              value={selectedCompany}
-              onChange={(event) => setSelectedCompany(event.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
-            >
-              {companies.map((company) => (
-                <option key={company.id} value={company.id}>
-                  {company.name}
-                </option>
-              ))}
-            </select>
-          )}
-          <button
-            type="button"
-            onClick={() => setEditMode((prev) => !prev)}
-            className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
-          >
-            {editMode ? "편집 종료" : "조직도 등록/수정"}
-          </button>
-          {editMode && (
+  const handleCreateTemplate = () => {
+    setData({
+      ...TEMPLATE_DATA,
+      company: selectedCompanyInfo?.name || "",
+      children: (TEMPLATE_DATA.children || []).map((child) => ({
+        ...child,
+        company: selectedCompanyInfo?.name || "",
+      })),
+    });
+    setIsEditMode(true);
+  };
+
+  const handleCompanyChange = (companyId) => {
+    setSelectedCompany(companyId);
+    setSelectedNode(null);
+    setIsEditMode(false);
+  };
+
+  if (!selectedCompany && !loading) {
+    return (
+      <div className="p-8 border border-slate-200 rounded-lg bg-slate-50 text-center text-slate-500">
+        접근 가능한 회사가 없습니다.
+      </div>
+    );
+  }
+
+  if (!data && !loading) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-gray-900">조직도 조회</h1>
+          <div className="flex items-center gap-2">
+            {(isSuperuser || companies.length > 1) && (
+              <select
+                value={selectedCompany}
+                onChange={(event) => handleCompanyChange(event.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              >
+                {companies.map((company) => (
+                  <option key={company.id} value={company.id}>
+                    {company.name}
+                  </option>
+                ))}
+              </select>
+            )}
             <button
               type="button"
-              onClick={openCreateDepartment}
-              className="px-4 py-2 text-sm bg-[#1e1e2f] text-white rounded-lg hover:bg-[#13131f]"
+              onClick={handleCreateTemplate}
+              className="px-4 py-2 rounded-lg bg-[#1e1e2f] text-white text-sm hover:bg-[#13131f]"
             >
-              부서 추가
+              조직도 생성하기
             </button>
-          )}
+          </div>
+        </div>
+
+        <div className="p-8 flex flex-col items-center justify-center min-h-[400px] border border-slate-200 rounded-lg bg-slate-50">
+          <p className="text-slate-500 mb-2 font-medium">
+            현재 등록된 조직도가 없습니다.
+          </p>
+          <p className="text-slate-400 text-xs mb-6">
+            현장 조직도를 만들어 체계적으로 관리하세요.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 pt-0 relative animate-in fade-in duration-500">
+      <div className="flex justify-end mb-4 items-center gap-2">
+        {(isSuperuser || companies.length > 1) && (
+          <select
+            value={selectedCompany}
+            onChange={(event) => handleCompanyChange(event.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+          >
+            {companies.map((company) => (
+              <option key={company.id} value={company.id}>
+                {company.name}
+              </option>
+            ))}
+          </select>
+        )}
+        <button
+          onClick={() => {
+            if (isEditMode) {
+              handleSave();
+            } else {
+              setIsEditMode(true);
+            }
+          }}
+          disabled={saving}
+          className={`px-4 py-2 rounded-lg shadow-sm text-sm font-medium transition-all flex items-center gap-2 disabled:opacity-60 ${
+            isEditMode
+              ? "bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md"
+              : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300"
+          }`}
+        >
+          {isEditMode ? <>저장 완료</> : <>조직도 등록/수정</>}
+        </button>
+      </div>
+
+      <div className="mb-6">
+        <div className="flex border-b border-gray-200">
+          <button
+            onClick={() => setActiveTab("org")}
+            className={`px-6 py-3 text-sm font-medium transition-colors relative ${
+              activeTab === "org"
+                ? "text-blue-600"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            현장 조직도
+            {activeTab === "org" && (
+              <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-t-full"></div>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab("emergency")}
+            className={`px-6 py-3 text-sm font-medium transition-colors relative ${
+              activeTab === "emergency"
+                ? "text-blue-600"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            비상 연락망
+            {activeTab === "emergency" && (
+              <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-t-full"></div>
+            )}
+          </button>
         </div>
       </div>
 
-      <div className="border-b border-gray-200 flex items-center gap-6">
-        <button
-          type="button"
-          onClick={() => setActiveTab("org")}
-          className={`px-4 py-3 text-sm font-semibold border-b-2 ${
-            activeTab === "org"
-              ? "border-[#1e1e2f] text-[#1e1e2f]"
-              : "border-transparent text-gray-500 hover:text-gray-700"
-          }`}
-        >
-          현장 조직도
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab("emergency")}
-          className={`px-4 py-3 text-sm font-semibold border-b-2 ${
-            activeTab === "emergency"
-              ? "border-[#1e1e2f] text-[#1e1e2f]"
-              : "border-transparent text-gray-500 hover:text-gray-700"
-          }`}
-        >
-          비상 연락망
-        </button>
-      </div>
+      <div
+        className={`bg-slate-50/50 rounded-xl border border-slate-200 min-h-[500px] overflow-auto relative scrollbar-hide
+                ${activeTab === "org" ? "p-8" : "p-0"}
+            `}
+      >
+        {loading && (
+          <div className="flex items-center justify-center py-24">
+            <div className="animate-spin rounded-full h-10 w-10 border-2 border-blue-600 border-t-transparent"></div>
+          </div>
+        )}
 
-      <div className="bg-white rounded-xl border border-gray-200 p-5 min-h-[560px]">
-        {activeTab === "org" ? (
-          loading ? (
-            <div className="flex items-center justify-center py-20">
-              <div className="animate-spin rounded-full h-10 w-10 border-2 border-[#1e1e2f] border-t-transparent"></div>
-            </div>
-          ) : (
-            <div className="space-y-10">
-              {chiefMember && (
-                <div className="flex flex-col items-center">
-                  <div className="px-8 py-4 bg-slate-700 text-white rounded-xl shadow font-semibold mb-3">
-                    {chiefMember.position_name || "총괄"}
-                  </div>
-                  <PersonCard person={chiefMember} highlighted />
-                </div>
-              )}
-
-              {departmentTree.length === 0 ? (
-                <div className="text-center text-gray-500 py-20">
-                  등록된 부서가 없습니다.
-                </div>
-              ) : (
-                <div className="overflow-x-auto pb-2">
-                  <div className="inline-flex items-start gap-10 min-w-full justify-center">
-                    {departmentTree.map((department) => (
-                      <DepartmentNode
-                        key={department.id}
-                        node={department}
-                        memberMap={memberMap}
-                        editMode={editMode}
-                        onAddChild={openAddChildDepartment}
-                        onEdit={openEditDepartment}
-                        onDelete={handleDeleteDepartment}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-              {isSuperuser && (
-                <div className="text-sm text-gray-500 text-right">
-                  {selectedCompanyInfo?.name ? `${selectedCompanyInfo.name} 기준` : ""}
-                </div>
-              )}
-            </div>
-          )
-        ) : (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">
-                비상 연락망
-              </h2>
-              <input
-                type="text"
-                value={keyword}
-                onChange={(event) => setKeyword(event.target.value)}
-                placeholder="이름/부서/직위/연락처 검색"
-                className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg text-sm"
+        {!loading && activeTab === "org" && (
+          <div className="min-w-max pb-16 pt-4">
+            <div className="flex justify-center transform scale-95 origin-top">
+              <OrgNode
+                node={data}
+                isEdit={isEditMode}
+                onUpdate={handleUpdate}
+                onAdd={handleAddChild}
+                onDelete={handleDeleteNode}
+                onNodeClick={handleNodeClick}
+                users={users}
               />
             </div>
+            <div className="text-center mt-16 flex flex-col items-center gap-2">
+              {isEditMode ? (
+                <div className="bg-blue-50 text-blue-700 px-4 py-2 rounded-full text-xs font-medium border border-blue-100 shadow-sm max-w-md">
+                  [+부서] 또는 [+인원] 버튼을 눌러 하위 조직을 추가하세요.
+                </div>
+              ) : (
+                <p className="text-slate-400 text-xs">
+                  카드를 클릭하면 상세 정보를 확인할 수 있습니다.
+                </p>
+              )}
+            </div>
+          </div>
+        )}
 
-            <div className="border border-gray-200 rounded-xl overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr className="text-sm text-gray-700">
-                    <th className="px-3 py-3 text-center w-16">번호</th>
-                    <th className="px-3 py-3 text-left">이름</th>
-                    {showCompanyColumn && <th className="px-3 py-3 text-left">회사</th>}
-                    {showDepartmentColumn && <th className="px-3 py-3 text-left">부서</th>}
-                    {showPositionColumn && <th className="px-3 py-3 text-left">직위</th>}
-                    <th className="px-3 py-3 text-left">연락처</th>
+        {!loading && activeTab === "emergency" && (
+          <div className="w-full bg-white min-h-[500px]">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left text-gray-500">
+                <thead className="text-xs text-gray-700 uppercase bg-gray-50 border-b border-gray-100">
+                  <tr>
+                    <th className="px-6 py-4 text-center w-32">직책</th>
+                    <th className="px-6 py-4 text-center w-32">성명</th>
+                    <th className="px-6 py-4 text-center w-40">소속</th>
+                    <th className="px-6 py-4 text-center">연락처</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {loading ? (
-                    <tr>
-                      <td
-                        colSpan={emergencyColumnCount}
-                        className="px-3 py-10 text-center text-sm text-gray-500"
-                      >
-                        로딩 중입니다.
+                <tbody className="divide-y divide-gray-100">
+                  {contactList.map((person) => (
+                    <tr
+                      key={person.id}
+                      className={`hover:bg-blue-50/50 transition-colors ${selectedNode?.id === person.id ? "bg-blue-50" : ""}`}
+                    >
+                      <td className="px-6 py-4 text-center font-medium text-slate-600">
+                        {person.position || "-"}
+                      </td>
+                      <td className="px-6 py-4 text-center font-bold text-gray-900">
+                        {person.name}
+                      </td>
+                      <td className="px-6 py-4 text-center text-slate-500 text-xs">
+                        {person.company || person.inheritedDept || "-"}
+                      </td>
+                      <td className="px-6 py-4 text-center text-slate-500 font-mono text-xs">
+                        {person.phone || "-"}
                       </td>
                     </tr>
-                  ) : emergencyRows.length === 0 ? (
+                  ))}
+                  {contactList.length === 0 && (
                     <tr>
-                      <td
-                        colSpan={emergencyColumnCount}
-                        className="px-3 py-10 text-center text-sm text-gray-500"
-                      >
-                        표시할 연락처가 없습니다.
+                      <td colSpan="4" className="text-center py-20">
+                        <div className="flex flex-col items-center justify-center text-slate-300">
+                          <span>등록된 비상연락망 인원이 없습니다.</span>
+                        </div>
                       </td>
                     </tr>
-                  ) : (
-                    emergencyRows.map((member, index) => (
-                      <tr key={member.id} className="border-t border-gray-100 text-sm">
-                        <td className="px-3 py-3 text-center text-gray-500">
-                          {index + 1}
-                        </td>
-                        <td className="px-3 py-3 font-medium text-gray-900">
-                          {member.name}
-                        </td>
-                        {showCompanyColumn && (
-                          <td className="px-3 py-3 text-gray-700">
-                            {member.company_name || "-"}
-                          </td>
-                        )}
-                        {showDepartmentColumn && (
-                          <td className="px-3 py-3 text-gray-700">
-                            {member.department_name || "-"}
-                          </td>
-                        )}
-                        {showPositionColumn && (
-                          <td className="px-3 py-3 text-gray-700">
-                            {member.position_name || "-"}
-                          </td>
-                        )}
-                        <td className="px-3 py-3 text-gray-700">
-                          {member.phone_number || "-"}
-                        </td>
-                      </tr>
-                    ))
                   )}
                 </tbody>
               </table>
             </div>
           </div>
         )}
-      </div>
 
-      <DepartmentFormModal
-        isOpen={formOpen}
-        onClose={() => {
-          setFormOpen(false);
-          setEditingDepartment(null);
-          setParentDepartment(null);
-        }}
-        onSave={handleSaveDepartment}
-        canSelectCompany={isSuperuser}
-        companies={companies}
-        departments={departments}
-        selectedCompanyId={selectedCompany}
-        editingDepartment={editingDepartment}
-        parentDepartment={parentDepartment}
-        saving={saving}
-      />
+        {/* 선택된 노드 상세 팝업 (조직도 탭에서만 표시) */}
+        {selectedNode && activeTab === "org" && !isEditMode && (
+          <div
+            className="fixed bg-white border border-slate-200 shadow-2xl rounded-xl p-6 w-80 z-[100] ring-1 ring-slate-900/10"
+            style={{ left: popupPosition.x, top: popupPosition.y }}
+          >
+            {/* 드래그 가능한 헤더 */}
+            <div
+              className="flex justify-between items-start mb-4 border-b border-slate-100 pb-3 cursor-move select-none"
+              onMouseDown={handleDragStart}
+            >
+              <div>
+                <h4 className="font-bold text-2xl text-slate-800 tracking-tight">
+                  {selectedNode.name}
+                </h4>
+                <span
+                  className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase mt-2 inline-block ${selectedNode.type === "dept" ? "bg-slate-100 text-slate-500" : "bg-blue-50 text-blue-600"}`}
+                >
+                  {selectedNode.type === "dept" ? "Department" : "Person"}
+                </span>
+              </div>
+              <button
+                onClick={() => setSelectedNode(null)}
+                className="text-slate-300 hover:text-slate-500 p-2 hover:bg-slate-50 rounded-full transition-colors -mr-2 -mt-2"
+              >
+                X
+              </button>
+            </div>
+
+            {selectedNode.type === "dept" ? (
+              <div className="text-sm text-slate-500 p-4 bg-slate-50 rounded-lg text-center">
+                하위 조직을 포함하는 부서 노드입니다.
+              </div>
+            ) : (
+              <div className="space-y-4 text-sm text-slate-600">
+                {/* 사진 표시 */}
+                <div className="flex justify-center mb-4">
+                  <div className="w-[105px] h-[135px] bg-slate-100 rounded-lg overflow-hidden border border-slate-200">
+                    {selectedNode.profile_picture_url ? (
+                      <img
+                        src={selectedNode.profile_picture_url}
+                        alt={selectedNode.user_name || selectedNode.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-slate-300 text-4xl">
+                        인
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 text-xs font-semibold">
+                    직책
+                  </span>
+                  <span className="font-medium text-slate-800 text-base">
+                    {selectedNode.position || "-"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 text-xs font-semibold">
+                    소속
+                  </span>
+                  {/* 상속받은 부서명 또는 입력된 회사명 */}
+                  <span className="font-medium text-slate-700">
+                    {selectedNode.company || selectedNode.inheritedDept || "-"}
+                  </span>
+                </div>
+                <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 flex flex-col gap-1">
+                  <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">
+                    Mobile
+                  </span>
+                  <a
+                    href={`tel:${selectedNode.phone}`}
+                    className="font-bold text-lg text-blue-600 font-mono tracking-tight hover:underline"
+                  >
+                    {selectedNode.phone || "-"}
+                  </a>
+                </div>
+              </div>
+            )}
+
+            {selectedNode.type !== "dept" && (
+              <div className="mt-6 pt-4 border-t border-slate-100 flex justify-end">
+                <button
+                  onClick={() => {
+                    setActiveTab("emergency");
+                  }}
+                  className="text-xs text-slate-500 hover:text-blue-600 flex items-center gap-1 transition-colors font-medium"
+                >
+                  비상연락망에서 확인하기
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
-}
+};
+
+export default OrganizationChart;
