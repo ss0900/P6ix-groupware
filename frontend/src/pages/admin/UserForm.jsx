@@ -86,13 +86,24 @@ export default function UserForm() {
 
   // 필터링된 부서/직위 (선택된 회사 기준)
   const filteredDepartments = departments.filter(
-    (d) => !formData.company || String(d.company) === String(formData.company)
+    (d) => !formData.company || String(d.company) === String(formData.company),
   );
   const filteredPositions = positions.filter(
     (p) =>
       !formData.company ||
-      String(p.company_id || p.company) === String(formData.company)
+      String(p.company_id || p.company) === String(formData.company),
   );
+
+  const handlePhoneNumberChange = (e) => {
+    const value = e.target.value;
+
+    if (!isEdit && /[^0-9]/.test(value)) {
+      alert("숫자만 입력해주세요.");
+      return;
+    }
+
+    setFormData({ ...formData, phone_number: value });
+  };
 
   // 저장
   const handleSubmit = async (e) => {
@@ -270,9 +281,9 @@ export default function UserForm() {
               <input
                 type="tel"
                 value={formData.phone_number}
-                onChange={(e) =>
-                  setFormData({ ...formData, phone_number: e.target.value })
-                }
+                onChange={handlePhoneNumberChange}
+                inputMode="numeric"
+                pattern="[0-9]*"
                 placeholder="010-0000-0000"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                 required
