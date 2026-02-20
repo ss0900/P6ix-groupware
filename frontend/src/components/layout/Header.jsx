@@ -17,6 +17,7 @@ function Header({ onMenuClick }) {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [companyLogoUrl, setCompanyLogoUrl] = useState(null);
 
   // 알림 개수 로드
   useEffect(() => {
@@ -33,6 +34,43 @@ function Header({ onMenuClick }) {
     const interval = setInterval(loadUnreadCount, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadCompanyLogo = async () => {
+      if (!user) {
+        if (mounted) setCompanyLogoUrl(null);
+        return;
+      }
+
+      try {
+        const membershipRes = await api.get("core/membership/me/");
+        const memberships = membershipRes.data?.results ?? membershipRes.data ?? [];
+        const primaryMembership =
+          memberships.find((membership) => membership.is_primary) || memberships[0];
+
+        const companyId = primaryMembership?.company;
+        if (!companyId) {
+          if (mounted) setCompanyLogoUrl(null);
+          return;
+        }
+
+        const companyRes = await api.get(`core/companies/${companyId}/`);
+        if (mounted) {
+          setCompanyLogoUrl(companyRes.data?.logo || null);
+        }
+      } catch (err) {
+        if (mounted) setCompanyLogoUrl(null);
+      }
+    };
+
+    loadCompanyLogo();
+
+    return () => {
+      mounted = false;
+    };
+  }, [user]);
 
   const handleLogout = async () => {
     await logout();
@@ -64,7 +102,16 @@ function Header({ onMenuClick }) {
               onClick={goDashboard}
               className="text-white font-bold text-xl hover:opacity-90 transition-opacity whitespace-nowrap"
             >
-              P6ix Groupware
+              {companyLogoUrl ? (
+                <img
+                  src={companyLogoUrl}
+                  alt="Company Logo"
+                  className="h-8 w-auto max-w-[220px] object-contain"
+                  onError={() => setCompanyLogoUrl(null)}
+                />
+              ) : (
+                "P6ix Groupware"
+              )}
             </button>
           </div>
 
