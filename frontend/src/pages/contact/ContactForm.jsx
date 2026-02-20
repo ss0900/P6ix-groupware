@@ -457,7 +457,7 @@ export default function ContactForm() {
         await ContactApi.createMessage(formData);
       }
 
-      navigate(isDraft ? "/contact/draft" : "/contact/sent");
+      navigate(isDraft ? "/contact/draft" : "/contact/all");
     } catch (err) {
       console.error("Failed to submit:", err);
       alert("저장에 실패했습니다.");
