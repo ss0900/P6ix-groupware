@@ -35,6 +35,17 @@ const normalizeList = (payload) => {
   return [];
 };
 
+const formatPhoneNumber = (phoneNumber) => {
+  const digits = String(phoneNumber ?? "")
+    .replace(/\D/g, "")
+    .slice(0, 11);
+
+  if (!digits) return "";
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+};
+
 const AUTO_REFRESH_INTERVAL_MS = 5000;
 
 const normalizeUsersForOrg = (
@@ -450,6 +461,7 @@ const OrgNode = ({
 
   // 사진 URL: 사용자 연결 시 profile_picture_url 사용
   const photoUrl = node.profile_picture_url;
+  const displayPhone = formatPhoneNumber(node.user_phone || node.phone);
 
   return (
     <div className="flex flex-col items-center">
@@ -691,10 +703,10 @@ const OrgNode = ({
                     </div>
                   </div>
                   {/* 하단: 전화번호 (있을때만) */}
-                  {(node.user_phone || node.phone) && (
+                  {displayPhone && (
                     <div className="border-t border-slate-100 py-1 px-2 bg-white rounded-br-xl">
                       <div className="text-muted text-center">
-                        {node.user_phone || node.phone}
+                        {displayPhone}
                       </div>
                     </div>
                   )}
@@ -794,6 +806,18 @@ const OrganizationChart = () => {
     [companies, selectedCompany],
   );
   const contactList = useMemo(() => flattenTree(data), [data]);
+  const orgTopNodes = useMemo(() => {
+    if (!data) return [];
+    if (
+      data.id === "root" &&
+      data.type === "dept" &&
+      Array.isArray(data.children) &&
+      data.children.length > 0
+    ) {
+      return data.children;
+    }
+    return [data];
+  }, [data]);
 
   const handleDragStart = (event) => {
     setIsDragging(true);
@@ -1006,6 +1030,14 @@ const OrganizationChart = () => {
     setSelectedNode(node);
   };
 
+  const handleTabChange = (tab, options = {}) => {
+    const { keepSelection = false } = options;
+    setActiveTab(tab);
+    if (tab !== "org" && !keepSelection) {
+      setSelectedNode(null);
+    }
+  };
+
   const handleSave = async () => {
     if (!selectedCompany) {
       alert("회사를 먼저 선택해주세요.");
@@ -1147,7 +1179,7 @@ const OrganizationChart = () => {
       <div className="mb-6">
         <div className="flex border-b border-gray-200">
           <button
-            onClick={() => setActiveTab("org")}
+            onClick={() => handleTabChange("org")}
             className={`px-6 py-3 text-sm font-medium transition-colors relative ${
               activeTab === "org"
                 ? "text-blue-600"
@@ -1160,7 +1192,7 @@ const OrganizationChart = () => {
             )}
           </button>
           <button
-            onClick={() => setActiveTab("emergency")}
+            onClick={() => handleTabChange("emergency")}
             className={`px-6 py-3 text-sm font-medium transition-colors relative ${
               activeTab === "emergency"
                 ? "text-blue-600"
@@ -1189,15 +1221,22 @@ const OrganizationChart = () => {
         {!loading && activeTab === "org" && (
           <div className="min-w-max pb-16 pt-4">
             <div className="flex justify-center transform scale-95 origin-top">
-              <OrgNode
-                node={data}
-                isEdit={isEditMode}
-                onUpdate={handleUpdate}
-                onAdd={handleAddChild}
-                onDelete={handleDeleteNode}
-                onNodeClick={handleNodeClick}
-                users={users}
-              />
+              <div
+                className={`flex ${orgTopNodes.length > 1 ? "items-start gap-8" : "items-start"}`}
+              >
+                {orgTopNodes.map((topNode) => (
+                  <OrgNode
+                    key={topNode.id}
+                    node={topNode}
+                    isEdit={isEditMode}
+                    onUpdate={handleUpdate}
+                    onAdd={handleAddChild}
+                    onDelete={handleDeleteNode}
+                    onNodeClick={handleNodeClick}
+                    users={users}
+                  />
+                ))}
+              </div>
             </div>
             <div className="text-center mt-16 flex flex-col items-center gap-2">
               {isEditMode ? (
@@ -1219,10 +1258,10 @@ const OrganizationChart = () => {
               <table className="w-full text-sm text-left text-gray-500">
                 <thead className="text-xs text-gray-700 uppercase bg-gray-50 border-b border-gray-100">
                   <tr>
-                    <th className="px-6 py-4 text-center w-32">직책</th>
-                    <th className="px-6 py-4 text-center w-32">성명</th>
-                    <th className="px-6 py-4 text-center w-40">소속</th>
-                    <th className="px-6 py-4 text-center">연락처</th>
+                    <th className="px-6 py-4 text-center w-1/4">성명</th>
+                    <th className="px-6 py-4 text-center w-1/4">부서</th>
+                    <th className="px-6 py-4 text-center w-1/4">직위</th>
+                    <th className="px-6 py-4 text-center w-1/4">연락처</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -1231,17 +1270,17 @@ const OrganizationChart = () => {
                       key={person.id}
                       className={`hover:bg-blue-50/50 transition-colors ${selectedNode?.id === person.id ? "bg-blue-50" : ""}`}
                     >
-                      <td className="px-6 py-4 text-center font-medium text-slate-600">
-                        {person.position || "-"}
-                      </td>
                       <td className="px-6 py-4 text-center font-bold text-gray-900">
                         {person.name}
                       </td>
                       <td className="px-6 py-4 text-center text-slate-500 text-xs">
-                        {person.company || person.inheritedDept || "-"}
+                        {person.inheritedDept || person.department_name || "-"}
                       </td>
-                      <td className="px-6 py-4 text-center text-slate-500 font-mono text-xs">
-                        {person.phone || "-"}
+                      <td className="px-6 py-4 text-center font-medium text-slate-600">
+                        {person.position || person.user_position || "-"}
+                      </td>
+                      <td className="px-6 py-4 text-center text-muted">
+                        {formatPhoneNumber(person.phone) || "-"}
                       </td>
                     </tr>
                   ))}
@@ -1313,19 +1352,18 @@ const OrganizationChart = () => {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-400 text-xs font-semibold">
-                    직책
+                    부서
                   </span>
                   <span className="font-medium text-slate-800 text-base">
-                    {selectedNode.position || "-"}
+                    {selectedNode.inheritedDept || selectedNode.department_name || "-"}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-400 text-xs font-semibold">
-                    소속
+                    직위
                   </span>
-                  {/* 상속받은 부서명 또는 입력된 회사명 */}
                   <span className="font-medium text-slate-700">
-                    {selectedNode.company || selectedNode.inheritedDept || "-"}
+                    {selectedNode.user_position || selectedNode.position || "-"}
                   </span>
                 </div>
                 <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 flex flex-col gap-1">
@@ -1333,10 +1371,10 @@ const OrganizationChart = () => {
                     Mobile
                   </span>
                   <a
-                    href={`tel:${selectedNode.phone}`}
+                    href={`tel:${String(selectedNode.phone || "").replace(/\D/g, "")}`}
                     className="font-bold text-lg text-blue-600 font-mono tracking-tight hover:underline"
                   >
-                    {selectedNode.phone || "-"}
+                    {formatPhoneNumber(selectedNode.phone) || "-"}
                   </a>
                 </div>
               </div>
@@ -1346,7 +1384,7 @@ const OrganizationChart = () => {
               <div className="mt-6 pt-4 border-t border-slate-100 flex justify-end">
                 <button
                   onClick={() => {
-                    setActiveTab("emergency");
+                    handleTabChange("emergency", { keepSelection: true });
                   }}
                   className="text-xs text-slate-500 hover:text-blue-600 flex items-center gap-1 transition-colors font-medium"
                 >

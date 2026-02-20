@@ -233,8 +233,8 @@ export default function SidebarLayout({ title, base, sections = [], enableToggle
   // sections가 비어있으면 사이드바 없이 렌더링
   if (!filteredSections || filteredSections.length === 0) {
     return (
-      <div className="bg-gray-50 min-h-[calc(100vh-60px)]">
-        <main className="p-6">
+      <div className="bg-gray-50 h-[calc(100vh-60px)]">
+        <main className="h-full p-6 overflow-y-auto">
           <Outlet />
         </main>
       </div>
@@ -242,7 +242,7 @@ export default function SidebarLayout({ title, base, sections = [], enableToggle
   }
 
   return (
-    <div className="bg-gray-50 min-h-[calc(100vh-60px)] flex relative">
+    <div className="bg-gray-50 h-[calc(100vh-60px)] flex relative overflow-hidden">
       {/* Sidebar */}
       <aside className={`hidden lg:flex flex-col bg-white border-r shrink-0 transition-all duration-300 ${
         sidebarCollapsed ? "w-14" : "w-56"
@@ -323,7 +323,7 @@ export default function SidebarLayout({ title, base, sections = [], enableToggle
       )}
 
       {/* Main Content */}
-      <main className="flex-1 p-6 overflow-auto">
+      <main className="flex-1 p-6 overflow-y-auto min-h-0">
         <Outlet />
       </main>
     </div>
