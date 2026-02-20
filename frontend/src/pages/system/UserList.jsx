@@ -7,6 +7,17 @@ import { fetchUsers } from "../../api/users/user";
 import BoardTable from "../../components/common/board/BoardTable"; //Changed
 import { useAuth } from "../../context/AuthContext";
 
+const formatPhoneNumber = (phoneNumber) => {
+  const digits = String(phoneNumber ?? "")
+    .replace(/\D/g, "")
+    .slice(0, 11);
+
+  if (!digits) return "";
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+};
+
 export default function UserList() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -164,7 +175,7 @@ export default function UserList() {
       key: "phone_number",
       header: "연락처",
       // width: 140,
-      render: (row) => row.phone_number || "-",
+      render: (row) => formatPhoneNumber(row.phone_number) || "-",
     },
     {
       key: "email",
