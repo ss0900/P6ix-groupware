@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import api from "../../api/axios";
+import { useAuth } from "../../context/AuthContext";
 
 // 초기 템플릿 데이터 (생성 시 사용)
 const TEMPLATE_DATA = {
@@ -505,6 +506,9 @@ const OrgNode = ({
 };
 
 const OrganizationChart = () => {
+  const { user } = useAuth();
+  const isSuperuser = Boolean(user?.is_superuser);
+
   const [companies, setCompanies] = useState([]);
   const [selectedCompany, setSelectedCompany] = useState("");
   const [data, setData] = useState(null);
@@ -722,6 +726,12 @@ const OrganizationChart = () => {
     setIsEditMode(true);
   };
 
+  const handleCompanyChange = (companyId) => {
+    setSelectedCompany(companyId);
+    setSelectedNode(null);
+    setIsEditMode(false);
+  };
+
   if (!selectedCompany && !loading) {
     return (
       <div className="p-8 border border-slate-200 rounded-lg bg-slate-50 text-center text-slate-500">
@@ -736,6 +746,19 @@ const OrganizationChart = () => {
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-900">조직도 조회</h1>
           <div className="flex items-center gap-2">
+            {(isSuperuser || companies.length > 1) && (
+              <select
+                value={selectedCompany}
+                onChange={(event) => handleCompanyChange(event.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              >
+                {companies.map((company) => (
+                  <option key={company.id} value={company.id}>
+                    {company.name}
+                  </option>
+                ))}
+              </select>
+            )}
             <button
               type="button"
               onClick={handleCreateTemplate}
@@ -761,6 +784,19 @@ const OrganizationChart = () => {
   return (
     <div className="p-6 pt-0 relative animate-in fade-in duration-500">
       <div className="flex justify-end mb-4 items-center gap-2">
+        {(isSuperuser || companies.length > 1) && (
+          <select
+            value={selectedCompany}
+            onChange={(event) => handleCompanyChange(event.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+          >
+            {companies.map((company) => (
+              <option key={company.id} value={company.id}>
+                {company.name}
+              </option>
+            ))}
+          </select>
+        )}
         <button
           onClick={() => {
             if (isEditMode) {
