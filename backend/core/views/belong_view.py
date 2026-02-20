@@ -461,13 +461,15 @@ class UserListSerializer(drf_serializers.ModelSerializer):
     company_id = drf_serializers.SerializerMethodField()
     department_id = drf_serializers.SerializerMethodField()
     position_id = drf_serializers.SerializerMethodField()
+    profile_picture = drf_serializers.SerializerMethodField()
 
     class Meta:
         model = CustomUser
         fields = [
             "id", "username", "email", "first_name", "last_name", "phone_number",
             "is_active", "is_staff", "is_superuser",
-            "company", "company_id", "department", "department_id", "position", "position_id"
+            "company", "company_id", "department", "department_id", "position", "position_id",
+            "profile_picture",
         ]
 
     def _get_primary_membership(self, obj):
@@ -496,6 +498,12 @@ class UserListSerializer(drf_serializers.ModelSerializer):
     def get_position_id(self, obj):
         m = self._get_primary_membership(obj)
         return m.position.id if m and m.position else None
+
+    def get_profile_picture(self, obj):
+        if not obj.profile_picture:
+            return None
+        request = self.context.get("request")
+        return request.build_absolute_uri(obj.profile_picture.url) if request else obj.profile_picture.url
 
 
 class UserViewSet(viewsets.ModelViewSet):

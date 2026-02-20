@@ -29,6 +29,161 @@ const normalizeList = (payload) => {
   return [];
 };
 
+const normalizeUsersForOrg = (rows, selectedCompany, strictCompanyFilter = false) =>
+  (rows || [])
+    .map((row) => {
+      const companyId = row.company_id || row.company?.id || null;
+      return {
+        id: row.id ?? row.user_id,
+        user_id: row.user_id ?? row.id,
+        username: row.username || "",
+        first_name: row.first_name || "",
+        last_name: row.last_name || "",
+        name: row.name || "",
+        phone_number: row.phone_number || "",
+        company_id: companyId,
+        company:
+          typeof row.company === "object"
+            ? row.company?.name || ""
+            : row.company || row.company_name || "",
+        position:
+          typeof row.position === "object"
+            ? row.position?.name || ""
+            : row.position || row.position_name || "",
+        profile_picture: row.profile_picture || row.profile_picture_url || "",
+      };
+    })
+    .filter(
+      (row) =>
+        !selectedCompany ||
+        (!strictCompanyFilter && row.company_id == null) ||
+        String(row.company_id) === String(selectedCompany),
+    )
+    .map((row) => ({
+      id: row.id,
+      username: row.username,
+      first_name: row.first_name,
+      last_name: row.last_name,
+      phone_number: row.phone_number || "",
+      company:
+        typeof row.company === "object" ? row.company?.name || "" : row.company || "",
+      position:
+        typeof row.position === "object"
+          ? row.position?.name || ""
+          : row.position || "",
+      profile_picture: row.profile_picture || "",
+    }));
+
+const buildAutoTreeFromOrgChart = (payload, users, selectedCompany) => {
+  const departments = Array.isArray(payload?.departments) ? payload.departments : [];
+  const members = Array.isArray(payload?.members) ? payload.members : [];
+  const companies = Array.isArray(payload?.companies) ? payload.companies : [];
+
+  const companyName =
+    companies.find((company) => String(company.id) === String(selectedCompany))
+      ?.name ||
+    departments.find((department) => String(department.company) === String(selectedCompany))
+      ?.company_name ||
+    members.find((member) => String(member.company_id) === String(selectedCompany))
+      ?.company_name ||
+    "조직도";
+
+  const root = {
+    id: "root",
+    type: "dept",
+    name: companyName,
+    children: [],
+  };
+
+  const departmentRows = departments.filter(
+    (department) => String(department.company) === String(selectedCompany),
+  );
+  const departmentNodes = new Map();
+
+  departmentRows.forEach((department) => {
+    departmentNodes.set(department.id, {
+      id: `dept-${department.id}`,
+      type: "dept",
+      name: department.name,
+      children: [],
+    });
+  });
+
+  departmentRows.forEach((department) => {
+    const node = departmentNodes.get(department.id);
+    if (!node) return;
+    if (department.parent && departmentNodes.has(department.parent)) {
+      departmentNodes.get(department.parent).children.push(node);
+      return;
+    }
+    root.children.push(node);
+  });
+
+  const userMap = new Map((users || []).map((user) => [String(user.id), user]));
+  const uniqueMembers = new Map();
+
+  members
+    .filter((member) => String(member.company_id) === String(selectedCompany))
+    .forEach((member) => {
+      const key = String(member.user_id);
+      if (!member.user_id) return;
+
+      const existing = uniqueMembers.get(key);
+      if (!existing || (member.is_primary && !existing.is_primary)) {
+        uniqueMembers.set(key, member);
+      }
+    });
+
+  const unassignedDept = {
+    id: "dept-unassigned",
+    type: "dept",
+    name: "미지정 부서",
+    children: [],
+  };
+
+  Array.from(uniqueMembers.values()).forEach((member) => {
+    const user = userMap.get(String(member.user_id)) || {};
+    const fullName =
+      `${user.last_name || ""}${user.first_name || ""}`.trim() ||
+      user.name ||
+      member.name ||
+      user.username ||
+      "";
+    const phone = user.phone_number || member.phone_number || "";
+    const company = user.company || member.company_name || companyName;
+    const position = user.position || member.position_name || "";
+    const profilePicture = user.profile_picture || "";
+
+    const personNode = {
+      id: `person-${member.user_id}`,
+      type: "person",
+      user_id: member.user_id || null,
+      name: fullName,
+      position,
+      phone,
+      company,
+      user_name: fullName,
+      user_phone: phone,
+      user_company: company,
+      user_position: position,
+      profile_picture_url: profilePicture,
+      children: [],
+    };
+
+    if (member.department_id && departmentNodes.has(member.department_id)) {
+      departmentNodes.get(member.department_id).children.push(personNode);
+      return;
+    }
+    unassignedDept.children.push(personNode);
+  });
+
+  if (unassignedDept.children.length > 0) {
+    root.children.push(unassignedDept);
+  }
+
+  return root.children.length > 0 ? root : null;
+};
+
 // 트리 평탄화 함수 (비상연락망용) - 부서(dept) 제외
 const flattenTree = (node, list = [], parentDept = "") => {
   if (!node) return list;
@@ -604,21 +759,45 @@ const OrganizationChart = () => {
     (async () => {
       setLoading(true);
       try {
-        const [orgRes, usersRes] = await Promise.all([
-          api.get("core/organizations/", { params: { company: selectedCompany } }),
-          api.get("core/organizations/available-users/", { params: { company: selectedCompany } }),
-        ]);
+        const orgPromise = api.get("core/organizations/", {
+          params: { company: selectedCompany },
+        });
+        const usersPromise = isSuperuser
+          ? api.get("core/users/")
+          : api.get("core/organizations/available-users/", {
+              params: { company: selectedCompany },
+            });
+        const [orgRes, usersRes] = await Promise.all([orgPromise, usersPromise]);
 
         if (!active) return;
         const orgRows = normalizeList(orgRes.data);
-        const userRows = normalizeList(usersRes.data);
+        const userRows = isSuperuser
+          ? normalizeUsersForOrg(normalizeList(usersRes.data), selectedCompany, true)
+          : normalizeUsersForOrg(normalizeList(usersRes.data), selectedCompany, false);
 
         if (orgRows.length > 0) {
           setOrgId(orgRows[0].id);
           setData(orgRows[0].tree || null);
         } else {
+          let generatedTree = null;
+          try {
+            const orgChartRes = await api.get("core/departments/org-chart/", {
+              params: { company: selectedCompany },
+            });
+            if (!active) return;
+            generatedTree = buildAutoTreeFromOrgChart(
+              orgChartRes.data,
+              userRows,
+              selectedCompany,
+            );
+          } catch (autoError) {
+            console.error(
+              "Failed to auto-generate organization chart from memberships:",
+              autoError,
+            );
+          }
           setOrgId(null);
-          setData(null);
+          setData(generatedTree);
         }
         setUsers(userRows);
       } catch (error) {
@@ -635,7 +814,7 @@ const OrganizationChart = () => {
     return () => {
       active = false;
     };
-  }, [selectedCompany]);
+  }, [selectedCompany, isSuperuser]);
 
   const handleUpdate = (id, field, value) => {
     setData((prev) => updateNode(prev, id, field, value));
