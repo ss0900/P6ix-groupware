@@ -12,6 +12,16 @@ const FieldRow = ({ label, value }) => (
   </div>
 );
 
+const formatPhoneNumber = (phoneNumber) => {
+  const digits = String(phoneNumber ?? "")
+    .replace(/\D/g, "")
+    .slice(0, 11);
+
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+};
+
 export default function UserDetail() {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -50,6 +60,7 @@ export default function UserDetail() {
   }
 
   const fullName = `${user.last_name ?? ""}${user.first_name ?? ""}`.trim();
+  const formattedPhoneNumber = formatPhoneNumber(user.phone_number);
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -79,7 +90,7 @@ export default function UserDetail() {
             <FieldRow label="이름" value={fullName} />
             <FieldRow label="아이디" value={user.username} />
             <FieldRow label="이메일" value={user.email} />
-            <FieldRow label="연락처" value={user.phone_number} />
+            <FieldRow label="연락처" value={formattedPhoneNumber} />
           </div>
         </div>
 
