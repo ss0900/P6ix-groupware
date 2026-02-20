@@ -122,11 +122,11 @@ export default function UserForm() {
 
       if (isEdit) {
         await api.patch(`core/users/${id}/`, payload);
+        navigate(`/admin/users/${id}`);
       } else {
         await api.post("core/users/", payload);
+        navigate("/admin/users");
       }
-
-      navigate("/admin/users");
     } catch (err) {
       console.error(err);
       const msg =
@@ -387,7 +387,9 @@ export default function UserForm() {
         <div className="flex gap-3 pt-4 border-t border-gray-200">
           <button
             type="button"
-            onClick={() => navigate("/admin/users")}
+            onClick={() =>
+              navigate(isEdit ? `/admin/users/${id}` : "/admin/users")
+            }
             className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
           >
             취소
