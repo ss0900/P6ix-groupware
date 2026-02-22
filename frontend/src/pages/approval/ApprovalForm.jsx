@@ -47,14 +47,20 @@ const UserSearchModal = ({ isOpen, onClose, onSelect, selectedUsers }) => {
       <div className="bg-white rounded-xl w-full max-w-md max-h-[80vh] flex flex-col shadow-xl">
         <div className="p-4 border-b border-gray-200 flex items-center justify-between">
           <h3 className="font-semibold text-gray-900">결재자 선택</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
             <X size={20} />
           </button>
         </div>
 
         <div className="p-4 border-b border-gray-200">
           <div className="relative">
-            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Search
+              size={18}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            />
             <input
               type="text"
               value={searchQuery}
@@ -71,14 +77,19 @@ const UserSearchModal = ({ isOpen, onClose, onSelect, selectedUsers }) => {
               <div className="animate-spin rounded-full h-6 w-6 border-2 border-sky-500 border-t-transparent"></div>
             </div>
           ) : users.length === 0 ? (
-            <p className="text-center text-gray-500 py-8">사용자를 찾을 수 없습니다.</p>
+            <p className="text-center text-gray-500 py-8">
+              사용자를 찾을 수 없습니다.
+            </p>
           ) : (
             <div className="space-y-2">
               {users.map((user) => {
                 const isSelected = selectedUsers.some((u) => u.id === user.id);
-                const fullName = `${user.last_name || ""}${user.first_name || ""}`.trim() || user.username;
+                const fullName =
+                  `${user.last_name || ""}${user.first_name || ""}`.trim() ||
+                  user.username;
                 const position = user.primary_membership?.position_name || "";
-                const department = user.primary_membership?.department_name || "";
+                const department =
+                  user.primary_membership?.department_name || "";
 
                 return (
                   <button
@@ -97,10 +108,14 @@ const UserSearchModal = ({ isOpen, onClose, onSelect, selectedUsers }) => {
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate">
                         {fullName}
-                        {position && <span className="text-gray-500 ml-1">{position}</span>}
+                        {position && (
+                          <span className="text-gray-500 ml-1">{position}</span>
+                        )}
                       </p>
                       {department && (
-                        <p className="text-xs text-gray-500 truncate">{department}</p>
+                        <p className="text-xs text-gray-500 truncate">
+                          {department}
+                        </p>
                       )}
                     </div>
                     {isSelected && (
@@ -174,7 +189,7 @@ export default function ApprovalForm() {
             position: line.approver_position,
             department: line.approver_department,
             approval_type: line.approval_type,
-          })) || []
+          })) || [],
         );
         setExistingAttachments(doc.attachments || []);
       } catch (err) {
@@ -190,7 +205,8 @@ export default function ApprovalForm() {
 
   // 결재자 추가
   const handleAddApprover = (user) => {
-    const fullName = `${user.last_name || ""}${user.first_name || ""}`.trim() || user.username;
+    const fullName =
+      `${user.last_name || ""}${user.first_name || ""}`.trim() || user.username;
     setApprovalLines((prev) => [
       ...prev,
       {
@@ -212,7 +228,9 @@ export default function ApprovalForm() {
   // 결재 유형 변경
   const handleTypeChange = (index, type) => {
     setApprovalLines((prev) =>
-      prev.map((item, i) => (i === index ? { ...item, approval_type: type } : item))
+      prev.map((item, i) =>
+        i === index ? { ...item, approval_type: type } : item,
+      ),
     );
   };
 
@@ -232,8 +250,12 @@ export default function ApprovalForm() {
   const handleRemoveExistingAttachment = async (attachment) => {
     if (!window.confirm("첨부파일을 삭제하시겠습니까?")) return;
     try {
-      await api.delete(`/approval/documents/${id}/attachment/${attachment.id}/`);
-      setExistingAttachments((prev) => prev.filter((a) => a.id !== attachment.id));
+      await api.delete(
+        `/approval/documents/${id}/attachment/${attachment.id}/`,
+      );
+      setExistingAttachments((prev) =>
+        prev.filter((a) => a.id !== attachment.id),
+      );
     } catch (err) {
       console.error("Failed to delete attachment:", err);
       alert("첨부파일 삭제에 실패했습니다.");
@@ -270,8 +292,8 @@ export default function ApprovalForm() {
           approvalLines.map((line) => ({
             approver: line.id,
             approval_type: line.approval_type,
-          }))
-        )
+          })),
+        ),
       );
 
       // 새 첨부파일 추가
@@ -359,10 +381,14 @@ export default function ApprovalForm() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* 양식 선택 */}
           <div>
-            <label className="block text-sm text-gray-600 mb-1">결재 양식</label>
+            <label className="block text-sm text-gray-600 mb-1">
+              결재 양식
+            </label>
             <select
               value={formData.template}
-              onChange={(e) => setFormData((prev) => ({ ...prev, template: e.target.value }))}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, template: e.target.value }))
+              }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none"
             >
               <option value="">양식 선택</option>
@@ -379,7 +405,9 @@ export default function ApprovalForm() {
             <label className="block text-sm text-gray-600 mb-1">우선순위</label>
             <select
               value={formData.priority}
-              onChange={(e) => setFormData((prev) => ({ ...prev, priority: e.target.value }))}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, priority: e.target.value }))
+              }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none"
             >
               <option value="normal">일반</option>
@@ -391,11 +419,15 @@ export default function ApprovalForm() {
 
         {/* 제목 */}
         <div>
-          <label className="block text-sm text-gray-600 mb-1">제목 *</label>
+          <label className="block text-sm text-gray-600 mb-1">
+            제목 <span className="text-red-500">*</span>
+          </label>
           <input
             type="text"
             value={formData.title}
-            onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
+            onChange={(e) =>
+              setFormData((prev) => ({ ...prev, title: e.target.value }))
+            }
             placeholder="문서 제목을 입력하세요"
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none"
           />
@@ -406,7 +438,9 @@ export default function ApprovalForm() {
           <label className="block text-sm text-gray-600 mb-1">내용</label>
           <textarea
             value={formData.content}
-            onChange={(e) => setFormData((prev) => ({ ...prev, content: e.target.value }))}
+            onChange={(e) =>
+              setFormData((prev) => ({ ...prev, content: e.target.value }))
+            }
             placeholder="문서 내용을 입력하세요"
             rows={10}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none resize-none"
@@ -417,7 +451,9 @@ export default function ApprovalForm() {
       {/* 결재선 설정 */}
       <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-gray-700">결재선 설정</h3>
+          <h3 className="text-sm font-semibold text-gray-700">
+            결재선 설정 <span className="text-red-500">*</span>
+          </h3>
           <button
             onClick={() => setShowUserModal(true)}
             className="flex items-center gap-1 px-3 py-1.5 text-sm text-sky-600 bg-sky-50 rounded-lg hover:bg-sky-100 transition-colors"
@@ -446,7 +482,11 @@ export default function ApprovalForm() {
                 <div className="flex-1">
                   <p className="font-medium text-gray-900">
                     {idx + 1}. {line.name}
-                    {line.position && <span className="text-gray-500 ml-1">{line.position}</span>}
+                    {line.position && (
+                      <span className="text-gray-500 ml-1">
+                        {line.position}
+                      </span>
+                    )}
                   </p>
                   {line.department && (
                     <p className="text-xs text-gray-500">{line.department}</p>
@@ -503,7 +543,9 @@ export default function ApprovalForm() {
                 <div className="flex items-center gap-3">
                   <Paperclip size={16} className="text-gray-400" />
                   <div>
-                    <p className="text-sm font-medium text-gray-900">{att.filename}</p>
+                    <p className="text-sm font-medium text-gray-900">
+                      {att.filename}
+                    </p>
                     <p className="text-xs text-gray-500">
                       {(att.file_size / 1024).toFixed(1)} KB
                     </p>
@@ -531,7 +573,9 @@ export default function ApprovalForm() {
                 <div className="flex items-center gap-3">
                   <Paperclip size={16} className="text-blue-400" />
                   <div>
-                    <p className="text-sm font-medium text-gray-900">{file.name}</p>
+                    <p className="text-sm font-medium text-gray-900">
+                      {file.name}
+                    </p>
                     <p className="text-xs text-gray-500">
                       {(file.size / 1024).toFixed(1)} KB (새 파일)
                     </p>
