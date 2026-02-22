@@ -1033,6 +1033,9 @@ const OrganizationChart = () => {
   const handleTabChange = (tab, options = {}) => {
     const { keepSelection = false } = options;
     setActiveTab(tab);
+    if (tab === "emergency" && isEditMode) {
+      setIsEditMode(false);
+    }
     if (tab !== "org" && !keepSelection) {
       setSelectedNode(null);
     }
@@ -1157,23 +1160,25 @@ const OrganizationChart = () => {
             ))}
           </select>
         )}
-        <button
-          onClick={() => {
-            if (isEditMode) {
-              handleSave();
-            } else {
-              setIsEditMode(true);
-            }
-          }}
-          disabled={saving}
-          className={`px-4 py-2 rounded-lg shadow-sm text-sm font-medium transition-all flex items-center gap-2 disabled:opacity-60 ${
-            isEditMode
-              ? "bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md"
-              : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300"
-          }`}
-        >
-          {isEditMode ? <>저장 완료</> : <>조직도 등록/수정</>}
-        </button>
+        {activeTab === "org" && (
+          <button
+            onClick={() => {
+              if (isEditMode) {
+                handleSave();
+              } else {
+                setIsEditMode(true);
+              }
+            }}
+            disabled={saving}
+            className={`px-4 py-2 rounded-lg shadow-sm text-sm font-medium transition-all flex items-center gap-2 disabled:opacity-60 ${
+              isEditMode
+                ? "bg-blue-600 text-white hover:bg-blue-700 hover:shadow-md"
+                : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300"
+            }`}
+          >
+            {isEditMode ? <>저장 완료</> : <>조직도 등록/수정</>}
+          </button>
+        )}
       </div>
 
       <div className="mb-6">
