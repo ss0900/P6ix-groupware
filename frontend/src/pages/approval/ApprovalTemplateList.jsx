@@ -2,6 +2,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../api/axios";
+import HtmlEditorFrame from "../../components/HtmlEditorFrame";
 import {
   FileText,
   Search,
@@ -121,17 +122,16 @@ const TemplateModal = ({
             <label className="mb-1 block text-sm font-medium text-gray-700">
               내용
             </label>
-            <textarea
+            <HtmlEditorFrame
               value={formData.content}
-              onChange={(event) =>
+              onChange={(nextContent) =>
                 setFormData((prev) => ({
                   ...prev,
-                  content: event.target.value,
+                  content: nextContent,
                 }))
               }
-              rows={8}
-              className="w-full resize-y rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500"
-              placeholder="양식 내용을 입력하세요"
+              height={320}
+              title="양식 내용 편집기"
             />
           </div>
 
