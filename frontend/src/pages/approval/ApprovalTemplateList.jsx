@@ -57,7 +57,7 @@ const TemplateModal = ({
         <form onSubmit={onSubmit} className="space-y-4">
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">
-              양식명<span className="text-red-500">*</span>
+              양식명 <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -79,7 +79,10 @@ const TemplateModal = ({
               <select
                 value={formData.category}
                 onChange={(event) =>
-                  setFormData((prev) => ({ ...prev, category: event.target.value }))
+                  setFormData((prev) => ({
+                    ...prev,
+                    category: event.target.value,
+                  }))
                 }
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500"
               >
@@ -366,9 +369,12 @@ export default function ApprovalTemplateList() {
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <FileText size={18} className="text-sky-500" />
-                    <span className="font-medium text-gray-900">{template.name}</span>
+                    <span className="font-medium text-gray-900">
+                      {template.name}
+                    </span>
                     <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
-                      {template.category_display || getCategoryLabel(template.category)}
+                      {template.category_display ||
+                        getCategoryLabel(template.category)}
                     </span>
                   </div>
                   {template.content && (
