@@ -2,6 +2,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../../api/axios";
+import { useAuth } from "../../context/AuthContext";
 import {
   ArrowLeft,
   Save,
@@ -18,7 +19,27 @@ import {
 
 const ATTENDANCE_TEMPLATE_VALUE = "__attendance__";
 const ATTENDANCE_TEMPLATE_TITLE = "근태계";
-const ATTENDANCE_TEMPLATE_CONTENT = `
+
+const getUserDisplayName = (user) =>
+  `${user?.last_name || ""}${user?.first_name || ""}`.trim() ||
+  user?.username ||
+  "";
+
+const getUserDepartmentName = (user) =>
+  user?.primary_membership?.department_name ||
+  user?.department?.name ||
+  user?.department_name ||
+  "";
+
+const escapeHtml = (value) =>
+  String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
+const buildAttendanceTemplateContent = ({ departmentName, userName }) => `
 <div class="attendance-template leading-relaxed text-gray-900">
   <h1 class="text-center text-4xl font-normal mb-4">근태계</h1>
 
@@ -43,8 +64,8 @@ const ATTENDANCE_TEMPLATE_CONTENT = `
     </thead>
     <tbody>
       <tr>
-        <td class="doc-td text-left">전략사업본부</td>
-        <td class="doc-td text-left">박수연 주임</td>
+        <td class="doc-td text-left">${escapeHtml(departmentName || "미지정")}</td>
+        <td class="doc-td text-left">${escapeHtml(userName || "사용자")}</td>
         <td class="doc-td">
           <select disabled class="input-sm bg-gray-50">
             <option selected>선택</option>
@@ -242,6 +263,7 @@ const UserSearchModal = ({ isOpen, onClose, onSelect, selectedUsers }) => {
 export default function ApprovalForm() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { user } = useAuth();
   const isEdit = Boolean(id);
 
   const [loading, setLoading] = useState(isEdit);
@@ -258,6 +280,9 @@ export default function ApprovalForm() {
   const [approvalLines, setApprovalLines] = useState([]);
   const [attachments, setAttachments] = useState([]);
   const [existingAttachments, setExistingAttachments] = useState([]);
+
+  const attendanceDepartmentName = getUserDepartmentName(user) || "미지정";
+  const attendanceUserName = getUserDisplayName(user) || "사용자";
 
   // 문서 로드 (수정 모드)
   useEffect(() => {
@@ -427,7 +452,10 @@ export default function ApprovalForm() {
         ...prev,
         template: templateValue,
         title: ATTENDANCE_TEMPLATE_TITLE,
-        content: ATTENDANCE_TEMPLATE_CONTENT,
+        content: buildAttendanceTemplateContent({
+          departmentName: attendanceDepartmentName,
+          userName: attendanceUserName,
+        }),
       }));
       return;
     }
@@ -436,6 +464,17 @@ export default function ApprovalForm() {
   };
 
   const isAttendanceTemplate = formData.template === ATTENDANCE_TEMPLATE_VALUE;
+
+  useEffect(() => {
+    if (!isAttendanceTemplate) return;
+    const nextContent = buildAttendanceTemplateContent({
+      departmentName: attendanceDepartmentName,
+      userName: attendanceUserName,
+    });
+    setFormData((prev) =>
+      prev.content === nextContent ? prev : { ...prev, content: nextContent },
+    );
+  }, [isAttendanceTemplate, attendanceDepartmentName, attendanceUserName]);
 
   if (loading) {
     return (
