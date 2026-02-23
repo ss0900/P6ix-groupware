@@ -115,7 +115,7 @@ class ApprovalLinePresetItemSerializer(serializers.ModelSerializer):
 
 class ApprovalLinePresetSerializer(serializers.ModelSerializer):
     items = ApprovalLinePresetItemSerializer(many=True, read_only=True)
-    lines = serializers.ListField(child=serializers.DictField(), write_only=True, required=True)
+    lines = serializers.ListField(child=serializers.DictField(), write_only=True, required=False)
     line_count = serializers.SerializerMethodField()
 
     class Meta:
@@ -134,22 +134,7 @@ class ApprovalLinePresetSerializer(serializers.ModelSerializer):
     def get_line_count(self, obj):
         return obj.items.count()
 
-    @transaction.atomic
-    def create(self, validated_data):
-        lines_data = validated_data.pop("lines", [])
-        name = (validated_data.get("name") or "").strip()
-        request = self.context.get("request")
-        owner = getattr(request, "user", None)
-
-        if owner is None or not owner.is_authenticated:
-            raise serializers.ValidationError("결재선 저장 권한이 없습니다.")
-
-        if not name:
-            raise serializers.ValidationError({"name": "결재선 이름을 입력해주세요."})
-
-        if not lines_data:
-            raise serializers.ValidationError({"lines": "결재선 항목이 비어 있습니다."})
-
+    def _normalize_lines(self, lines_data):
         normalized_lines = []
         seen_approver_ids = set()
         valid_types = {choice[0] for choice in ApprovalLine.TYPE_CHOICES}
@@ -191,17 +176,47 @@ class ApprovalLinePresetSerializer(serializers.ModelSerializer):
             for line in normalized_lines
             if line["approver_id"] in valid_approver_ids
         ]
+        return normalized_lines
 
+    def _validate_name(self, owner, name, instance=None):
+        if not name:
+            raise serializers.ValidationError({"name": "결재선 이름을 입력해주세요."})
+
+        duplicate_qs = ApprovalLinePreset.objects.filter(owner=owner, name=name)
+        if instance is not None:
+            duplicate_qs = duplicate_qs.exclude(id=instance.id)
+
+        if duplicate_qs.exists():
+            raise serializers.ValidationError({"name": "이미 같은 이름의 결재선이 있습니다."})
+
+        return name
+
+    @transaction.atomic
+    def create(self, validated_data):
+        lines_data = validated_data.pop("lines", [])
+        name = (validated_data.get("name") or "").strip()
+        request = self.context.get("request")
+        owner = getattr(request, "user", None)
+
+        if owner is None or not owner.is_authenticated:
+            raise serializers.ValidationError("결재선 저장 권한이 없습니다.")
+
+        if not lines_data:
+            raise serializers.ValidationError({"lines": "결재선 항목이 비어 있습니다."})
+
+        normalized_lines = self._normalize_lines(lines_data)
         if not normalized_lines:
             raise serializers.ValidationError({"lines": "유효한 결재선 항목이 없습니다."})
 
         preset = ApprovalLinePreset.objects.filter(owner=owner, name=name).first()
         if preset is None:
-            preset = ApprovalLinePreset.objects.create(owner=owner, name=name)
+            validated_name = self._validate_name(owner, name)
+            preset = ApprovalLinePreset.objects.create(owner=owner, name=validated_name)
         else:
-            preset.items.all().delete()
+            preset.name = self._validate_name(owner, name, instance=preset)
             preset.updated_at = timezone.now()
-            preset.save(update_fields=["updated_at"])
+            preset.save(update_fields=["name", "updated_at"])
+            preset.items.all().delete()
 
         for idx, line in enumerate(normalized_lines):
             ApprovalLinePresetItem.objects.create(
@@ -212,6 +227,31 @@ class ApprovalLinePresetSerializer(serializers.ModelSerializer):
             )
 
         return preset
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        name = (validated_data.get("name", instance.name) or "").strip()
+        lines_data = validated_data.get("lines", None)
+
+        instance.name = self._validate_name(instance.owner, name, instance=instance)
+        instance.updated_at = timezone.now()
+        instance.save(update_fields=["name", "updated_at"])
+
+        if lines_data is not None:
+            normalized_lines = self._normalize_lines(lines_data)
+            if not normalized_lines:
+                raise serializers.ValidationError({"lines": "유효한 결재선 항목이 없습니다."})
+
+            instance.items.all().delete()
+            for idx, line in enumerate(normalized_lines):
+                ApprovalLinePresetItem.objects.create(
+                    preset=instance,
+                    approver_id=line["approver_id"],
+                    order=idx,
+                    approval_type=line["approval_type"],
+                )
+
+        return instance
 
 
 class ApprovalActionSerializer(serializers.ModelSerializer):

@@ -1,6 +1,6 @@
 # backend/approval/views.py
 from rest_framework import viewsets, status
-from rest_framework.mixins import ListModelMixin, CreateModelMixin, DestroyModelMixin
+from rest_framework.mixins import ListModelMixin, CreateModelMixin, DestroyModelMixin, UpdateModelMixin
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -441,6 +441,7 @@ class AttachmentViewSet(viewsets.ReadOnlyModelViewSet):
 class ApprovalLinePresetViewSet(
     ListModelMixin,
     CreateModelMixin,
+    UpdateModelMixin,
     DestroyModelMixin,
     viewsets.GenericViewSet,
 ):

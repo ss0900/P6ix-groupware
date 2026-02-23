@@ -20,6 +20,7 @@ import {
   Upload,
   Paperclip,
   Trash2,
+  Pencil,
 } from "lucide-react";
 
 const ATTENDANCE_TEMPLATE_VALUE = "__attendance__";
@@ -403,14 +404,19 @@ const ApproverSelectModal = ({
   savedPresets,
   presetLoading,
   presetSaving,
+  presetUpdatingId,
   presetDeletingId,
   onSavePreset,
+  onUpdatePreset,
   onDeletePreset,
   onSave,
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedLines, setSelectedLines] = useState([]);
   const [expandedGroupKeys, setExpandedGroupKeys] = useState({});
+  const [expandedPresetIds, setExpandedPresetIds] = useState({});
+  const [editingPresetId, setEditingPresetId] = useState(null);
+  const [editingPresetName, setEditingPresetName] = useState("");
 
   const buildLineFromUser = useCallback(
     (targetUser, previousLine = {}) => ({
@@ -452,6 +458,9 @@ const ApproverSelectModal = ({
     setSelectedLines(uniqueLines);
     setSearchQuery("");
     setExpandedGroupKeys({});
+    setExpandedPresetIds({});
+    setEditingPresetId(null);
+    setEditingPresetName("");
   }, [isOpen, initialSelectedLines]);
 
   useEffect(() => {
@@ -472,11 +481,24 @@ const ApproverSelectModal = ({
     };
   }, [isOpen]);
 
+  useEffect(() => {
+    if (editingPresetId == null) return;
+    const matchedPreset = savedPresets.find(
+      (preset) => preset.id === editingPresetId,
+    );
+    if (!matchedPreset) {
+      setEditingPresetId(null);
+      setEditingPresetName("");
+      return;
+    }
+    if (matchedPreset.name !== editingPresetName) {
+      setEditingPresetName(matchedPreset.name || "");
+    }
+  }, [savedPresets, editingPresetId, editingPresetName]);
+
   if (!isOpen) return null;
 
-  const selectedIdSet = new Set(
-    selectedLines.map((line) => String(line.id)),
-  );
+  const selectedIdSet = new Set(selectedLines.map((line) => String(line.id)));
   const normalizedQuery = searchQuery.trim().toLowerCase();
 
   const filteredUsers = users.filter((targetUser) => {
@@ -645,9 +667,35 @@ const ApproverSelectModal = ({
     setSelectedLines(nextLines);
   };
 
+  const startEditPreset = (preset) => {
+    applyPreset(preset);
+    setEditingPresetId(preset.id);
+    setEditingPresetName(preset.name || "");
+  };
+
+  const cancelEditPreset = () => {
+    setEditingPresetId(null);
+    setEditingPresetName("");
+  };
+
   const handleSavePreset = async () => {
     if (selectedLines.length === 0) {
       alert("저장할 결재선을 먼저 구성해주세요.");
+      return;
+    }
+    if (editingPresetId != null) {
+      const trimmedName = editingPresetName.trim();
+      if (!trimmedName) {
+        alert("결재선 이름을 입력해주세요.");
+        return;
+      }
+      const ok = await onUpdatePreset(editingPresetId, {
+        name: trimmedName,
+        lines: selectedLines,
+      });
+      if (ok) {
+        cancelEditPreset();
+      }
       return;
     }
     await onSavePreset(selectedLines);
@@ -657,6 +705,13 @@ const ApproverSelectModal = ({
     setExpandedGroupKeys((prev) => ({
       ...prev,
       [groupKey]: !prev[groupKey],
+    }));
+  };
+
+  const togglePresetDetails = (presetId) => {
+    setExpandedPresetIds((prev) => ({
+      ...prev,
+      [presetId]: !prev[presetId],
     }));
   };
 
@@ -797,47 +852,157 @@ const ApproverSelectModal = ({
                 </div>
               ) : (
                 <div className="mt-3 space-y-2">
-                  {savedPresets.map((preset) => (
-                    <div
-                      key={preset.id}
-                      className="px-3 py-2.5 border border-gray-200 rounded-xl bg-white"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">
-                            {preset.name}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {preset.line_count}명
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-1">
+                  {savedPresets.map((preset) => {
+                    const isExpanded = Boolean(expandedPresetIds[preset.id]);
+                    const presetItems = preset.items || [];
+
+                    return (
+                      <div
+                        key={preset.id}
+                        className={`px-3 py-2.5 border rounded-xl bg-white ${
+                          editingPresetId === preset.id
+                            ? "border-blue-400"
+                            : "border-gray-200"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
                           <button
                             type="button"
-                            onClick={() => applyPreset(preset)}
-                            className="px-2 py-1 text-xs font-medium text-white bg-blue-500 rounded-md hover:bg-blue-600"
+                            onClick={() => togglePresetDetails(preset.id)}
+                            className="min-w-0 inline-flex items-center gap-2 text-left"
                           >
-                            적용
+                            {isExpanded ? (
+                              <ChevronDown
+                                size={14}
+                                className="text-gray-500 shrink-0"
+                              />
+                            ) : (
+                              <ChevronRight
+                                size={14}
+                                className="text-gray-500 shrink-0"
+                              />
+                            )}
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-gray-900 truncate">
+                                {preset.name}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {preset.line_count}명
+                              </p>
+                            </div>
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => onDeletePreset(preset.id)}
-                            disabled={presetDeletingId === preset.id}
-                            className="p-1 text-gray-400 rounded-md hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
-                            title="삭제"
-                          >
-                            <Trash2 size={14} />
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => applyPreset(preset)}
+                              className="px-2 py-1 text-xs font-medium text-white bg-blue-500 rounded-md hover:bg-blue-600"
+                            >
+                              적용
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => startEditPreset(preset)}
+                              disabled={presetUpdatingId === preset.id}
+                              className="p-1 text-gray-400 rounded-md hover:bg-gray-100 hover:text-gray-600 disabled:opacity-50"
+                              title="수정"
+                            >
+                              <Pencil size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onDeletePreset(preset.id)}
+                              disabled={
+                                presetDeletingId === preset.id ||
+                                presetUpdatingId === preset.id
+                              }
+                              className="p-1 text-gray-400 rounded-md hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
+                              title="삭제"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
                         </div>
+
+                        {isExpanded && (
+                          <div className="mt-2 pt-2 border-t border-gray-100 space-y-1.5">
+                            {presetItems.length === 0 ? (
+                              <div className="px-2 py-2 text-xs text-gray-500 bg-gray-50 rounded-lg">
+                                저장된 결재선 구성이 없습니다.
+                              </div>
+                            ) : (
+                              presetItems.map((item, itemIndex) => {
+                                const orderNumber = Number.isFinite(
+                                  Number(item.order),
+                                )
+                                  ? Number(item.order) + 1
+                                  : itemIndex + 1;
+                                const itemName =
+                                  item.approver_name ||
+                                  `사용자 ${item.approver}`;
+                                const itemDepartment =
+                                  item.approver_department || "부서 미지정";
+                                return (
+                                  <div
+                                    key={`${preset.id}-${item.id || itemIndex}`}
+                                    className="flex items-start gap-2 px-2 py-1.5 rounded-lg bg-gray-50"
+                                  >
+                                    <span className="mt-0.5 inline-flex items-center justify-center w-5 h-5 text-[11px] font-semibold text-blue-600 bg-blue-100 rounded-full shrink-0">
+                                      {orderNumber}
+                                    </span>
+                                    <div className="min-w-0">
+                                      <p className="text-xs font-medium text-gray-800 truncate">
+                                        {itemName}
+                                        {item.approver_position && (
+                                          <span className="ml-1 font-normal text-gray-500">
+                                            {item.approver_position}
+                                          </span>
+                                        )}
+                                      </p>
+                                      <p className="text-[11px] text-gray-500 truncate">
+                                        {itemDepartment}
+                                      </p>
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
           </div>
 
           <div className="p-4 overflow-y-auto">
+            {editingPresetId != null && (
+              <div className="mb-3 p-2.5 rounded-lg border border-blue-200 bg-blue-50/60">
+                <p className="text-xs font-semibold text-blue-700 mb-2">
+                  저장 결재선 수정 모드
+                </p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={editingPresetName}
+                    onChange={(event) =>
+                      setEditingPresetName(event.target.value)
+                    }
+                    placeholder="결재선 이름"
+                    className="flex-1 px-2.5 py-1.5 text-sm border border-blue-200 rounded-md bg-white focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={cancelEditPreset}
+                    className="px-2 py-1.5 text-xs text-gray-600 border border-gray-300 rounded-md hover:bg-white"
+                  >
+                    취소
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="mb-4 flex items-center justify-between">
               <p className="text-sm font-semibold text-gray-800">
                 결재선 구성 ({selectedLines.length}명)
@@ -846,10 +1011,21 @@ const ApproverSelectModal = ({
                 <button
                   type="button"
                   onClick={handleSavePreset}
-                  disabled={presetSaving || selectedLines.length === 0}
+                  disabled={
+                    presetSaving ||
+                    (editingPresetId != null &&
+                      presetUpdatingId === editingPresetId) ||
+                    selectedLines.length === 0
+                  }
                   className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-500 rounded-lg hover:bg-blue-600 disabled:opacity-50"
                 >
-                  {presetSaving ? "저장 중..." : "결재선 저장"}
+                  {editingPresetId != null
+                    ? presetUpdatingId === editingPresetId
+                      ? "수정 중..."
+                      : "수정 저장"
+                    : presetSaving
+                      ? "저장 중..."
+                      : "결재선 저장"}
                 </button>
                 {selectedLines.length > 0 && (
                   <button
@@ -877,6 +1053,10 @@ const ApproverSelectModal = ({
               <div className="space-y-2">
                 {selectedLines.map((line, index) => {
                   const departmentText = line.department || "부서 미지정";
+                  const agreementOption = mapApprovalTypeToAgreementOption(
+                    line.approval_type,
+                  );
+                  const isAgreementSelected = agreementOption === "agreement";
 
                   return (
                     <div
@@ -927,7 +1107,12 @@ const ApproverSelectModal = ({
                           onChange={(event) =>
                             handleDecisionTypeChange(index, event.target.value)
                           }
-                          className="px-2.5 py-1.5 text-sm border border-gray-300 rounded-lg bg-gray-50"
+                          disabled={isAgreementSelected}
+                          className={`px-2.5 py-1.5 text-sm border border-gray-300 rounded-lg ${
+                            isAgreementSelected
+                              ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                              : "bg-gray-50"
+                          }`}
                         >
                           {APPROVAL_DECISION_OPTIONS.map((option) => (
                             <option key={option.value} value={option.value}>
@@ -937,9 +1122,7 @@ const ApproverSelectModal = ({
                         </select>
 
                         <select
-                          value={mapApprovalTypeToAgreementOption(
-                            line.approval_type,
-                          )}
+                          value={agreementOption}
                           onChange={(event) =>
                             handleAgreementTypeChange(index, event.target.value)
                           }
@@ -1013,6 +1196,7 @@ export default function ApprovalForm() {
   const [savedApprovalLinePresets, setSavedApprovalLinePresets] = useState([]);
   const [presetLoading, setPresetLoading] = useState(false);
   const [presetSaving, setPresetSaving] = useState(false);
+  const [presetUpdatingId, setPresetUpdatingId] = useState(null);
   const [presetDeletingId, setPresetDeletingId] = useState(null);
   const [attendanceData, setAttendanceData] = useState(() =>
     createDefaultAttendanceData(),
@@ -1075,7 +1259,9 @@ export default function ApprovalForm() {
       list.forEach((position) => {
         if (position?.id == null) return;
         const parsedLevel = Number(position.level);
-        nextPositionLevelById[String(position.id)] = Number.isFinite(parsedLevel)
+        nextPositionLevelById[String(position.id)] = Number.isFinite(
+          parsedLevel,
+        )
           ? parsedLevel
           : Number.MAX_SAFE_INTEGER;
       });
@@ -1144,12 +1330,7 @@ export default function ApprovalForm() {
     loadDepartments();
     loadPositions();
     loadApprovalLinePresets();
-  }, [
-    showUserModal,
-    loadDepartments,
-    loadPositions,
-    loadApprovalLinePresets,
-  ]);
+  }, [showUserModal, loadDepartments, loadPositions, loadApprovalLinePresets]);
 
   // 문서 로드 (수정 모드)
   useEffect(() => {
@@ -1271,6 +1452,46 @@ export default function ApprovalForm() {
       alert("결재선 저장에 실패했습니다.");
     } finally {
       setPresetSaving(false);
+    }
+  };
+
+  const handleUpdateApprovalLinePreset = async (
+    presetId,
+    { name, lines } = {},
+  ) => {
+    if (!presetId) return false;
+
+    const trimmedName = (name || "").trim();
+    if (!trimmedName) {
+      alert("결재선 이름을 입력해주세요.");
+      return false;
+    }
+
+    if (!Array.isArray(lines) || lines.length === 0) {
+      alert("저장할 결재선을 먼저 구성해주세요.");
+      return false;
+    }
+
+    setPresetUpdatingId(presetId);
+    try {
+      await api.patch(`/approval/line-presets/${presetId}/`, {
+        name: trimmedName,
+        lines: lines.map((line, index) => ({
+          approver: line.id,
+          order: index,
+          approval_type: normalizeApprovalType(line.approval_type),
+          decision_type: normalizeDecisionType(line.decision_type),
+        })),
+      });
+      await loadApprovalLinePresets();
+      alert("결재선이 수정되었습니다.");
+      return true;
+    } catch (err) {
+      console.error("Failed to update approval line preset:", err);
+      alert("결재선 수정에 실패했습니다.");
+      return false;
+    } finally {
+      setPresetUpdatingId(null);
     }
   };
 
@@ -1892,7 +2113,7 @@ export default function ApprovalForm() {
             className="flex items-center gap-1 px-3 py-1.5 text-sm text-sky-600 bg-sky-50 rounded-lg hover:bg-sky-100 transition-colors"
           >
             <Plus size={16} />
-            결재자 선택
+            결재선 관리
           </button>
         </div>
 
@@ -2033,7 +2254,7 @@ export default function ApprovalForm() {
         )}
       </div>
 
-      {/* 결재자 선택 모달 */}
+      {/* 결재선 관리 모달 */}
       <ApproverSelectModal
         isOpen={showUserModal}
         onClose={() => setShowUserModal(false)}
@@ -2044,8 +2265,10 @@ export default function ApprovalForm() {
         savedPresets={savedApprovalLinePresets}
         presetLoading={presetLoading}
         presetSaving={presetSaving}
+        presetUpdatingId={presetUpdatingId}
         presetDeletingId={presetDeletingId}
         onSavePreset={handleSaveApprovalLinePreset}
+        onUpdatePreset={handleUpdateApprovalLinePreset}
         onDeletePreset={handleDeleteApprovalLinePreset}
         onSave={handleSaveApproverSelection}
       />
