@@ -69,6 +69,48 @@ const getUserPositionName = (user) =>
   user?.position_name ||
   "";
 
+const getUserPositionId = (user) =>
+  user?.primary_membership?.position_id ||
+  user?.position?.id ||
+  user?.position_id ||
+  null;
+
+const getUserPositionLevel = (user, positionLevelById = {}) => {
+  const directLevel = Number(
+    user?.primary_membership?.position_level ??
+      user?.position?.level ??
+      user?.position_level,
+  );
+  if (Number.isFinite(directLevel)) return directLevel;
+
+  const positionId = getUserPositionId(user);
+  if (positionId != null) {
+    const mappedLevel = Number(positionLevelById[String(positionId)]);
+    if (Number.isFinite(mappedLevel)) return mappedLevel;
+  }
+
+  return Number.MAX_SAFE_INTEGER;
+};
+
+const userNameCollator = new Intl.Collator("ko", {
+  sensitivity: "base",
+  numeric: true,
+});
+
+const compareUsersByPositionThenName = (a, b, positionLevelById) => {
+  const aLevel = getUserPositionLevel(a, positionLevelById);
+  const bLevel = getUserPositionLevel(b, positionLevelById);
+  if (aLevel !== bLevel) return aLevel - bLevel;
+
+  const nameCompare = userNameCollator.compare(
+    getUserDisplayName(a),
+    getUserDisplayName(b),
+  );
+  if (nameCompare !== 0) return nameCompare;
+
+  return userNameCollator.compare(a?.username || "", b?.username || "");
+};
+
 const getUserSearchText = (user) => {
   const fields = [
     getUserDisplayName(user),
@@ -317,6 +359,7 @@ const ApproverSelectModal = ({
   onClose,
   users,
   departmentOrderById,
+  positionLevelById,
   initialSelectedLines,
   onSave,
 }) => {
@@ -408,12 +451,19 @@ const ApproverSelectModal = ({
     return acc;
   }, {});
 
-  const groupedUserEntries = Object.values(groupedUsers).sort((a, b) => {
-    if (a.departmentOrder !== b.departmentOrder) {
-      return a.departmentOrder - b.departmentOrder;
-    }
-    return a.departmentName.localeCompare(b.departmentName, "ko");
-  });
+  const groupedUserEntries = Object.values(groupedUsers)
+    .map((group) => ({
+      ...group,
+      users: [...group.users].sort((a, b) =>
+        compareUsersByPositionThenName(a, b, positionLevelById),
+      ),
+    }))
+    .sort((a, b) => {
+      if (a.departmentOrder !== b.departmentOrder) {
+        return a.departmentOrder - b.departmentOrder;
+      }
+      return a.departmentName.localeCompare(b.departmentName, "ko");
+    });
 
   const selectedLineById = initialSelectedLines.reduce((acc, line) => {
     acc[String(line.id)] = line;
@@ -421,11 +471,17 @@ const ApproverSelectModal = ({
   }, {});
 
   const addApprover = (userId) => {
-    setSelectedIds((prev) => (prev.some((id) => String(id) === String(userId)) ? prev : [...prev, userId]));
+    setSelectedIds((prev) =>
+      prev.some((id) => String(id) === String(userId))
+        ? prev
+        : [...prev, userId],
+    );
   };
 
   const removeApprover = (userId) => {
-    setSelectedIds((prev) => prev.filter((id) => String(id) !== String(userId)));
+    setSelectedIds((prev) =>
+      prev.filter((id) => String(id) !== String(userId)),
+    );
   };
 
   const addDepartmentUsers = (departmentUsers) => {
@@ -536,7 +592,6 @@ const ApproverSelectModal = ({
                           <div className="mt-2 space-y-1">
                             {departmentUsers.map((targetUser) => {
                               const fullName = getUserDisplayName(targetUser);
-                              const company = getUserCompanyName(targetUser);
                               const position = getUserPositionName(targetUser);
 
                               return (
@@ -554,10 +609,6 @@ const ApproverSelectModal = ({
                                             {position}
                                           </span>
                                         )}
-                                      </p>
-                                      <p className="text-xs text-gray-500 truncate">
-                                        {targetUser.username}
-                                        {company ? ` · ${company}` : ""}
                                       </p>
                                     </div>
                                     <span className="inline-flex items-center gap-1 text-xs text-blue-600">
@@ -646,7 +697,6 @@ const ApproverSelectModal = ({
                   }
 
                   const fullName = getUserDisplayName(targetUser);
-                  const company = getUserCompanyName(targetUser);
                   const department = getUserDepartmentName(targetUser);
                   const position = getUserPositionName(targetUser);
 
@@ -665,8 +715,7 @@ const ApproverSelectModal = ({
                           )}
                         </p>
                         <p className="text-xs text-gray-500 truncate">
-                          {company}
-                          {department ? ` · ${department}` : ""}
+                          {department}
                         </p>
                       </div>
                       <button
@@ -724,6 +773,7 @@ export default function ApprovalForm() {
   const [existingAttachments, setExistingAttachments] = useState([]);
   const [users, setUsers] = useState([]);
   const [departmentOrderById, setDepartmentOrderById] = useState({});
+  const [positionLevelById, setPositionLevelById] = useState({});
   const [attendanceData, setAttendanceData] = useState(() =>
     createDefaultAttendanceData(),
   );
@@ -775,6 +825,27 @@ export default function ApprovalForm() {
     }
   }, []);
 
+  const loadPositions = useCallback(async () => {
+    try {
+      const res = await api.get("core/positions/", {
+        params: { page_size: 1000 },
+      });
+      const list = res.data?.results ?? res.data ?? [];
+      const nextPositionLevelById = {};
+      list.forEach((position) => {
+        if (position?.id == null) return;
+        const parsedLevel = Number(position.level);
+        nextPositionLevelById[String(position.id)] = Number.isFinite(parsedLevel)
+          ? parsedLevel
+          : Number.MAX_SAFE_INTEGER;
+      });
+      setPositionLevelById(nextPositionLevelById);
+    } catch (err) {
+      console.error("Failed to load positions:", err);
+      setPositionLevelById({});
+    }
+  }, []);
+
   useEffect(() => {
     let mounted = true;
 
@@ -811,12 +882,14 @@ export default function ApprovalForm() {
   useEffect(() => {
     loadUsers();
     loadDepartments();
-  }, [loadUsers, loadDepartments]);
+    loadPositions();
+  }, [loadUsers, loadDepartments, loadPositions]);
 
   useEffect(() => {
     if (!showUserModal) return;
     loadDepartments();
-  }, [showUserModal, loadDepartments]);
+    loadPositions();
+  }, [showUserModal, loadDepartments, loadPositions]);
 
   // 문서 로드 (수정 모드)
   useEffect(() => {
@@ -879,13 +952,15 @@ export default function ApprovalForm() {
         );
 
         if (!targetUser) {
-          return previous || {
-            id: selectedId,
-            name: `사용자 ${selectedId}`,
-            position: "",
-            department: "",
-            approval_type: "approval",
-          };
+          return (
+            previous || {
+              id: selectedId,
+              name: `사용자 ${selectedId}`,
+              position: "",
+              department: "",
+              approval_type: "approval",
+            }
+          );
         }
 
         const fullName = getUserDisplayName(targetUser) || targetUser.username;
@@ -1649,6 +1724,7 @@ export default function ApprovalForm() {
         onClose={() => setShowUserModal(false)}
         users={users}
         departmentOrderById={departmentOrderById}
+        positionLevelById={positionLevelById}
         initialSelectedLines={approvalLines}
         onSave={handleSaveApproverSelection}
       />

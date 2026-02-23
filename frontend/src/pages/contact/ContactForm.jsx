@@ -42,6 +42,48 @@ const getUserPositionName = (user) =>
   user?.position_name ||
   "";
 
+const getUserPositionId = (user) =>
+  user?.primary_membership?.position_id ||
+  user?.position?.id ||
+  user?.position_id ||
+  null;
+
+const getUserPositionLevel = (user, positionLevelById = {}) => {
+  const directLevel = Number(
+    user?.primary_membership?.position_level ??
+      user?.position?.level ??
+      user?.position_level,
+  );
+  if (Number.isFinite(directLevel)) return directLevel;
+
+  const positionId = getUserPositionId(user);
+  if (positionId != null) {
+    const mappedLevel = Number(positionLevelById[String(positionId)]);
+    if (Number.isFinite(mappedLevel)) return mappedLevel;
+  }
+
+  return Number.MAX_SAFE_INTEGER;
+};
+
+const userNameCollator = new Intl.Collator("ko", {
+  sensitivity: "base",
+  numeric: true,
+});
+
+const compareUsersByPositionThenName = (a, b, positionLevelById) => {
+  const aLevel = getUserPositionLevel(a, positionLevelById);
+  const bLevel = getUserPositionLevel(b, positionLevelById);
+  if (aLevel !== bLevel) return aLevel - bLevel;
+
+  const nameCompare = userNameCollator.compare(
+    getUserDisplayName(a),
+    getUserDisplayName(b),
+  );
+  if (nameCompare !== 0) return nameCompare;
+
+  return userNameCollator.compare(a?.username || "", b?.username || "");
+};
+
 const getUserSearchText = (user) => {
   const fields = [
     getUserDisplayName(user),
@@ -58,6 +100,7 @@ const RecipientSelectModal = ({
   onClose,
   users,
   departmentOrderById,
+  positionLevelById,
   initialSelectedIds,
   currentUserId,
   currentUsername,
@@ -75,8 +118,7 @@ const RecipientSelectModal = ({
         const isCurrentById =
           currentUserId != null && String(userId) === String(currentUserId);
         const isCurrentByUsername =
-          Boolean(currentUsername) &&
-          targetUser?.username === currentUsername;
+          Boolean(currentUsername) && targetUser?.username === currentUsername;
         return !(isCurrentById || isCurrentByUsername);
       }),
     );
@@ -129,9 +171,7 @@ const RecipientSelectModal = ({
       user?.primary_membership?.department_order ??
       user?.department?.order ??
       user?.department_order ??
-      (departmentId != null
-        ? departmentOrderById[String(departmentId)]
-        : null);
+      (departmentId != null ? departmentOrderById[String(departmentId)] : null);
     const departmentOrder = Number(rawDepartmentOrder);
     const normalizedDepartmentOrder = Number.isFinite(departmentOrder)
       ? departmentOrder
@@ -157,12 +197,19 @@ const RecipientSelectModal = ({
     return acc;
   }, {});
 
-  const groupedUserEntries = Object.values(groupedUsers).sort((a, b) => {
-    if (a.departmentOrder !== b.departmentOrder) {
-      return a.departmentOrder - b.departmentOrder;
-    }
-    return a.departmentName.localeCompare(b.departmentName, "ko");
-  });
+  const groupedUserEntries = Object.values(groupedUsers)
+    .map((group) => ({
+      ...group,
+      users: [...group.users].sort((a, b) =>
+        compareUsersByPositionThenName(a, b, positionLevelById),
+      ),
+    }))
+    .sort((a, b) => {
+      if (a.departmentOrder !== b.departmentOrder) {
+        return a.departmentOrder - b.departmentOrder;
+      }
+      return a.departmentName.localeCompare(b.departmentName, "ko");
+    });
 
   const selectedUsers = selectedIds
     .map((userId) => users.find((user) => user.id === userId))
@@ -282,7 +329,6 @@ const RecipientSelectModal = ({
                           <div className="mt-2 space-y-1">
                             {departmentUsers.map((user) => {
                               const fullName = getUserDisplayName(user);
-                              const company = getUserCompanyName(user);
                               const position = getUserPositionName(user);
 
                               return (
@@ -300,10 +346,6 @@ const RecipientSelectModal = ({
                                             {position}
                                           </span>
                                         )}
-                                      </p>
-                                      <p className="text-xs text-gray-500 truncate">
-                                        {user.username}
-                                        {company ? ` · ${company}` : ""}
                                       </p>
                                     </div>
                                     <span className="inline-flex items-center gap-1 text-xs text-green-700">
@@ -350,8 +392,8 @@ const RecipientSelectModal = ({
               <div className="space-y-2">
                 {selectedUsers.map((user) => {
                   const fullName = getUserDisplayName(user);
-                  const company = getUserCompanyName(user);
                   const department = getUserDepartmentName(user);
+                  const position = getUserPositionName(user);
 
                   return (
                     <div
@@ -361,10 +403,14 @@ const RecipientSelectModal = ({
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-gray-900 truncate">
                           {fullName}
+                          {position && (
+                            <span className="ml-1 text-gray-500 font-normal">
+                              {position}
+                            </span>
+                          )}
                         </p>
                         <p className="text-xs text-gray-500 truncate">
-                          {company}
-                          {department ? ` · ${department}` : ""}
+                          {department}
                         </p>
                       </div>
                       <button
@@ -416,6 +462,7 @@ export default function ContactForm() {
 
   const [users, setUsers] = useState([]);
   const [departmentOrderById, setDepartmentOrderById] = useState({});
+  const [positionLevelById, setPositionLevelById] = useState({});
   const [showRecipientModal, setShowRecipientModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -452,6 +499,29 @@ export default function ContactForm() {
     }
   }, []);
 
+  const loadPositions = useCallback(async () => {
+    try {
+      const res = await api.get("core/positions/", {
+        params: { page_size: 1000 },
+      });
+      const list = res.data?.results ?? res.data ?? [];
+      const nextPositionLevelById = {};
+      list.forEach((position) => {
+        if (position?.id == null) return;
+        const parsedLevel = Number(position.level);
+        nextPositionLevelById[String(position.id)] = Number.isFinite(
+          parsedLevel,
+        )
+          ? parsedLevel
+          : Number.MAX_SAFE_INTEGER;
+      });
+      setPositionLevelById(nextPositionLevelById);
+    } catch (err) {
+      console.error("Failed to load positions:", err);
+      setPositionLevelById({});
+    }
+  }, []);
+
   const loadMessage = useCallback(async () => {
     if (!id) return;
     setLoading(true);
@@ -472,13 +542,15 @@ export default function ContactForm() {
   useEffect(() => {
     loadUsers();
     loadDepartments();
+    loadPositions();
     loadMessage();
-  }, [loadUsers, loadDepartments, loadMessage]);
+  }, [loadUsers, loadDepartments, loadPositions, loadMessage]);
 
   useEffect(() => {
     if (!showRecipientModal) return;
     loadDepartments();
-  }, [showRecipientModal, loadDepartments]);
+    loadPositions();
+  }, [showRecipientModal, loadDepartments, loadPositions]);
 
   useEffect(() => {
     if (!user) return;
@@ -742,6 +814,7 @@ export default function ContactForm() {
         onClose={() => setShowRecipientModal(false)}
         users={users}
         departmentOrderById={departmentOrderById}
+        positionLevelById={positionLevelById}
         initialSelectedIds={recipientIds}
         currentUserId={user?.id}
         currentUsername={user?.username}
