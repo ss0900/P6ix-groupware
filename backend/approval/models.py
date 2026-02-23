@@ -169,6 +169,63 @@ class ApprovalLine(models.Model):
         return f"{self.document.title} - {self.order}. {self.approver}"
 
 
+class ApprovalLinePreset(models.Model):
+    """사용자별 저장 결재선"""
+
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="approval_line_presets",
+        verbose_name="소유자",
+    )
+    name = models.CharField("결재선 이름", max_length=100)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "결재선 프리셋"
+        verbose_name_plural = "결재선 프리셋"
+        ordering = ["-updated_at", "-id"]
+        unique_together = [["owner", "name"]]
+
+    def __str__(self):
+        return f"{self.owner} - {self.name}"
+
+
+class ApprovalLinePresetItem(models.Model):
+    """저장 결재선 항목"""
+
+    preset = models.ForeignKey(
+        ApprovalLinePreset,
+        on_delete=models.CASCADE,
+        related_name="items",
+        verbose_name="결재선 프리셋",
+    )
+    approver = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="approval_line_preset_items",
+        verbose_name="결재자",
+    )
+    order = models.PositiveIntegerField("순서", default=0)
+    approval_type = models.CharField(
+        "결재 유형",
+        max_length=20,
+        choices=ApprovalLine.TYPE_CHOICES,
+        default="approval",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "결재선 프리셋 항목"
+        verbose_name_plural = "결재선 프리셋 항목"
+        ordering = ["preset", "order"]
+        unique_together = [["preset", "order"]]
+
+    def __str__(self):
+        return f"{self.preset.name} - {self.order}. {self.approver}"
+
+
 class ApprovalAction(models.Model):
     """결재 이력 (로그)"""
     ACTION_CHOICES = [

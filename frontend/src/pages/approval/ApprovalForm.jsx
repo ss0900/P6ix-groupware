@@ -13,6 +13,7 @@ import {
   Users,
   UserPlus,
   Search,
+  ChevronUp,
   ChevronDown,
   ChevronRight,
   GripVertical,
@@ -354,6 +355,29 @@ const APPROVAL_TEMPLATE_OPTIONS = [
 
 const isNumericTemplateId = (value) => /^\d+$/.test(String(value || ""));
 
+const APPROVAL_LINE_TYPE_OPTIONS = [
+  { value: "approval", label: "일반결재" },
+  { value: "agreement", label: "합의" },
+  { value: "reference", label: "참조" },
+];
+
+const APPROVAL_LINE_TYPE_SET = new Set(
+  APPROVAL_LINE_TYPE_OPTIONS.map((option) => option.value),
+);
+
+const normalizeApprovalType = (value) =>
+  APPROVAL_LINE_TYPE_SET.has(value) ? value : "approval";
+
+const buildDefaultPresetName = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const date = String(now.getDate()).padStart(2, "0");
+  const hour = String(now.getHours()).padStart(2, "0");
+  const minute = String(now.getMinutes()).padStart(2, "0");
+  return `결재선 ${year}-${month}-${date} ${hour}:${minute}`;
+};
+
 const ApproverSelectModal = ({
   isOpen,
   onClose,
@@ -361,23 +385,54 @@ const ApproverSelectModal = ({
   departmentOrderById,
   positionLevelById,
   initialSelectedLines,
+  savedPresets,
+  presetLoading,
+  presetSaving,
+  presetDeletingId,
+  onSavePreset,
+  onDeletePreset,
   onSave,
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedIds, setSelectedIds] = useState([]);
+  const [selectedLines, setSelectedLines] = useState([]);
   const [expandedGroupKeys, setExpandedGroupKeys] = useState({});
+
+  const buildLineFromUser = useCallback(
+    (targetUser, previousLine = {}) => ({
+      id: targetUser.id,
+      name:
+        getUserDisplayName(targetUser) ||
+        previousLine.name ||
+        targetUser.username ||
+        `사용자 ${targetUser.id}`,
+      position: getUserPositionName(targetUser) || previousLine.position || "",
+      department:
+        getUserDepartmentName(targetUser) || previousLine.department || "",
+      company: getUserCompanyName(targetUser) || previousLine.company || "",
+      approval_type: normalizeApprovalType(previousLine.approval_type),
+    }),
+    [],
+  );
 
   useEffect(() => {
     if (!isOpen) return;
-    const uniqueIds = [];
+    const uniqueLines = [];
     const seen = new Set();
     initialSelectedLines.forEach((line) => {
-      const key = String(line?.id ?? "");
-      if (!key || seen.has(key)) return;
+      if (line?.id == null) return;
+      const key = String(line.id);
+      if (seen.has(key)) return;
       seen.add(key);
-      uniqueIds.push(line.id);
+      uniqueLines.push({
+        id: line.id,
+        name: line.name || "",
+        position: line.position || "",
+        department: line.department || "",
+        company: line.company || "",
+        approval_type: normalizeApprovalType(line.approval_type),
+      });
     });
-    setSelectedIds(uniqueIds);
+    setSelectedLines(uniqueLines);
     setSearchQuery("");
     setExpandedGroupKeys({});
   }, [isOpen, initialSelectedLines]);
@@ -402,7 +457,9 @@ const ApproverSelectModal = ({
 
   if (!isOpen) return null;
 
-  const selectedIdSet = new Set(selectedIds.map((id) => String(id)));
+  const selectedIdSet = new Set(
+    selectedLines.map((line) => String(line.id)),
+  );
   const normalizedQuery = searchQuery.trim().toLowerCase();
 
   const filteredUsers = users.filter((targetUser) => {
@@ -465,37 +522,102 @@ const ApproverSelectModal = ({
       return a.departmentName.localeCompare(b.departmentName, "ko");
     });
 
-  const selectedLineById = initialSelectedLines.reduce((acc, line) => {
-    acc[String(line.id)] = line;
-    return acc;
-  }, {});
-
   const addApprover = (userId) => {
-    setSelectedIds((prev) =>
-      prev.some((id) => String(id) === String(userId))
-        ? prev
-        : [...prev, userId],
-    );
+    setSelectedLines((prev) => {
+      if (prev.some((line) => String(line.id) === String(userId))) {
+        return prev;
+      }
+      const targetUser = users.find(
+        (candidate) => String(candidate.id) === String(userId),
+      );
+      if (targetUser) {
+        return [...prev, buildLineFromUser(targetUser)];
+      }
+      return [
+        ...prev,
+        {
+          id: userId,
+          name: `사용자 ${userId}`,
+          position: "",
+          department: "",
+          company: "",
+          approval_type: "approval",
+        },
+      ];
+    });
   };
 
   const removeApprover = (userId) => {
-    setSelectedIds((prev) =>
-      prev.filter((id) => String(id) !== String(userId)),
+    setSelectedLines((prev) =>
+      prev.filter((line) => String(line.id) !== String(userId)),
     );
   };
 
   const addDepartmentUsers = (departmentUsers) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev.map((id) => String(id)));
+    setSelectedLines((prev) => {
+      const selectedSet = new Set(prev.map((line) => String(line.id)));
       const ordered = [...prev];
       departmentUsers.forEach((targetUser) => {
         const key = String(targetUser.id);
-        if (next.has(key)) return;
-        next.add(key);
-        ordered.push(targetUser.id);
+        if (selectedSet.has(key)) return;
+        selectedSet.add(key);
+        ordered.push(buildLineFromUser(targetUser));
       });
       return ordered;
     });
+  };
+
+  const handleTypeChange = (index, approvalType) => {
+    setSelectedLines((prev) =>
+      prev.map((line, idx) =>
+        idx === index
+          ? { ...line, approval_type: normalizeApprovalType(approvalType) }
+          : line,
+      ),
+    );
+  };
+
+  const moveLine = (index, direction) => {
+    const nextIndex = index + direction;
+    if (nextIndex < 0 || nextIndex >= selectedLines.length) return;
+    setSelectedLines((prev) => {
+      const copied = [...prev];
+      [copied[index], copied[nextIndex]] = [copied[nextIndex], copied[index]];
+      return copied;
+    });
+  };
+
+  const applyPreset = (preset) => {
+    const nextLines = (preset?.items || []).map((item) => {
+      const targetUser = users.find(
+        (candidate) => String(candidate.id) === String(item.approver),
+      );
+      if (targetUser) {
+        return buildLineFromUser(targetUser, {
+          name: item.approver_name,
+          position: item.approver_position,
+          department: item.approver_department,
+          approval_type: item.approval_type,
+        });
+      }
+      return {
+        id: item.approver,
+        name: item.approver_name || `사용자 ${item.approver}`,
+        position: item.approver_position || "",
+        department: item.approver_department || "",
+        company: "",
+        approval_type: normalizeApprovalType(item.approval_type),
+      };
+    });
+    setSelectedLines(nextLines);
+  };
+
+  const handleSavePreset = async () => {
+    if (selectedLines.length === 0) {
+      alert("저장할 결재선을 먼저 구성해주세요.");
+      return;
+    }
+    await onSavePreset(selectedLines);
   };
 
   const toggleDepartmentGroup = (groupKey) => {
@@ -632,28 +754,82 @@ const ApproverSelectModal = ({
               <p className="text-sm font-semibold text-gray-800">
                 자주 쓰는 결재선
               </p>
-              <div className="mt-3 px-3 py-4 text-sm text-center text-gray-500 bg-gray-100 rounded-xl">
-                저장된 결재선이 없습니다.
-              </div>
+              {presetLoading ? (
+                <div className="mt-3 px-3 py-4 text-sm text-center text-gray-500 bg-gray-100 rounded-xl">
+                  저장된 결재선을 불러오는 중입니다.
+                </div>
+              ) : savedPresets.length === 0 ? (
+                <div className="mt-3 px-3 py-4 text-sm text-center text-gray-500 bg-gray-100 rounded-xl">
+                  저장된 결재선이 없습니다.
+                </div>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  {savedPresets.map((preset) => (
+                    <div
+                      key={preset.id}
+                      className="px-3 py-2.5 border border-gray-200 rounded-xl bg-white"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">
+                            {preset.name}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {preset.line_count}명
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => applyPreset(preset)}
+                            className="px-2 py-1 text-xs font-medium text-white bg-blue-500 rounded-md hover:bg-blue-600"
+                          >
+                            적용
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onDeletePreset(preset.id)}
+                            disabled={presetDeletingId === preset.id}
+                            className="p-1 text-gray-400 rounded-md hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
+                            title="삭제"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
           <div className="p-4 overflow-y-auto">
             <div className="mb-4 flex items-center justify-between">
               <p className="text-sm font-semibold text-gray-800">
-                결재선 구성 ({selectedIds.length}명)
+                결재선 구성 ({selectedLines.length}명)
               </p>
-              {selectedIds.length > 0 && (
+              <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setSelectedIds([])}
-                  className="text-xs text-gray-500 hover:text-red-500"
+                  type="button"
+                  onClick={handleSavePreset}
+                  disabled={presetSaving || selectedLines.length === 0}
+                  className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-500 rounded-lg hover:bg-blue-600 disabled:opacity-50"
                 >
-                  전체제거
+                  {presetSaving ? "저장 중..." : "결재선 저장"}
                 </button>
-              )}
+                {selectedLines.length > 0 && (
+                  <button
+                    onClick={() => setSelectedLines([])}
+                    className="text-xs text-gray-500 hover:text-red-500"
+                  >
+                    전체제거
+                  </button>
+                )}
+              </div>
             </div>
 
-            {selectedIds.length === 0 ? (
+            {selectedLines.length === 0 ? (
               <div className="h-full min-h-[240px] flex flex-col items-center justify-center text-center text-gray-400">
                 <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-3">
                   <Users size={28} />
@@ -666,63 +842,73 @@ const ApproverSelectModal = ({
               </div>
             ) : (
               <div className="space-y-2">
-                {selectedIds.map((selectedId) => {
-                  const targetUser = users.find(
-                    (candidate) => String(candidate.id) === String(selectedId),
-                  );
-
-                  if (!targetUser) {
-                    const fallback = selectedLineById[String(selectedId)];
-                    return (
-                      <div
-                        key={selectedId}
-                        className="flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-200 bg-white"
-                      >
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">
-                            {fallback?.name || `사용자 ${selectedId}`}
-                          </p>
-                          <p className="text-xs text-gray-500 truncate">
-                            {fallback?.department || ""}
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => removeApprover(selectedId)}
-                          className="p-1 text-gray-400 rounded-md hover:bg-red-50 hover:text-red-500"
-                        >
-                          <X size={16} />
-                        </button>
-                      </div>
-                    );
-                  }
-
-                  const fullName = getUserDisplayName(targetUser);
-                  const department = getUserDepartmentName(targetUser);
-                  const position = getUserPositionName(targetUser);
+                {selectedLines.map((line, index) => {
+                  const organizationText = [
+                    line.company,
+                    line.department,
+                    line.position,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ");
 
                   return (
                     <div
-                      key={targetUser.id}
+                      key={`${line.id}-${index}`}
                       className="flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-200 bg-white"
                     >
-                      <div className="min-w-0">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex flex-col items-center gap-1 text-gray-400">
+                          <button
+                            type="button"
+                            onClick={() => moveLine(index, -1)}
+                            disabled={index === 0}
+                            className="p-0.5 rounded hover:bg-gray-100 disabled:opacity-30"
+                          >
+                            <ChevronUp size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => moveLine(index, 1)}
+                            disabled={index === selectedLines.length - 1}
+                            className="p-0.5 rounded hover:bg-gray-100 disabled:opacity-30"
+                          >
+                            <ChevronDown size={14} />
+                          </button>
+                        </div>
+                        <div className="w-9 h-9 rounded-full bg-blue-500 text-white font-semibold flex items-center justify-center shrink-0">
+                          {index + 1}
+                        </div>
+                      </div>
+
+                      <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900 truncate">
-                          {fullName}
-                          {position && (
-                            <span className="ml-1 font-normal text-gray-500">
-                              {position}
-                            </span>
-                          )}
+                          {line.name || `사용자 ${line.id}`}
                         </p>
                         <p className="text-xs text-gray-500 truncate">
-                          {department}
+                          {organizationText || "소속 정보 없음"}
                         </p>
                       </div>
-                      <button
-                        onClick={() => removeApprover(targetUser.id)}
-                        className="p-1 text-gray-400 rounded-md hover:bg-red-50 hover:text-red-500"
+
+                      <select
+                        value={normalizeApprovalType(line.approval_type)}
+                        onChange={(event) =>
+                          handleTypeChange(index, event.target.value)
+                        }
+                        className="px-2.5 py-1.5 text-sm border border-gray-300 rounded-lg bg-gray-50"
                       >
-                        <X size={16} />
+                        {APPROVAL_LINE_TYPE_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+
+                      <button
+                        onClick={() => removeApprover(line.id)}
+                        className="p-1 text-gray-400 rounded-md hover:bg-red-50 hover:text-red-500"
+                        title="결재자 제거"
+                      >
+                        <Trash2 size={16} />
                       </button>
                     </div>
                   );
@@ -740,7 +926,7 @@ const ApproverSelectModal = ({
             닫기
           </button>
           <button
-            onClick={() => onSave(selectedIds)}
+            onClick={() => onSave(selectedLines)}
             className="px-4 py-2 text-sm text-white bg-blue-500 rounded-lg hover:bg-blue-600"
           >
             확인
@@ -774,6 +960,10 @@ export default function ApprovalForm() {
   const [users, setUsers] = useState([]);
   const [departmentOrderById, setDepartmentOrderById] = useState({});
   const [positionLevelById, setPositionLevelById] = useState({});
+  const [savedApprovalLinePresets, setSavedApprovalLinePresets] = useState([]);
+  const [presetLoading, setPresetLoading] = useState(false);
+  const [presetSaving, setPresetSaving] = useState(false);
+  const [presetDeletingId, setPresetDeletingId] = useState(null);
   const [attendanceData, setAttendanceData] = useState(() =>
     createDefaultAttendanceData(),
   );
@@ -846,6 +1036,19 @@ export default function ApprovalForm() {
     }
   }, []);
 
+  const loadApprovalLinePresets = useCallback(async () => {
+    setPresetLoading(true);
+    try {
+      const res = await api.get("/approval/line-presets/");
+      setSavedApprovalLinePresets(res.data?.results ?? res.data ?? []);
+    } catch (err) {
+      console.error("Failed to load approval line presets:", err);
+      setSavedApprovalLinePresets([]);
+    } finally {
+      setPresetLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     let mounted = true;
 
@@ -883,13 +1086,20 @@ export default function ApprovalForm() {
     loadUsers();
     loadDepartments();
     loadPositions();
-  }, [loadUsers, loadDepartments, loadPositions]);
+    loadApprovalLinePresets();
+  }, [loadUsers, loadDepartments, loadPositions, loadApprovalLinePresets]);
 
   useEffect(() => {
     if (!showUserModal) return;
     loadDepartments();
     loadPositions();
-  }, [showUserModal, loadDepartments, loadPositions]);
+    loadApprovalLinePresets();
+  }, [
+    showUserModal,
+    loadDepartments,
+    loadPositions,
+    loadApprovalLinePresets,
+  ]);
 
   // 문서 로드 (수정 모드)
   useEffect(() => {
@@ -922,7 +1132,8 @@ export default function ApprovalForm() {
             name: line.approver_name,
             position: line.approver_position,
             department: line.approver_department,
-            approval_type: line.approval_type,
+            company: "",
+            approval_type: normalizeApprovalType(line.approval_type),
           })) || [],
         );
         setExistingAttachments(doc.attachments || []);
@@ -937,43 +1148,91 @@ export default function ApprovalForm() {
     loadDocument();
   }, [id, isEdit, navigate]);
 
-  const handleSaveApproverSelection = (selectedIds) => {
-    setApprovalLines((prev) => {
-      const previousById = prev.reduce((acc, line) => {
-        acc[String(line.id)] = line;
-        return acc;
-      }, {});
-
-      return selectedIds.map((selectedId) => {
-        const key = String(selectedId);
-        const previous = previousById[key];
+  const handleSaveApproverSelection = (selectedLines) => {
+    setApprovalLines(
+      selectedLines.map((line) => {
         const targetUser = users.find(
-          (candidate) => String(candidate.id) === key,
+          (candidate) => String(candidate.id) === String(line.id),
         );
 
         if (!targetUser) {
-          return (
-            previous || {
-              id: selectedId,
-              name: `사용자 ${selectedId}`,
-              position: "",
-              department: "",
-              approval_type: "approval",
-            }
-          );
+          return {
+            id: line.id,
+            name: line.name || `사용자 ${line.id}`,
+            position: line.position || "",
+            department: line.department || "",
+            company: line.company || "",
+            approval_type: normalizeApprovalType(line.approval_type),
+          };
         }
 
-        const fullName = getUserDisplayName(targetUser) || targetUser.username;
         return {
           id: targetUser.id,
-          name: fullName,
-          position: getUserPositionName(targetUser),
-          department: getUserDepartmentName(targetUser),
-          approval_type: previous?.approval_type || "approval",
+          name: getUserDisplayName(targetUser) || targetUser.username,
+          position: getUserPositionName(targetUser) || line.position || "",
+          department:
+            getUserDepartmentName(targetUser) || line.department || "",
+          company: getUserCompanyName(targetUser) || line.company || "",
+          approval_type: normalizeApprovalType(line.approval_type),
         };
-      });
-    });
+      }),
+    );
     setShowUserModal(false);
+  };
+
+  const handleSaveApprovalLinePreset = async (selectedLines) => {
+    if (selectedLines.length === 0) {
+      alert("저장할 결재선을 먼저 구성해주세요.");
+      return;
+    }
+
+    const defaultName = buildDefaultPresetName();
+    const rawName = window.prompt(
+      "저장할 결재선 이름을 입력해주세요.",
+      defaultName,
+    );
+
+    if (rawName === null) return;
+
+    const name = rawName.trim();
+    if (!name) {
+      alert("결재선 이름을 입력해주세요.");
+      return;
+    }
+
+    setPresetSaving(true);
+    try {
+      await api.post("/approval/line-presets/", {
+        name,
+        lines: selectedLines.map((line, index) => ({
+          approver: line.id,
+          order: index,
+          approval_type: normalizeApprovalType(line.approval_type),
+        })),
+      });
+      await loadApprovalLinePresets();
+      alert("결재선이 저장되었습니다.");
+    } catch (err) {
+      console.error("Failed to save approval line preset:", err);
+      alert("결재선 저장에 실패했습니다.");
+    } finally {
+      setPresetSaving(false);
+    }
+  };
+
+  const handleDeleteApprovalLinePreset = async (presetId) => {
+    if (!window.confirm("저장된 결재선을 삭제하시겠습니까?")) return;
+
+    setPresetDeletingId(presetId);
+    try {
+      await api.delete(`/approval/line-presets/${presetId}/`);
+      await loadApprovalLinePresets();
+    } catch (err) {
+      console.error("Failed to delete approval line preset:", err);
+      alert("결재선 삭제에 실패했습니다.");
+    } finally {
+      setPresetDeletingId(null);
+    }
   };
 
   // 결재자 제거
@@ -985,7 +1244,9 @@ export default function ApprovalForm() {
   const handleTypeChange = (index, type) => {
     setApprovalLines((prev) =>
       prev.map((item, i) =>
-        i === index ? { ...item, approval_type: type } : item,
+        i === index
+          ? { ...item, approval_type: normalizeApprovalType(type) }
+          : item,
       ),
     );
   };
@@ -1726,6 +1987,12 @@ export default function ApprovalForm() {
         departmentOrderById={departmentOrderById}
         positionLevelById={positionLevelById}
         initialSelectedLines={approvalLines}
+        savedPresets={savedApprovalLinePresets}
+        presetLoading={presetLoading}
+        presetSaving={presetSaving}
+        presetDeletingId={presetDeletingId}
+        onSavePreset={handleSaveApprovalLinePreset}
+        onDeletePreset={handleDeleteApprovalLinePreset}
         onSave={handleSaveApproverSelection}
       />
     </div>

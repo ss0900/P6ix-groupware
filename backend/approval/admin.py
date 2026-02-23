@@ -1,6 +1,14 @@
 # backend/approval/admin.py
 from django.contrib import admin
-from .models import DocumentTemplate, Document, ApprovalLine, ApprovalAction, Attachment
+from .models import (
+    DocumentTemplate,
+    Document,
+    ApprovalLine,
+    ApprovalAction,
+    Attachment,
+    ApprovalLinePreset,
+    ApprovalLinePresetItem,
+)
 
 
 @admin.register(DocumentTemplate)
@@ -27,6 +35,12 @@ class AttachmentInline(admin.TabularInline):
     model = Attachment
     extra = 0
     readonly_fields = ["filename", "file_size", "uploaded_by", "uploaded_at"]
+
+
+class ApprovalLinePresetItemInline(admin.TabularInline):
+    model = ApprovalLinePresetItem
+    extra = 0
+    raw_id_fields = ["approver"]
 
 
 @admin.register(Document)
@@ -58,3 +72,11 @@ class AttachmentAdmin(admin.ModelAdmin):
     list_filter = ["uploaded_at"]
     search_fields = ["filename", "document__title"]
     raw_id_fields = ["document", "uploaded_by"]
+
+
+@admin.register(ApprovalLinePreset)
+class ApprovalLinePresetAdmin(admin.ModelAdmin):
+    list_display = ["name", "owner", "created_at", "updated_at"]
+    search_fields = ["name", "owner__username", "owner__first_name", "owner__last_name"]
+    raw_id_fields = ["owner"]
+    inlines = [ApprovalLinePresetItemInline]

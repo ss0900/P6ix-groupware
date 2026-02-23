@@ -1,5 +1,6 @@
 # backend/approval/views.py
 from rest_framework import viewsets, status
+from rest_framework.mixins import ListModelMixin, CreateModelMixin, DestroyModelMixin
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -8,13 +9,21 @@ from django.db.models import Q, Count
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 
-from .models import DocumentTemplate, Document, ApprovalLine, ApprovalAction, Attachment
+from .models import (
+    DocumentTemplate,
+    Document,
+    ApprovalLine,
+    ApprovalAction,
+    Attachment,
+    ApprovalLinePreset,
+)
 from .serializers import (
     DocumentTemplateSerializer,
     DocumentListSerializer, DocumentDetailSerializer, 
     DocumentCreateSerializer, DocumentSubmitSerializer,
     ApprovalDecisionSerializer, ApprovalActionSerializer,
-    AttachmentSerializer, BulkDecisionSerializer
+    AttachmentSerializer, BulkDecisionSerializer,
+    ApprovalLinePresetSerializer,
 )
 
 
@@ -427,3 +436,23 @@ class AttachmentViewSet(viewsets.ReadOnlyModelViewSet):
             filename=attachment.filename
         )
         return response
+
+
+class ApprovalLinePresetViewSet(
+    ListModelMixin,
+    CreateModelMixin,
+    DestroyModelMixin,
+    viewsets.GenericViewSet,
+):
+    """저장 결재선 ViewSet"""
+
+    serializer_class = ApprovalLinePresetSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return ApprovalLinePreset.objects.filter(owner=self.request.user).prefetch_related(
+            "items",
+            "items__approver",
+            "items__approver__memberships__department",
+            "items__approver__memberships__position",
+        )
