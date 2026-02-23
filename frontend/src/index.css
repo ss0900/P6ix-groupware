@@ -627,3 +627,10 @@ code {
 .attendance-template p {
   font-size: 14px;
 }
+
+.attendance-template .attendance-guide-table .doc-th,
+.attendance-template .attendance-guide-table .doc-th-end,
+.attendance-template .attendance-guide-table .doc-td {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}

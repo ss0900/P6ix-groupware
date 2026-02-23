@@ -19,6 +19,28 @@ import {
 
 const ATTENDANCE_TEMPLATE_VALUE = "__attendance__";
 const ATTENDANCE_TEMPLATE_TITLE = "근태계";
+const ATTENDANCE_TYPE_OPTIONS = [
+  "결근",
+  "유급휴가",
+  "경조",
+  "병가",
+  "공가",
+  "기타",
+];
+const ATTENDANCE_REASON_OPTIONS = [
+  "연차",
+  "월차",
+  "오전반차",
+  "오후반차",
+  "결혼",
+  "사망",
+  "회갑",
+  "출산",
+  "병가",
+  "예비군",
+  "민방위",
+  "기타",
+];
 
 const getUserDisplayName = (user) =>
   `${user?.last_name || ""}${user?.first_name || ""}`.trim() ||
@@ -39,8 +61,122 @@ const escapeHtml = (value) =>
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 
-const buildAttendanceTemplateContent = ({ departmentName, userName }) => `
+const encodeMeta = (value) => encodeURIComponent(String(value ?? ""));
+
+const decodeMeta = (value) => {
+  try {
+    return decodeURIComponent(value || "");
+  } catch {
+    return "";
+  }
+};
+
+const getTodayDateString = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const date = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${date}`;
+};
+
+const getAttendanceReasonOptions = () => ATTENDANCE_REASON_OPTIONS;
+
+const getAttendanceDayCount = (startDate, endDate) => {
+  if (!startDate || !endDate) return 1;
+  const start = new Date(`${startDate}T00:00:00`);
+  const end = new Date(`${endDate}T00:00:00`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 1;
+  const diffDays = Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
+  return diffDays > 0 ? diffDays : 1;
+};
+
+const createDefaultAttendanceData = () => {
+  const today = getTodayDateString();
+  return {
+    leaveType: "",
+    leaveReason: "",
+    startDate: today,
+    endDate: today,
+    remark: "",
+  };
+};
+
+const normalizeAttendanceData = (rawData) => {
+  const defaults = createDefaultAttendanceData();
+  const leaveType = ATTENDANCE_TYPE_OPTIONS.includes(rawData?.leaveType)
+    ? rawData.leaveType
+    : "";
+  const availableReasons = getAttendanceReasonOptions();
+  const leaveReason = availableReasons.includes(rawData?.leaveReason)
+    ? rawData.leaveReason
+    : "";
+  const startDate = rawData?.startDate || defaults.startDate;
+  const endDate = rawData?.endDate || defaults.endDate;
+  const normalizedEndDate = endDate < startDate ? startDate : endDate;
+
+  return {
+    leaveType,
+    leaveReason,
+    startDate,
+    endDate: normalizedEndDate,
+    remark: rawData?.remark || "",
+  };
+};
+
+const parseAttendanceTemplateData = (content) => {
+  if (
+    !content ||
+    typeof content !== "string" ||
+    !content.includes("attendance-meta")
+  ) {
+    return null;
+  }
+  if (typeof DOMParser === "undefined") return null;
+
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(content, "text/html");
+    const meta = doc.querySelector(".attendance-meta");
+    if (!meta) return null;
+
+    return normalizeAttendanceData({
+      leaveType: decodeMeta(meta.getAttribute("data-leave-type")),
+      leaveReason: decodeMeta(meta.getAttribute("data-leave-reason")),
+      startDate: decodeMeta(meta.getAttribute("data-start-date")),
+      endDate: decodeMeta(meta.getAttribute("data-end-date")),
+      remark: decodeMeta(meta.getAttribute("data-remark")),
+    });
+  } catch (err) {
+    console.error("Failed to parse attendance template content:", err);
+    return null;
+  }
+};
+
+const buildAttendanceTemplateContent = ({
+  departmentName,
+  userName,
+  attendanceData,
+}) => {
+  const normalized = normalizeAttendanceData(attendanceData);
+  const dayCount = getAttendanceDayCount(
+    normalized.startDate,
+    normalized.endDate,
+  );
+  const remarkHtml = normalized.remark
+    ? escapeHtml(normalized.remark).replace(/\n/g, "<br />")
+    : "";
+
+  return `
 <div class="attendance-template leading-relaxed text-gray-900">
+  <div
+    class="attendance-meta"
+    style="display:none;"
+    data-leave-type="${encodeMeta(normalized.leaveType)}"
+    data-leave-reason="${encodeMeta(normalized.leaveReason)}"
+    data-start-date="${encodeMeta(normalized.startDate)}"
+    data-end-date="${encodeMeta(normalized.endDate)}"
+    data-remark="${encodeMeta(normalized.remark)}"
+  ></div>
   <h1 class="text-center text-4xl font-normal mb-4">근태계</h1>
 
   <table class="doc-table w-full table-fixed mb-3">
@@ -66,25 +202,10 @@ const buildAttendanceTemplateContent = ({ departmentName, userName }) => `
       <tr>
         <td class="doc-td text-left">${escapeHtml(departmentName || "미지정")}</td>
         <td class="doc-td text-left">${escapeHtml(userName || "사용자")}</td>
-        <td class="doc-td">
-          <select disabled class="input-sm bg-gray-50">
-            <option selected>선택</option>
-          </select>
-        </td>
-        <td class="doc-td">
-          <select disabled class="input-sm bg-gray-50">
-            <option selected>선택</option>
-          </select>
-        </td>
-        <td class="doc-td text-left whitespace-nowrap">
-          <div class="flex items-center gap-1 text-[11px]">
-            <input type="date" value="2026-02-23" disabled class="input-sm !w-auto bg-gray-50" />
-            <span>~</span>
-            <input type="date" value="2026-02-23" disabled class="input-sm !w-auto bg-gray-50" />
-            <span>(1일)</span>
-          </div>
-        </td>
-        <td class="doc-td text-left"></td>
+        <td class="doc-td text-left">${escapeHtml(normalized.leaveType || "선택")}</td>
+        <td class="doc-td text-left">${escapeHtml(normalized.leaveReason || "선택")}</td>
+        <td class="doc-td text-left">${escapeHtml(normalized.startDate)} ~ ${escapeHtml(normalized.endDate)} (${dayCount}일)</td>
+        <td class="doc-td text-left">${remarkHtml}</td>
       </tr>
     </tbody>
   </table>
@@ -93,10 +214,10 @@ const buildAttendanceTemplateContent = ({ departmentName, userName }) => `
   <p class="mb-1">※ 근태사유 중 증빙이 필요한 경우(예비군, 민방위 등)는 추후 관리부에 서류를 제출해 주시기 바랍니다.</p>
   <p class="mb-3">※ 사유는 다음에 제시하는 것 중 선택하여 기입하십시오.</p>
 
-  <table class="doc-table w-full table-fixed mb-4">
+  <table class="doc-table attendance-guide-table w-full table-fixed mb-4">
     <colgroup>
-      <col style="width:26%;" />
-      <col style="width:74%;" />
+      <col style="width:15%;" />
+      <col style="width:85%;" />
     </colgroup>
     <thead class="doc-thead">
       <tr>
@@ -106,29 +227,48 @@ const buildAttendanceTemplateContent = ({ departmentName, userName }) => `
     </thead>
     <tbody>
       <tr>
-        <td class="doc-td font-semibold">결근</td>
+        <td class="doc-td">결근</td>
         <td class="doc-td text-left">무계 결근, 유계 결근</td>
       </tr>
       <tr>
-        <td class="doc-td font-semibold">유급휴가</td>
+        <td class="doc-td">유급휴가</td>
         <td class="doc-td text-left">연/월차 휴가, 생리휴가, 산전/후 휴가</td>
       </tr>
       <tr>
-        <td class="doc-td font-semibold">경조휴가</td>
-        <td class="doc-td text-left leading-6">
-          결혼: 본인결혼(5일), 자녀(1일), 형제자매/배우자 형제자매(1일)<br />
-          회갑/고희: 부모/배우자 부모(1일)<br />
-          사망: 부모/배우자(5일), 배우자 부모(5일), 본인/배우자의 조부모(2일), 자녀(2일), 본인/배우자의 형제자매(3일)<br />
-          배우자의 출산: 10일 (1회 분할 가능, 90일 이내 신청)<br />
-          기타:
+        <td class="doc-td">경조휴가</td>
+        <td class="doc-td text-left" style="padding:0;">
+          <table class="attendance-guide-subtable" style="width:100%; border-collapse:collapse;">
+            <tbody>
+              <tr>
+                <td style="width:20%; border-right:1px solid #000; border-bottom:1px solid #000; padding:4px 6px; text-align:center;">결혼</td>
+                <td style="border-bottom:1px solid #000; padding:4px 6px; text-align:left;">본인결혼(5일), 자녀(1일), 형제자매/배우자 형제자매(1일)</td>
+              </tr>
+              <tr>
+                <td style="border-right:1px solid #000; border-bottom:1px solid #000; padding:4px 6px; text-align:center;">회갑/고희</td>
+                <td style="border-bottom:1px solid #000; padding:4px 6px; text-align:left;">부모/배우자 부모(1일)</td>
+              </tr>
+              <tr>
+                <td style="border-right:1px solid #000; border-bottom:1px solid #000; padding:4px 6px; text-align:center;">사망</td>
+                <td style="border-bottom:1px solid #000; padding:4px 6px; text-align:left;">부모/배우자(5일), 배우자 부모(5일), 본인/배우자의 조부모(2일), 자녀(2일), 본인/배우자의 형제자매(3일)</td>
+              </tr>
+              <tr>
+                <td style="border-right:1px solid #000; border-bottom:1px solid #000; padding:4px 6px; text-align:center;">배우자의 출산</td>
+                <td style="border-bottom:1px solid #000; padding:4px 6px; text-align:left;">10일 (1회 분할 가능, 90일 이내 신청)</td>
+              </tr>
+              <tr>
+                <td style="border-right:1px solid #000; padding:4px 6px; text-align:center;">기타</td>
+                <td style="padding:4px 6px; text-align:left;"></td>
+              </tr>
+            </tbody>
+          </table>
         </td>
       </tr>
       <tr>
-        <td class="doc-td font-semibold">병가</td>
+        <td class="doc-td">병가</td>
         <td class="doc-td text-left">병가</td>
       </tr>
       <tr>
-        <td class="doc-td font-semibold">공가</td>
+        <td class="doc-td">공가</td>
         <td class="doc-td text-left">예비군 훈련, 민방위 훈련</td>
       </tr>
     </tbody>
@@ -137,6 +277,7 @@ const buildAttendanceTemplateContent = ({ departmentName, userName }) => `
   <p class="text-center">상기와 같이 근태계를 제출하오니 승인하여 주시기 바랍니다.</p>
 </div>
 `;
+};
 
 const APPROVAL_TEMPLATE_OPTIONS = [
   { value: ATTENDANCE_TEMPLATE_VALUE, label: "근태계" },
@@ -280,9 +421,17 @@ export default function ApprovalForm() {
   const [approvalLines, setApprovalLines] = useState([]);
   const [attachments, setAttachments] = useState([]);
   const [existingAttachments, setExistingAttachments] = useState([]);
+  const [attendanceData, setAttendanceData] = useState(() =>
+    createDefaultAttendanceData(),
+  );
 
   const attendanceDepartmentName = getUserDepartmentName(user) || "미지정";
   const attendanceUserName = getUserDisplayName(user) || "사용자";
+  const attendanceReasonOptions = getAttendanceReasonOptions();
+  const attendanceDayCount = getAttendanceDayCount(
+    attendanceData.startDate,
+    attendanceData.endDate,
+  );
 
   // 문서 로드 (수정 모드)
   useEffect(() => {
@@ -292,8 +441,19 @@ export default function ApprovalForm() {
       try {
         const res = await api.get(`/approval/documents/${id}/`);
         const doc = res.data;
+        const parsedAttendanceData = parseAttendanceTemplateData(doc.content);
+        const isAttendanceDoc = Boolean(parsedAttendanceData);
+
+        if (isAttendanceDoc) {
+          setAttendanceData(parsedAttendanceData);
+        }
+
         setFormData({
-          template: doc.template ? String(doc.template) : "",
+          template: isAttendanceDoc
+            ? ATTENDANCE_TEMPLATE_VALUE
+            : doc.template
+              ? String(doc.template)
+              : "",
           title: doc.title,
           content: doc.content,
           preservation_period: doc.preservation_period || 5,
@@ -378,6 +538,60 @@ export default function ApprovalForm() {
     }
   };
 
+  const handleAttendanceTypeChange = (nextLeaveType) => {
+    setAttendanceData((prev) => {
+      const nextReasonOptions = getAttendanceReasonOptions();
+      const nextLeaveReason = nextReasonOptions.includes(prev.leaveReason)
+        ? prev.leaveReason
+        : "";
+      return {
+        ...prev,
+        leaveType: nextLeaveType,
+        leaveReason: nextLeaveReason,
+      };
+    });
+  };
+
+  const handleAttendanceReasonChange = (nextLeaveReason) => {
+    setAttendanceData((prev) => ({
+      ...prev,
+      leaveReason: nextLeaveReason,
+    }));
+  };
+
+  const handleAttendanceStartDateChange = (nextStartDate) => {
+    setAttendanceData((prev) => {
+      const safeStartDate = nextStartDate || prev.startDate;
+      const safeEndDate =
+        prev.endDate < safeStartDate ? safeStartDate : prev.endDate;
+      return {
+        ...prev,
+        startDate: safeStartDate,
+        endDate: safeEndDate,
+      };
+    });
+  };
+
+  const handleAttendanceEndDateChange = (nextEndDate) => {
+    setAttendanceData((prev) => {
+      const safeEndDate =
+        !nextEndDate || nextEndDate < prev.startDate
+          ? prev.startDate
+          : nextEndDate;
+      return {
+        ...prev,
+        endDate: safeEndDate,
+      };
+    });
+  };
+
+  const handleAttendanceRemarkChange = (nextRemark) => {
+    setAttendanceData((prev) => ({
+      ...prev,
+      remark: nextRemark,
+    }));
+  };
+
   // 저장
   const handleSave = async (submit = false) => {
     if (!formData.title.trim()) {
@@ -392,9 +606,17 @@ export default function ApprovalForm() {
 
     setSaving(true);
     try {
+      const contentToSave = isAttendanceTemplate
+        ? buildAttendanceTemplateContent({
+            departmentName: attendanceDepartmentName,
+            userName: attendanceUserName,
+            attendanceData,
+          })
+        : formData.content;
+
       const data = new FormData();
       data.append("title", formData.title);
-      data.append("content", formData.content);
+      data.append("content", contentToSave);
       data.append("preservation_period", formData.preservation_period);
       if (isNumericTemplateId(formData.template)) {
         data.append("template", formData.template);
@@ -448,14 +670,16 @@ export default function ApprovalForm() {
 
   const handleTemplateChange = (templateValue) => {
     if (templateValue === ATTENDANCE_TEMPLATE_VALUE) {
+      const nextContent = buildAttendanceTemplateContent({
+        departmentName: attendanceDepartmentName,
+        userName: attendanceUserName,
+        attendanceData,
+      });
       setFormData((prev) => ({
         ...prev,
         template: templateValue,
         title: ATTENDANCE_TEMPLATE_TITLE,
-        content: buildAttendanceTemplateContent({
-          departmentName: attendanceDepartmentName,
-          userName: attendanceUserName,
-        }),
+        content: nextContent,
       }));
       return;
     }
@@ -470,11 +694,17 @@ export default function ApprovalForm() {
     const nextContent = buildAttendanceTemplateContent({
       departmentName: attendanceDepartmentName,
       userName: attendanceUserName,
+      attendanceData,
     });
     setFormData((prev) =>
       prev.content === nextContent ? prev : { ...prev, content: nextContent },
     );
-  }, [isAttendanceTemplate, attendanceDepartmentName, attendanceUserName]);
+  }, [
+    isAttendanceTemplate,
+    attendanceDepartmentName,
+    attendanceUserName,
+    attendanceData,
+  ]);
 
   if (loading) {
     return (
@@ -525,9 +755,7 @@ export default function ApprovalForm() {
 
         {/* 양식 선택 */}
         <div>
-          <label className="block text-sm text-gray-600 mb-1">
-            결재 양식
-          </label>
+          <label className="block text-sm text-gray-600 mb-1">결재 양식</label>
           <select
             value={formData.template}
             onChange={(e) => handleTemplateChange(e.target.value)}
@@ -568,10 +796,281 @@ export default function ApprovalForm() {
           <label className="block text-sm text-gray-600 mb-1">내용</label>
           {isAttendanceTemplate ? (
             <div className="bg-transparent p-0">
-              <div
-                className="max-h-[560px] overflow-auto"
-                dangerouslySetInnerHTML={{ __html: formData.content }}
-              />
+              <div className="attendance-template max-h-[560px] overflow-auto leading-relaxed text-gray-900">
+                <h1 className="mb-4 text-center text-4xl font-normal">
+                  근태계
+                </h1>
+
+                <table className="doc-table mb-3 w-full table-fixed">
+                  <colgroup>
+                    <col style={{ width: "12%" }} />
+                    <col style={{ width: "12%" }} />
+                    <col style={{ width: "15%" }} />
+                    <col style={{ width: "15%" }} />
+                    <col style={{ width: "23%" }} />
+                    <col style={{ width: "23%" }} />
+                  </colgroup>
+                  <thead className="doc-thead">
+                    <tr>
+                      <th className="doc-th">부서</th>
+                      <th className="doc-th">성명</th>
+                      <th className="doc-th">근태구분</th>
+                      <th className="doc-th">근태사유</th>
+                      <th className="doc-th">기간</th>
+                      <th className="doc-th-end">비고 (상세사유 기재)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="doc-td text-center">
+                        {attendanceDepartmentName}
+                      </td>
+                      <td className="doc-td text-center">
+                        {attendanceUserName}
+                      </td>
+                      <td className="doc-td">
+                        <select
+                          value={attendanceData.leaveType}
+                          onChange={(e) =>
+                            handleAttendanceTypeChange(e.target.value)
+                          }
+                          className="input-sm bg-white"
+                          style={{ width: "110px", minWidth: "110px" }}
+                        >
+                          <option value="">선택</option>
+                          {ATTENDANCE_TYPE_OPTIONS.map((typeOption) => (
+                            <option key={typeOption} value={typeOption}>
+                              {typeOption}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="doc-td">
+                        <select
+                          value={attendanceData.leaveReason}
+                          onChange={(e) =>
+                            handleAttendanceReasonChange(e.target.value)
+                          }
+                          className="input-sm bg-white"
+                          style={{ width: "110px", minWidth: "110px" }}
+                        >
+                          <option value="">선택</option>
+                          {attendanceReasonOptions.map((reasonOption) => (
+                            <option key={reasonOption} value={reasonOption}>
+                              {reasonOption}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="doc-td text-center whitespace-nowrap">
+                        <div className="flex w-full items-center justify-center gap-1 text-[11px]">
+                          <input
+                            type="date"
+                            value={attendanceData.startDate}
+                            onChange={(e) =>
+                              handleAttendanceStartDateChange(e.target.value)
+                            }
+                            className="input-sm !w-auto bg-white"
+                          />
+                          <span>~</span>
+                          <input
+                            type="date"
+                            value={attendanceData.endDate}
+                            min={attendanceData.startDate}
+                            onChange={(e) =>
+                              handleAttendanceEndDateChange(e.target.value)
+                            }
+                            className="input-sm !w-auto bg-white"
+                          />
+                          <span>({attendanceDayCount}일)</span>
+                        </div>
+                      </td>
+                      <td className="doc-td text-left">
+                        <input
+                          type="text"
+                          value={attendanceData.remark}
+                          onChange={(e) =>
+                            handleAttendanceRemarkChange(e.target.value)
+                          }
+                          className="input-sm bg-white"
+                          placeholder="상세사유를 입력하세요"
+                        />
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <p className="mb-1">
+                  ※ 본 근태계는 해당 부서를 경유, 관리부에 미리 제출해 주시기
+                  바랍니다.
+                </p>
+                <p className="mb-1">
+                  ※ 근태사유 중 증빙이 필요한 경우(예비군, 민방위 등)는 추후
+                  관리부에 서류를 제출해 주시기 바랍니다.
+                </p>
+                <p className="mb-3">
+                  ※ 사유는 다음에 제시하는 것 중 선택하여 기입하십시오.
+                </p>
+
+                <table className="doc-table attendance-guide-table mb-4 w-full table-fixed">
+                  <colgroup>
+                    <col style={{ width: "15%" }} />
+                    <col style={{ width: "85%" }} />
+                  </colgroup>
+                  <thead className="doc-thead">
+                    <tr>
+                      <th className="doc-th">근태구분</th>
+                      <th className="doc-th-end">근태사유</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="doc-td">결근</td>
+                      <td className="doc-td text-left">무계 결근, 유계 결근</td>
+                    </tr>
+                    <tr>
+                      <td className="doc-td">유급휴가</td>
+                      <td className="doc-td text-left">
+                        연/월차 휴가, 생리휴가, 산전/후 휴가
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="doc-td">경조휴가</td>
+                      <td className="doc-td text-left" style={{ padding: 0 }}>
+                        <table
+                          className="attendance-guide-subtable"
+                          style={{
+                            width: "100%",
+                            borderCollapse: "collapse",
+                          }}
+                        >
+                          <tbody>
+                            <tr>
+                              <td
+                                style={{
+                                  width: "15%",
+                                  borderRight: "1px solid #000",
+                                  borderBottom: "1px solid #000",
+                                  padding: "4px 6px",
+                                  textAlign: "center",
+                                }}
+                              >
+                                결혼
+                              </td>
+                              <td
+                                style={{
+                                  borderBottom: "1px solid #000",
+                                  padding: "4px 6px",
+                                  textAlign: "left",
+                                }}
+                              >
+                                본인결혼(5일), 자녀(1일), 형제자매/배우자
+                                형제자매(1일)
+                              </td>
+                            </tr>
+                            <tr>
+                              <td
+                                style={{
+                                  borderRight: "1px solid #000",
+                                  borderBottom: "1px solid #000",
+                                  padding: "4px 6px",
+                                  textAlign: "center",
+                                }}
+                              >
+                                회갑/고희
+                              </td>
+                              <td
+                                style={{
+                                  borderBottom: "1px solid #000",
+                                  padding: "4px 6px",
+                                  textAlign: "left",
+                                }}
+                              >
+                                부모/배우자 부모(1일)
+                              </td>
+                            </tr>
+                            <tr>
+                              <td
+                                style={{
+                                  borderRight: "1px solid #000",
+                                  borderBottom: "1px solid #000",
+                                  padding: "4px 6px",
+                                  textAlign: "center",
+                                }}
+                              >
+                                사망
+                              </td>
+                              <td
+                                style={{
+                                  borderBottom: "1px solid #000",
+                                  padding: "4px 6px",
+                                  textAlign: "left",
+                                }}
+                              >
+                                부모/배우자(5일), 배우자 부모(5일),
+                                본인/배우자의 조부모(2일), 자녀(2일),
+                                본인/배우자의 형제자매(3일)
+                              </td>
+                            </tr>
+                            <tr>
+                              <td
+                                style={{
+                                  borderRight: "1px solid #000",
+                                  borderBottom: "1px solid #000",
+                                  padding: "4px 6px",
+                                  textAlign: "center",
+                                }}
+                              >
+                                배우자의 출산
+                              </td>
+                              <td
+                                style={{
+                                  borderBottom: "1px solid #000",
+                                  padding: "4px 6px",
+                                  textAlign: "left",
+                                }}
+                              >
+                                10일 (1회 분할 가능, 90일 이내 신청)
+                              </td>
+                            </tr>
+                            <tr>
+                              <td
+                                style={{
+                                  borderRight: "1px solid #000",
+                                  padding: "4px 6px",
+                                  textAlign: "center",
+                                }}
+                              >
+                                기타
+                              </td>
+                              <td
+                                style={{
+                                  padding: "4px 6px",
+                                  textAlign: "left",
+                                }}
+                              />
+                            </tr>
+                          </tbody>
+                        </table>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="doc-td">병가</td>
+                      <td className="doc-td text-left">병가</td>
+                    </tr>
+                    <tr>
+                      <td className="doc-td">공가</td>
+                      <td className="doc-td text-left">
+                        예비군 훈련, 민방위 훈련
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <p className="text-center">
+                  상기와 같이 근태계를 제출하오니 승인하여 주시기 바랍니다.
+                </p>
+              </div>
             </div>
           ) : (
             <textarea
