@@ -1,4 +1,6 @@
 # backend/approval/serializers.py
+import json
+
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.db import transaction
@@ -393,6 +395,48 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
             "id", "title", "content", "form_data",
             "preservation_period", "template", "approval_lines", "attachments"
         ]
+
+    def to_internal_value(self, data):
+        normalized = data
+
+        # multipart/form-data에서는 approval_lines가 문자열(JSON)로 들어오므로
+        # 리스트로 역직렬화해서 ListField 검증을 통과시키도록 보정한다.
+        if hasattr(data, "lists"):
+            normalized = {}
+            for key, values in data.lists():
+                if not values:
+                    normalized[key] = None
+                elif len(values) == 1:
+                    normalized[key] = values[0]
+                else:
+                    normalized[key] = values
+        elif isinstance(data, dict):
+            normalized = dict(data)
+
+        raw_approval_lines = (
+            normalized.get("approval_lines")
+            if isinstance(normalized, dict)
+            else None
+        )
+        if isinstance(raw_approval_lines, str):
+            raw_text = raw_approval_lines.strip()
+            if raw_text:
+                try:
+                    parsed = json.loads(raw_text)
+                except json.JSONDecodeError as exc:
+                    raise serializers.ValidationError(
+                        {"approval_lines": "결재선 데이터 형식이 올바르지 않습니다."}
+                    ) from exc
+            else:
+                parsed = []
+
+            if not isinstance(parsed, list):
+                raise serializers.ValidationError(
+                    {"approval_lines": "결재선 데이터 형식이 올바르지 않습니다."}
+                )
+            normalized["approval_lines"] = parsed
+
+        return super().to_internal_value(normalized)
 
     def create(self, validated_data):
         approval_lines_data = validated_data.pop("approval_lines", [])

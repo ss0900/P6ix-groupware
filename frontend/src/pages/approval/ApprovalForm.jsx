@@ -1667,7 +1667,26 @@ export default function ApprovalForm() {
       }
     } catch (err) {
       console.error("Save failed:", err);
-      alert("저장 중 오류가 발생했습니다.");
+      const responseData = err?.response?.data;
+      let errorMessage = "저장 중 오류가 발생했습니다.";
+
+      if (typeof responseData === "string" && responseData.trim()) {
+        errorMessage = responseData;
+      } else if (responseData?.error) {
+        errorMessage = responseData.error;
+      } else if (responseData && typeof responseData === "object") {
+        const firstEntry = Object.entries(responseData)[0];
+        if (firstEntry) {
+          const [field, value] = firstEntry;
+          if (Array.isArray(value) && value.length > 0) {
+            errorMessage = `${field}: ${String(value[0])}`;
+          } else if (value) {
+            errorMessage = `${field}: ${String(value)}`;
+          }
+        }
+      }
+
+      alert(errorMessage);
     } finally {
       setSaving(false);
     }
