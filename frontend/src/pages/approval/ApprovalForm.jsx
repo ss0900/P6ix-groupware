@@ -10,7 +10,11 @@ import {
   Plus,
   X,
   User,
+  Users,
+  UserPlus,
   Search,
+  ChevronDown,
+  ChevronRight,
   GripVertical,
   Upload,
   Paperclip,
@@ -53,11 +57,28 @@ const getUserDepartmentName = (user) =>
   user?.department_name ||
   "";
 
+const getUserCompanyName = (user) =>
+  user?.primary_membership?.company_name ||
+  user?.company?.name ||
+  user?.company_name ||
+  "";
+
 const getUserPositionName = (user) =>
   user?.primary_membership?.position_name ||
   user?.position?.name ||
   user?.position_name ||
   "";
+
+const getUserSearchText = (user) => {
+  const fields = [
+    getUserDisplayName(user),
+    user?.username || "",
+    getUserCompanyName(user),
+    getUserDepartmentName(user),
+    getUserPositionName(user),
+  ];
+  return fields.join(" ").toLowerCase();
+};
 
 const escapeHtml = (value) =>
   String(value ?? "")
@@ -291,116 +312,390 @@ const APPROVAL_TEMPLATE_OPTIONS = [
 
 const isNumericTemplateId = (value) => /^\d+$/.test(String(value || ""));
 
-// 사용자 검색 모달
-const UserSearchModal = ({ isOpen, onClose, onSelect, selectedUsers }) => {
-  const [users, setUsers] = useState([]);
+const ApproverSelectModal = ({
+  isOpen,
+  onClose,
+  users,
+  departmentOrderById,
+  initialSelectedLines,
+  onSave,
+}) => {
   const [searchQuery, setSearchQuery] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const loadUsers = useCallback(async () => {
-    if (!isOpen) return;
-    setLoading(true);
-    try {
-      const params = searchQuery ? { search: searchQuery } : {};
-      const res = await api.get("/core/users/", { params });
-      setUsers(res.data?.results ?? res.data ?? []);
-    } catch (err) {
-      console.error("Failed to load users:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, [isOpen, searchQuery]);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [expandedGroupKeys, setExpandedGroupKeys] = useState({});
 
   useEffect(() => {
-    loadUsers();
-  }, [loadUsers]);
+    if (!isOpen) return;
+    const uniqueIds = [];
+    const seen = new Set();
+    initialSelectedLines.forEach((line) => {
+      const key = String(line?.id ?? "");
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      uniqueIds.push(line.id);
+    });
+    setSelectedIds(uniqueIds);
+    setSearchQuery("");
+    setExpandedGroupKeys({});
+  }, [isOpen, initialSelectedLines]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const handleEsc = (event) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleEsc);
+    return () => window.removeEventListener("keydown", handleEsc);
+  }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
+  const selectedIdSet = new Set(selectedIds.map((id) => String(id)));
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+
+  const filteredUsers = users.filter((targetUser) => {
+    const departmentName = getUserDepartmentName(targetUser);
+    if (!departmentName || !departmentName.trim()) return false;
+    if (selectedIdSet.has(String(targetUser.id))) return false;
+    if (!normalizedQuery) return true;
+    return getUserSearchText(targetUser).includes(normalizedQuery);
+  });
+
+  const groupedUsers = filteredUsers.reduce((acc, targetUser) => {
+    const departmentName = getUserDepartmentName(targetUser) || "부서 미지정";
+    const departmentId =
+      targetUser?.primary_membership?.department_id ??
+      targetUser?.department?.id ??
+      targetUser?.department_id ??
+      null;
+    const rawDepartmentOrder =
+      targetUser?.primary_membership?.department_order ??
+      targetUser?.department?.order ??
+      targetUser?.department_order ??
+      (departmentId != null ? departmentOrderById[String(departmentId)] : null);
+    const departmentOrder = Number(rawDepartmentOrder);
+    const normalizedDepartmentOrder = Number.isFinite(departmentOrder)
+      ? departmentOrder
+      : Number.MAX_SAFE_INTEGER;
+    const groupKey =
+      departmentId != null
+        ? `department-${departmentId}`
+        : `department-name-${departmentName}`;
+
+    if (!acc[groupKey]) {
+      acc[groupKey] = {
+        groupKey,
+        departmentName,
+        departmentOrder: normalizedDepartmentOrder,
+        users: [],
+      };
+    }
+
+    acc[groupKey].departmentOrder = Math.min(
+      acc[groupKey].departmentOrder,
+      normalizedDepartmentOrder,
+    );
+    acc[groupKey].users.push(targetUser);
+    return acc;
+  }, {});
+
+  const groupedUserEntries = Object.values(groupedUsers).sort((a, b) => {
+    if (a.departmentOrder !== b.departmentOrder) {
+      return a.departmentOrder - b.departmentOrder;
+    }
+    return a.departmentName.localeCompare(b.departmentName, "ko");
+  });
+
+  const selectedLineById = initialSelectedLines.reduce((acc, line) => {
+    acc[String(line.id)] = line;
+    return acc;
+  }, {});
+
+  const addApprover = (userId) => {
+    setSelectedIds((prev) => (prev.some((id) => String(id) === String(userId)) ? prev : [...prev, userId]));
+  };
+
+  const removeApprover = (userId) => {
+    setSelectedIds((prev) => prev.filter((id) => String(id) !== String(userId)));
+  };
+
+  const addDepartmentUsers = (departmentUsers) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev.map((id) => String(id)));
+      const ordered = [...prev];
+      departmentUsers.forEach((targetUser) => {
+        const key = String(targetUser.id);
+        if (next.has(key)) return;
+        next.add(key);
+        ordered.push(targetUser.id);
+      });
+      return ordered;
+    });
+  };
+
+  const toggleDepartmentGroup = (groupKey) => {
+    setExpandedGroupKeys((prev) => ({
+      ...prev,
+      [groupKey]: !prev[groupKey],
+    }));
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-xl w-full max-w-md max-h-[80vh] flex flex-col shadow-xl">
-        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-          <h3 className="font-semibold text-gray-900">결재자 선택</h3>
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative z-10 mx-4 w-full max-w-5xl h-[88vh] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900">결재선 관리</h3>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
+            className="p-1 text-gray-400 rounded-lg hover:bg-gray-100 hover:text-gray-600"
           >
             <X size={20} />
           </button>
         </div>
 
-        <div className="p-4 border-b border-gray-200">
-          <div className="relative">
-            <Search
-              size={18}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-            />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="이름, 부서로 검색..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none"
-            />
+        <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-2">
+          <div className="p-4 border-b md:border-b-0 md:border-r border-gray-200 overflow-y-auto">
+            <div className="mb-3">
+              <p className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                <Users size={16} />
+                사용자 목록
+              </p>
+            </div>
+
+            <div className="relative mb-4">
+              <Search
+                size={16}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+              />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="이름, 아이디, 회사, 부서로 검색"
+                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none"
+              />
+            </div>
+
+            {groupedUserEntries.length === 0 ? (
+              <div className="py-12 text-center text-sm text-gray-500 border border-dashed border-gray-200 rounded-xl">
+                검색 조건에 맞는 사용자가 없습니다.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {groupedUserEntries.map(
+                  ({ groupKey, departmentName, users: departmentUsers }) => {
+                    const isExpanded = Boolean(expandedGroupKeys[groupKey]);
+                    return (
+                      <div
+                        key={groupKey}
+                        className="border border-gray-200 rounded-xl p-3 bg-gray-50/50"
+                      >
+                        <div className="flex items-center justify-between">
+                          <button
+                            type="button"
+                            onClick={() => toggleDepartmentGroup(groupKey)}
+                            className="inline-flex min-w-0 items-center gap-2 text-left"
+                          >
+                            {isExpanded ? (
+                              <ChevronDown
+                                size={16}
+                                className="text-gray-500 shrink-0"
+                              />
+                            ) : (
+                              <ChevronRight
+                                size={16}
+                                className="text-gray-500 shrink-0"
+                              />
+                            )}
+                            <p className="text-sm font-medium text-gray-900 truncate">
+                              {departmentName}
+                            </p>
+                            <span className="px-2 py-0.5 text-xs bg-gray-200 text-gray-700 rounded-full">
+                              {departmentUsers.length}명
+                            </span>
+                          </button>
+                          <button
+                            onClick={() => addDepartmentUsers(departmentUsers)}
+                            className="px-2 py-1 text-xs font-medium text-white bg-blue-500 rounded-lg hover:bg-blue-600"
+                          >
+                            전체추가
+                          </button>
+                        </div>
+
+                        {isExpanded && (
+                          <div className="mt-2 space-y-1">
+                            {departmentUsers.map((targetUser) => {
+                              const fullName = getUserDisplayName(targetUser);
+                              const company = getUserCompanyName(targetUser);
+                              const position = getUserPositionName(targetUser);
+
+                              return (
+                                <button
+                                  key={targetUser.id}
+                                  onClick={() => addApprover(targetUser.id)}
+                                  className="w-full text-left px-2.5 py-2 rounded-lg bg-white border border-gray-200 hover:border-sky-200 hover:bg-sky-50 transition-colors"
+                                >
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="min-w-0">
+                                      <p className="text-sm font-medium text-gray-900 truncate">
+                                        {fullName}
+                                        {position && (
+                                          <span className="ml-1 text-gray-500 font-normal">
+                                            {position}
+                                          </span>
+                                        )}
+                                      </p>
+                                      <p className="text-xs text-gray-500 truncate">
+                                        {targetUser.username}
+                                        {company ? ` · ${company}` : ""}
+                                      </p>
+                                    </div>
+                                    <span className="inline-flex items-center gap-1 text-xs text-blue-600">
+                                      <UserPlus size={14} />
+                                      추가
+                                    </span>
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  },
+                )}
+              </div>
+            )}
+
+            <div className="mt-6 pt-4 border-t border-gray-200">
+              <p className="text-sm font-semibold text-gray-800">
+                자주 쓰는 결재선
+              </p>
+              <div className="mt-3 px-3 py-4 text-sm text-center text-gray-500 bg-gray-100 rounded-xl">
+                저장된 결재선이 없습니다.
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4 overflow-y-auto">
+            <div className="mb-4 flex items-center justify-between">
+              <p className="text-sm font-semibold text-gray-800">
+                결재선 구성 ({selectedIds.length}명)
+              </p>
+              {selectedIds.length > 0 && (
+                <button
+                  onClick={() => setSelectedIds([])}
+                  className="text-xs text-gray-500 hover:text-red-500"
+                >
+                  전체제거
+                </button>
+              )}
+            </div>
+
+            {selectedIds.length === 0 ? (
+              <div className="h-full min-h-[240px] flex flex-col items-center justify-center text-center text-gray-400">
+                <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-3">
+                  <Users size={28} />
+                </div>
+                <p className="text-sm leading-6">
+                  왼쪽 목록에서
+                  <br />
+                  결재자를 선택해주세요.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {selectedIds.map((selectedId) => {
+                  const targetUser = users.find(
+                    (candidate) => String(candidate.id) === String(selectedId),
+                  );
+
+                  if (!targetUser) {
+                    const fallback = selectedLineById[String(selectedId)];
+                    return (
+                      <div
+                        key={selectedId}
+                        className="flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-200 bg-white"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">
+                            {fallback?.name || `사용자 ${selectedId}`}
+                          </p>
+                          <p className="text-xs text-gray-500 truncate">
+                            {fallback?.department || ""}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => removeApprover(selectedId)}
+                          className="p-1 text-gray-400 rounded-md hover:bg-red-50 hover:text-red-500"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                    );
+                  }
+
+                  const fullName = getUserDisplayName(targetUser);
+                  const company = getUserCompanyName(targetUser);
+                  const department = getUserDepartmentName(targetUser);
+                  const position = getUserPositionName(targetUser);
+
+                  return (
+                    <div
+                      key={targetUser.id}
+                      className="flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-200 bg-white"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {fullName}
+                          {position && (
+                            <span className="ml-1 font-normal text-gray-500">
+                              {position}
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-xs text-gray-500 truncate">
+                          {company}
+                          {department ? ` · ${department}` : ""}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => removeApprover(targetUser.id)}
+                        className="p-1 text-gray-400 rounded-md hover:bg-red-50 hover:text-red-500"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4">
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-6 w-6 border-2 border-sky-500 border-t-transparent"></div>
-            </div>
-          ) : users.length === 0 ? (
-            <p className="text-center text-gray-500 py-8">
-              사용자를 찾을 수 없습니다.
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {users.map((user) => {
-                const isSelected = selectedUsers.some((u) => u.id === user.id);
-                const fullName =
-                  `${user.last_name || ""}${user.first_name || ""}`.trim() ||
-                  user.username;
-                const position = user.primary_membership?.position_name || "";
-                const department =
-                  user.primary_membership?.department_name || "";
-
-                return (
-                  <button
-                    key={user.id}
-                    onClick={() => !isSelected && onSelect(user)}
-                    disabled={isSelected}
-                    className={`w-full flex items-center gap-3 p-3 rounded-lg text-left transition-colors ${
-                      isSelected
-                        ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                        : "hover:bg-sky-50 cursor-pointer"
-                    }`}
-                  >
-                    <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
-                      <User size={20} className="text-gray-500" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">
-                        {fullName}
-                        {position && (
-                          <span className="text-gray-500 ml-1">{position}</span>
-                        )}
-                      </p>
-                      {department && (
-                        <p className="text-xs text-gray-500 truncate">
-                          {department}
-                        </p>
-                      )}
-                    </div>
-                    {isSelected && (
-                      <span className="text-xs text-gray-400">선택됨</span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+        <div className="px-6 py-3 border-t border-gray-200 flex items-center justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+          >
+            닫기
+          </button>
+          <button
+            onClick={() => onSave(selectedIds)}
+            className="px-4 py-2 text-sm text-white bg-blue-500 rounded-lg hover:bg-blue-600"
+          >
+            확인
+          </button>
         </div>
       </div>
     </div>
@@ -427,6 +722,8 @@ export default function ApprovalForm() {
   const [approvalLines, setApprovalLines] = useState([]);
   const [attachments, setAttachments] = useState([]);
   const [existingAttachments, setExistingAttachments] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [departmentOrderById, setDepartmentOrderById] = useState({});
   const [attendanceData, setAttendanceData] = useState(() =>
     createDefaultAttendanceData(),
   );
@@ -444,6 +741,39 @@ export default function ApprovalForm() {
     attendanceData.startDate,
     attendanceData.endDate,
   );
+
+  const loadUsers = useCallback(async () => {
+    try {
+      const res = await api.get("core/users/", {
+        params: { page_size: 1000 },
+      });
+      setUsers(res.data?.results ?? res.data ?? []);
+    } catch (err) {
+      console.error("Failed to load users:", err);
+      setUsers([]);
+    }
+  }, []);
+
+  const loadDepartments = useCallback(async () => {
+    try {
+      const res = await api.get("core/departments/", {
+        params: { page_size: 1000 },
+      });
+      const list = res.data?.results ?? res.data ?? [];
+      const nextOrderById = {};
+      list.forEach((department) => {
+        if (department?.id == null) return;
+        const parsedOrder = Number(department.order);
+        nextOrderById[String(department.id)] = Number.isFinite(parsedOrder)
+          ? parsedOrder
+          : Number.MAX_SAFE_INTEGER;
+      });
+      setDepartmentOrderById(nextOrderById);
+    } catch (err) {
+      console.error("Failed to load departments:", err);
+      setDepartmentOrderById({});
+    }
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -477,6 +807,16 @@ export default function ApprovalForm() {
       mounted = false;
     };
   }, [user]);
+
+  useEffect(() => {
+    loadUsers();
+    loadDepartments();
+  }, [loadUsers, loadDepartments]);
+
+  useEffect(() => {
+    if (!showUserModal) return;
+    loadDepartments();
+  }, [showUserModal, loadDepartments]);
 
   // 문서 로드 (수정 모드)
   useEffect(() => {
@@ -524,20 +864,40 @@ export default function ApprovalForm() {
     loadDocument();
   }, [id, isEdit, navigate]);
 
-  // 결재자 추가
-  const handleAddApprover = (user) => {
-    const fullName =
-      `${user.last_name || ""}${user.first_name || ""}`.trim() || user.username;
-    setApprovalLines((prev) => [
-      ...prev,
-      {
-        id: user.id,
-        name: fullName,
-        position: user.primary_membership?.position_name || "",
-        department: user.primary_membership?.department_name || "",
-        approval_type: "approval",
-      },
-    ]);
+  const handleSaveApproverSelection = (selectedIds) => {
+    setApprovalLines((prev) => {
+      const previousById = prev.reduce((acc, line) => {
+        acc[String(line.id)] = line;
+        return acc;
+      }, {});
+
+      return selectedIds.map((selectedId) => {
+        const key = String(selectedId);
+        const previous = previousById[key];
+        const targetUser = users.find(
+          (candidate) => String(candidate.id) === key,
+        );
+
+        if (!targetUser) {
+          return previous || {
+            id: selectedId,
+            name: `사용자 ${selectedId}`,
+            position: "",
+            department: "",
+            approval_type: "approval",
+          };
+        }
+
+        const fullName = getUserDisplayName(targetUser) || targetUser.username;
+        return {
+          id: targetUser.id,
+          name: fullName,
+          position: getUserPositionName(targetUser),
+          department: getUserDepartmentName(targetUser),
+          approval_type: previous?.approval_type || "approval",
+        };
+      });
+    });
     setShowUserModal(false);
   };
 
@@ -1142,7 +1502,7 @@ export default function ApprovalForm() {
             className="flex items-center gap-1 px-3 py-1.5 text-sm text-sky-600 bg-sky-50 rounded-lg hover:bg-sky-100 transition-colors"
           >
             <Plus size={16} />
-            결재자 추가
+            결재자 선택
           </button>
         </div>
 
@@ -1283,12 +1643,14 @@ export default function ApprovalForm() {
         )}
       </div>
 
-      {/* 사용자 검색 모달 */}
-      <UserSearchModal
+      {/* 결재자 선택 모달 */}
+      <ApproverSelectModal
         isOpen={showUserModal}
         onClose={() => setShowUserModal(false)}
-        onSelect={handleAddApprover}
-        selectedUsers={approvalLines}
+        users={users}
+        departmentOrderById={departmentOrderById}
+        initialSelectedLines={approvalLines}
+        onSave={handleSaveApproverSelection}
       />
     </div>
   );
