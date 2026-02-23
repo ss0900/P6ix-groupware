@@ -355,18 +355,33 @@ const APPROVAL_TEMPLATE_OPTIONS = [
 
 const isNumericTemplateId = (value) => /^\d+$/.test(String(value || ""));
 
-const APPROVAL_LINE_TYPE_OPTIONS = [
-  { value: "approval", label: "일반결재" },
-  { value: "agreement", label: "합의" },
-  { value: "reference", label: "참조" },
-];
-
-const APPROVAL_LINE_TYPE_SET = new Set(
-  APPROVAL_LINE_TYPE_OPTIONS.map((option) => option.value),
-);
+const APPROVAL_LINE_TYPE_SET = new Set(["approval", "agreement", "reference"]);
 
 const normalizeApprovalType = (value) =>
   APPROVAL_LINE_TYPE_SET.has(value) ? value : "approval";
+
+const APPROVAL_DECISION_OPTIONS = [
+  { value: "approval", label: "결재" },
+  { value: "delegate", label: "전결" },
+];
+
+const APPROVAL_DECISION_SET = new Set(
+  APPROVAL_DECISION_OPTIONS.map((option) => option.value),
+);
+
+const normalizeDecisionType = (value) =>
+  APPROVAL_DECISION_SET.has(value) ? value : "approval";
+
+const APPROVAL_AGREEMENT_OPTIONS = [
+  { value: "none", label: "선택" },
+  { value: "agreement", label: "합의" },
+];
+
+const mapApprovalTypeToAgreementOption = (approvalType) =>
+  normalizeApprovalType(approvalType) === "agreement" ? "agreement" : "none";
+
+const mapAgreementOptionToApprovalType = (agreementOption) =>
+  agreementOption === "agreement" ? "agreement" : "approval";
 
 const buildDefaultPresetName = () => {
   const now = new Date();
@@ -410,6 +425,7 @@ const ApproverSelectModal = ({
         getUserDepartmentName(targetUser) || previousLine.department || "",
       company: getUserCompanyName(targetUser) || previousLine.company || "",
       approval_type: normalizeApprovalType(previousLine.approval_type),
+      decision_type: normalizeDecisionType(previousLine.decision_type),
     }),
     [],
   );
@@ -430,6 +446,7 @@ const ApproverSelectModal = ({
         department: line.department || "",
         company: line.company || "",
         approval_type: normalizeApprovalType(line.approval_type),
+        decision_type: normalizeDecisionType(line.decision_type),
       });
     });
     setSelectedLines(uniqueLines);
@@ -542,6 +559,7 @@ const ApproverSelectModal = ({
           department: "",
           company: "",
           approval_type: "approval",
+          decision_type: "approval",
         },
       ];
     });
@@ -567,11 +585,24 @@ const ApproverSelectModal = ({
     });
   };
 
-  const handleTypeChange = (index, approvalType) => {
+  const handleDecisionTypeChange = (index, decisionType) => {
     setSelectedLines((prev) =>
       prev.map((line, idx) =>
         idx === index
-          ? { ...line, approval_type: normalizeApprovalType(approvalType) }
+          ? { ...line, decision_type: normalizeDecisionType(decisionType) }
+          : line,
+      ),
+    );
+  };
+
+  const handleAgreementTypeChange = (index, agreementType) => {
+    setSelectedLines((prev) =>
+      prev.map((line, idx) =>
+        idx === index
+          ? {
+              ...line,
+              approval_type: mapAgreementOptionToApprovalType(agreementType),
+            }
           : line,
       ),
     );
@@ -598,6 +629,7 @@ const ApproverSelectModal = ({
           position: item.approver_position,
           department: item.approver_department,
           approval_type: item.approval_type,
+          decision_type: item.decision_type,
         });
       }
       return {
@@ -607,6 +639,7 @@ const ApproverSelectModal = ({
         department: item.approver_department || "",
         company: "",
         approval_type: normalizeApprovalType(item.approval_type),
+        decision_type: normalizeDecisionType(item.decision_type),
       };
     });
     setSelectedLines(nextLines);
@@ -843,13 +876,7 @@ const ApproverSelectModal = ({
             ) : (
               <div className="space-y-2">
                 {selectedLines.map((line, index) => {
-                  const organizationText = [
-                    line.company,
-                    line.department,
-                    line.position,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ");
+                  const departmentText = line.department || "부서 미지정";
 
                   return (
                     <div
@@ -883,32 +910,55 @@ const ApproverSelectModal = ({
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900 truncate">
                           {line.name || `사용자 ${line.id}`}
+                          {line.position && (
+                            <span className="ml-1 font-normal text-gray-500">
+                              {line.position}
+                            </span>
+                          )}
                         </p>
                         <p className="text-xs text-gray-500 truncate">
-                          {organizationText || "소속 정보 없음"}
+                          {departmentText}
                         </p>
                       </div>
 
-                      <select
-                        value={normalizeApprovalType(line.approval_type)}
-                        onChange={(event) =>
-                          handleTypeChange(index, event.target.value)
-                        }
-                        className="px-2.5 py-1.5 text-sm border border-gray-300 rounded-lg bg-gray-50"
-                      >
-                        {APPROVAL_LINE_TYPE_OPTIONS.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={normalizeDecisionType(line.decision_type)}
+                          onChange={(event) =>
+                            handleDecisionTypeChange(index, event.target.value)
+                          }
+                          className="px-2.5 py-1.5 text-sm border border-gray-300 rounded-lg bg-gray-50"
+                        >
+                          {APPROVAL_DECISION_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+
+                        <select
+                          value={mapApprovalTypeToAgreementOption(
+                            line.approval_type,
+                          )}
+                          onChange={(event) =>
+                            handleAgreementTypeChange(index, event.target.value)
+                          }
+                          className="px-2.5 py-1.5 text-sm border border-gray-300 rounded-lg bg-gray-50"
+                        >
+                          {APPROVAL_AGREEMENT_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
                       <button
                         onClick={() => removeApprover(line.id)}
                         className="p-1 text-gray-400 rounded-md hover:bg-red-50 hover:text-red-500"
                         title="결재자 제거"
                       >
-                        <Trash2 size={16} />
+                        <X size={16} />
                       </button>
                     </div>
                   );
@@ -1134,6 +1184,7 @@ export default function ApprovalForm() {
             department: line.approver_department,
             company: "",
             approval_type: normalizeApprovalType(line.approval_type),
+            decision_type: "approval",
           })) || [],
         );
         setExistingAttachments(doc.attachments || []);
@@ -1163,6 +1214,7 @@ export default function ApprovalForm() {
             department: line.department || "",
             company: line.company || "",
             approval_type: normalizeApprovalType(line.approval_type),
+            decision_type: normalizeDecisionType(line.decision_type),
           };
         }
 
@@ -1174,6 +1226,7 @@ export default function ApprovalForm() {
             getUserDepartmentName(targetUser) || line.department || "",
           company: getUserCompanyName(targetUser) || line.company || "",
           approval_type: normalizeApprovalType(line.approval_type),
+          decision_type: normalizeDecisionType(line.decision_type),
         };
       }),
     );
@@ -1208,6 +1261,7 @@ export default function ApprovalForm() {
           approver: line.id,
           order: index,
           approval_type: normalizeApprovalType(line.approval_type),
+          decision_type: normalizeDecisionType(line.decision_type),
         })),
       });
       await loadApprovalLinePresets();
