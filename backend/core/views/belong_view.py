@@ -1,7 +1,7 @@
 import os
 
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Max, Q
 from rest_framework import viewsets, permissions, filters, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
@@ -118,7 +118,7 @@ class CompanyViewSet(viewsets.ModelViewSet):
 
 # 부서 관리
 class DepartmentViewSet(viewsets.ModelViewSet):
-    queryset = Department.objects.select_related('company', 'parent').all().order_by('company__name','name')
+    queryset = Department.objects.select_related('company', 'parent').all().order_by('company__name', 'order', 'name')
     serializer_class = DepartmentSerializer
     permission_classes = [permissions.IsAuthenticated, IsStaffOrSuperuser]
     filter_backends = [filters.SearchFilter]
@@ -150,6 +150,15 @@ class DepartmentViewSet(viewsets.ModelViewSet):
         company = serializer.validated_data.get("company")
         if company:
             self._ensure_company_permission(company.id)
+
+        order_in_request = self.request.data.get("order", None)
+        if order_in_request in (None, "") and company:
+            max_order = (
+                Department.objects.filter(company=company).aggregate(max_order=Max("order"))["max_order"] or 0
+            )
+            serializer.save(order=max_order + 1)
+            return
+
         serializer.save()
 
     def perform_update(self, serializer):
@@ -189,7 +198,7 @@ class DepartmentViewSet(viewsets.ModelViewSet):
         departments_qs = (
             Department.objects.filter(company_id__in=target_company_ids)
             .select_related("company", "parent")
-            .order_by("company__name", "name")
+            .order_by("company__name", "order", "name")
         )
         memberships_qs = (
             UserMembership.objects.filter(company_id__in=target_company_ids)

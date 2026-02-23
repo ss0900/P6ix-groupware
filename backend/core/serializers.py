@@ -228,7 +228,7 @@ class DepartmentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Department
-        fields = ["id", "company", "company_name", "name", "type", "parent",
+        fields = ["id", "company", "company_name", "name", "order", "type", "parent",
                   "created_at", "updated_at"]
         read_only_fields = ["id", "created_at", "updated_at"]
 

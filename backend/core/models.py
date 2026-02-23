@@ -64,6 +64,7 @@ class Department(models.Model):
     id = models.AutoField(primary_key=True)                                     # 부서 ID
     company = models.ForeignKey(Company, on_delete=models.CASCADE)              # 소속 회사 ID
     name = models.CharField(max_length=255, verbose_name="부서명")               # 부서팀명
+    order = models.PositiveIntegerField(default=0, verbose_name="정렬 순서")
     type = models.CharField(max_length=50, null=True, blank=True, verbose_name="부서 구분")  # 본사/현장/TF 등 구분
     parent = models.ForeignKey("self", on_delete=models.SET_NULL, null=True, blank=True)    # 상위 부서 ID 없으면 null
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="생성일시")
@@ -72,7 +73,7 @@ class Department(models.Model):
     class Meta:
         verbose_name = "부서"
         verbose_name_plural = "부서 목록"
-        ordering = ["company_id", "name"]
+        ordering = ["company_id", "order", "name"]
         constraints = [
             models.UniqueConstraint(
                 fields=["company", "name", "parent"],

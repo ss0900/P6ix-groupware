@@ -57,6 +57,7 @@ const RecipientSelectModal = ({
   isOpen,
   onClose,
   users,
+  departmentOrderById,
   initialSelectedIds,
   currentUserId,
   currentUsername,
@@ -124,6 +125,17 @@ const RecipientSelectModal = ({
       user?.department?.id ??
       user?.department_id ??
       null;
+    const rawDepartmentOrder =
+      user?.primary_membership?.department_order ??
+      user?.department?.order ??
+      user?.department_order ??
+      (departmentId != null
+        ? departmentOrderById[String(departmentId)]
+        : null);
+    const departmentOrder = Number(rawDepartmentOrder);
+    const normalizedDepartmentOrder = Number.isFinite(departmentOrder)
+      ? departmentOrder
+      : Number.MAX_SAFE_INTEGER;
     const groupKey =
       departmentId != null
         ? `department-${departmentId}`
@@ -133,16 +145,24 @@ const RecipientSelectModal = ({
       acc[groupKey] = {
         groupKey,
         departmentName,
+        departmentOrder: normalizedDepartmentOrder,
         users: [],
       };
     }
+    acc[groupKey].departmentOrder = Math.min(
+      acc[groupKey].departmentOrder,
+      normalizedDepartmentOrder,
+    );
     acc[groupKey].users.push(user);
     return acc;
   }, {});
 
-  const groupedUserEntries = Object.values(groupedUsers).sort((a, b) =>
-    a.departmentName.localeCompare(b.departmentName, "ko"),
-  );
+  const groupedUserEntries = Object.values(groupedUsers).sort((a, b) => {
+    if (a.departmentOrder !== b.departmentOrder) {
+      return a.departmentOrder - b.departmentOrder;
+    }
+    return a.departmentName.localeCompare(b.departmentName, "ko");
+  });
 
   const selectedUsers = selectedIds
     .map((userId) => users.find((user) => user.id === userId))
@@ -176,7 +196,7 @@ const RecipientSelectModal = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative z-10 mx-4 w-full max-w-5xl max-h-[88vh] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+      <div className="relative z-10 mx-4 w-full max-w-5xl h-[88vh] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-semibold text-gray-900">
             수신자 선택 관리
@@ -395,6 +415,7 @@ export default function ContactForm() {
   const [existingAttachments, setExistingAttachments] = useState([]);
 
   const [users, setUsers] = useState([]);
+  const [departmentOrderById, setDepartmentOrderById] = useState({});
   const [showRecipientModal, setShowRecipientModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -407,6 +428,27 @@ export default function ContactForm() {
       setUsers(res.data?.results ?? res.data ?? []);
     } catch (err) {
       console.error("Failed to load users:", err);
+    }
+  }, []);
+
+  const loadDepartments = useCallback(async () => {
+    try {
+      const res = await api.get("core/departments/", {
+        params: { page_size: 1000 },
+      });
+      const list = res.data?.results ?? res.data ?? [];
+      const nextOrderById = {};
+      list.forEach((department) => {
+        if (department?.id == null) return;
+        const parsedOrder = Number(department.order);
+        nextOrderById[String(department.id)] = Number.isFinite(parsedOrder)
+          ? parsedOrder
+          : Number.MAX_SAFE_INTEGER;
+      });
+      setDepartmentOrderById(nextOrderById);
+    } catch (err) {
+      console.error("Failed to load departments:", err);
+      setDepartmentOrderById({});
     }
   }, []);
 
@@ -429,8 +471,14 @@ export default function ContactForm() {
 
   useEffect(() => {
     loadUsers();
+    loadDepartments();
     loadMessage();
-  }, [loadUsers, loadMessage]);
+  }, [loadUsers, loadDepartments, loadMessage]);
+
+  useEffect(() => {
+    if (!showRecipientModal) return;
+    loadDepartments();
+  }, [showRecipientModal, loadDepartments]);
 
   useEffect(() => {
     if (!user) return;
@@ -693,6 +741,7 @@ export default function ContactForm() {
         isOpen={showRecipientModal}
         onClose={() => setShowRecipientModal(false)}
         users={users}
+        departmentOrderById={departmentOrderById}
         initialSelectedIds={recipientIds}
         currentUserId={user?.id}
         currentUsername={user?.username}

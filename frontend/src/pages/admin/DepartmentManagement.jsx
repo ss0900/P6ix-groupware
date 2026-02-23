@@ -212,6 +212,9 @@ export default function DepartmentManagement() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingDepartment, setEditingDepartment] = useState(null);
+  const [draggingDepartmentId, setDraggingDepartmentId] = useState(null);
+  const [dropDepartmentId, setDropDepartmentId] = useState(null);
+  const [isReordering, setIsReordering] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -258,7 +261,23 @@ export default function DepartmentManagement() {
       return String(item.company) === String(selectedCompany);
     });
 
-    return list.sort((a, b) => a.name.localeCompare(b.name, "ko"));
+    return list.sort((a, b) => {
+      const companyCompare = String(a.company_name ?? "").localeCompare(
+        String(b.company_name ?? ""),
+        "ko",
+      );
+      if (companyCompare !== 0) {
+        return companyCompare;
+      }
+
+      const orderA = Number(a.order ?? Number.MAX_SAFE_INTEGER);
+      const orderB = Number(b.order ?? Number.MAX_SAFE_INTEGER);
+
+      if (orderA !== orderB) {
+        return orderA - orderB;
+      }
+      return a.name.localeCompare(b.name, "ko");
+    });
   }, [departments, selectedCompany]);
 
   const handleSaveDepartment = async (data, departmentId) => {
@@ -296,6 +315,115 @@ export default function DepartmentManagement() {
     } catch (error) {
       console.error(error);
       alert("부서 삭제 중 오류가 발생했습니다.");
+    }
+  };
+
+  const isDraggableTarget = (targetDepartment) => {
+    if (!draggingDepartmentId) {
+      return false;
+    }
+
+    const draggingDepartment = departments.find(
+      (item) => item.id === draggingDepartmentId,
+    );
+
+    if (!draggingDepartment) {
+      return false;
+    }
+
+    return String(draggingDepartment.company) === String(targetDepartment.company);
+  };
+
+  const handleDragStart = (event, department) => {
+    if (isReordering) {
+      event.preventDefault();
+      return;
+    }
+
+    setDraggingDepartmentId(department.id);
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", String(department.id));
+  };
+
+  const handleDragEnd = () => {
+    setDraggingDepartmentId(null);
+    setDropDepartmentId(null);
+  };
+
+  const handleDropReorder = async (targetDepartment) => {
+    if (!draggingDepartmentId || isReordering) {
+      return;
+    }
+
+    const draggingDepartment = departments.find(
+      (item) => item.id === draggingDepartmentId,
+    );
+
+    if (!draggingDepartment) {
+      return;
+    }
+
+    if (String(draggingDepartment.company) !== String(targetDepartment.company)) {
+      alert("같은 회사의 부서끼리만 순서 변경이 가능합니다.");
+      return;
+    }
+
+    const companyDepartments = filteredDepartments.filter(
+      (item) => String(item.company) === String(draggingDepartment.company),
+    );
+
+    const fromIndex = companyDepartments.findIndex(
+      (item) => item.id === draggingDepartment.id,
+    );
+    const toIndex = companyDepartments.findIndex(
+      (item) => item.id === targetDepartment.id,
+    );
+
+    if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) {
+      return;
+    }
+
+    const reordered = [...companyDepartments];
+    const [moved] = reordered.splice(fromIndex, 1);
+    reordered.splice(toIndex, 0, moved);
+
+    const orderUpdates = reordered
+      .map((item, index) => ({
+        id: item.id,
+        order: index + 1,
+      }))
+      .filter(({ id, order }) => {
+        const current = companyDepartments.find((item) => item.id === id);
+        return Number(current?.order ?? 0) !== order;
+      });
+
+    if (orderUpdates.length === 0) {
+      return;
+    }
+
+    setIsReordering(true);
+
+    const nextOrderById = new Map(orderUpdates.map((item) => [item.id, item.order]));
+    setDepartments((prev) =>
+      prev.map((item) =>
+        nextOrderById.has(item.id)
+          ? { ...item, order: nextOrderById.get(item.id) }
+          : item,
+      ),
+    );
+
+    try {
+      await Promise.all(
+        orderUpdates.map((item) =>
+          api.patch(`core/departments/${item.id}/`, { order: item.order }),
+        ),
+      );
+    } catch (error) {
+      console.error(error);
+      alert("부서 순서 저장 중 오류가 발생했습니다.");
+      await loadData();
+    } finally {
+      setIsReordering(false);
     }
   };
 
@@ -368,17 +496,53 @@ export default function DepartmentManagement() {
               </tr>
             </thead>
             <tbody>
-              {filteredDepartments.map((department, index) => {
+              {filteredDepartments.map((department) => {
                 const parentDepartment = departmentMap.get(department.parent);
+                const isDropTarget = dropDepartmentId === department.id;
                 return (
                   <tr
                     key={department.id}
-                    className="border-b border-gray-100 hover:bg-gray-50"
+                    onDragOver={(event) => {
+                      if (!isDraggableTarget(department)) {
+                        return;
+                      }
+                      event.preventDefault();
+                      event.dataTransfer.dropEffect = "move";
+                      setDropDepartmentId(department.id);
+                    }}
+                    onDragLeave={() => {
+                      if (dropDepartmentId === department.id) {
+                        setDropDepartmentId(null);
+                      }
+                    }}
+                    onDrop={async (event) => {
+                      event.preventDefault();
+                      if (!isDraggableTarget(department)) {
+                        return;
+                      }
+                      await handleDropReorder(department);
+                      setDraggingDepartmentId(null);
+                      setDropDepartmentId(null);
+                    }}
+                    className={`border-b border-gray-100 ${
+                      isDropTarget ? "bg-blue-50" : "hover:bg-gray-50"
+                    }`}
                   >
                     <td className="px-4 py-3 text-sm text-gray-500">
                       <div className="flex items-center gap-2">
-                        <GripVertical size={16} className="text-gray-400" />
-                        {index + 1}
+                        <button
+                          type="button"
+                          draggable={!isReordering}
+                          onDragStart={(event) => handleDragStart(event, department)}
+                          onDragEnd={handleDragEnd}
+                          disabled={isReordering}
+                          className="cursor-grab rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 active:cursor-grabbing disabled:cursor-not-allowed"
+                          title="드래그하여 순서 변경"
+                          aria-label={`${department.name} 순서 드래그 핸들`}
+                        >
+                          <GripVertical size={16} />
+                        </button>
+                        <span>{department.order ?? "-"}</span>
                       </div>
                     </td>
                     <td className="px-4 py-3 text-sm font-medium text-gray-900">
