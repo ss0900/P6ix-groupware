@@ -2,7 +2,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../api/axios";
-import HtmlEditorFrame from "../../components/HtmlEditorFrame";
+import MarkdownEditor from "../../components/MarkdownEditor";
 import {
   FileText,
   Search,
@@ -122,7 +122,7 @@ const TemplateModal = ({
             <label className="mb-1 block text-sm font-medium text-gray-700">
               내용
             </label>
-            <HtmlEditorFrame
+            <MarkdownEditor
               value={formData.content}
               onChange={(nextContent) =>
                 setFormData((prev) => ({
@@ -131,7 +131,7 @@ const TemplateModal = ({
                 }))
               }
               height={320}
-              title="양식 내용 편집기"
+              placeholder="양식 내용을 마크다운으로 입력하세요"
             />
           </div>
 
