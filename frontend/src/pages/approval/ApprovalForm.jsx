@@ -53,6 +53,12 @@ const getUserDepartmentName = (user) =>
   user?.department_name ||
   "";
 
+const getUserPositionName = (user) =>
+  user?.primary_membership?.position_name ||
+  user?.position?.name ||
+  user?.position_name ||
+  "";
+
 const escapeHtml = (value) =>
   String(value ?? "")
     .replace(/&/g, "&amp;")
@@ -177,7 +183,7 @@ const buildAttendanceTemplateContent = ({
     data-end-date="${encodeMeta(normalized.endDate)}"
     data-remark="${encodeMeta(normalized.remark)}"
   ></div>
-  <h1 class="text-center text-4xl font-normal mb-4">근태계</h1>
+  <h1 class="text-center text-4xl font-normal mb-8">근태계</h1>
 
   <table class="doc-table w-full table-fixed mb-3">
     <colgroup>
@@ -424,14 +430,53 @@ export default function ApprovalForm() {
   const [attendanceData, setAttendanceData] = useState(() =>
     createDefaultAttendanceData(),
   );
+  const [primaryMembership, setPrimaryMembership] = useState(null);
 
   const attendanceDepartmentName = getUserDepartmentName(user) || "미지정";
-  const attendanceUserName = getUserDisplayName(user) || "사용자";
+  const attendanceBaseName = getUserDisplayName(user) || "사용자";
+  const attendancePositionName =
+    getUserPositionName(user) || primaryMembership?.position_name || "";
+  const attendanceUserName = attendancePositionName
+    ? `${attendanceBaseName} ${attendancePositionName}`
+    : attendanceBaseName;
   const attendanceReasonOptions = getAttendanceReasonOptions();
   const attendanceDayCount = getAttendanceDayCount(
     attendanceData.startDate,
     attendanceData.endDate,
   );
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadPrimaryMembership = async () => {
+      if (!user) {
+        if (mounted) setPrimaryMembership(null);
+        return;
+      }
+
+      try {
+        const res = await api.get("core/membership/me/");
+        const memberships = res.data?.results ?? res.data ?? [];
+        const primary =
+          memberships.find((membership) => membership.is_primary) ||
+          memberships[0] ||
+          null;
+        if (mounted) {
+          setPrimaryMembership(primary);
+        }
+      } catch (err) {
+        if (mounted) {
+          setPrimaryMembership(null);
+        }
+      }
+    };
+
+    loadPrimaryMembership();
+
+    return () => {
+      mounted = false;
+    };
+  }, [user]);
 
   // 문서 로드 (수정 모드)
   useEffect(() => {
@@ -797,7 +842,7 @@ export default function ApprovalForm() {
           {isAttendanceTemplate ? (
             <div className="bg-transparent p-0">
               <div className="attendance-template max-h-[560px] overflow-auto leading-relaxed text-gray-900">
-                <h1 className="mb-4 text-center text-4xl font-normal">
+                <h1 className="mb-8 text-center text-4xl font-normal">
                   근태계
                 </h1>
 
