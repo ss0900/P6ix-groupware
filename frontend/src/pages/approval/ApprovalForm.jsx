@@ -383,6 +383,12 @@ const mapApprovalTypeToAgreementOption = (approvalType) =>
 const mapAgreementOptionToApprovalType = (agreementOption) =>
   agreementOption === "agreement" ? "agreement" : "approval";
 
+const getApprovalStageLabel = (line = {}) => {
+  if (normalizeApprovalType(line.approval_type) === "agreement") return "합의";
+  if (normalizeDecisionType(line.decision_type) === "delegate") return "전결";
+  return "결재";
+};
+
 const buildDefaultPresetName = () => {
   const now = new Date();
   const year = now.getFullYear();
@@ -2109,68 +2115,27 @@ export default function ApprovalForm() {
             <p>결재자를 추가해주세요</p>
           </div>
         ) : (
-          <div className="space-y-2">
-            {approvalLines.map((line, idx) => {
-              const agreementOption = mapApprovalTypeToAgreementOption(
-                line.approval_type,
-              );
-              const isAgreementSelected = agreementOption === "agreement";
-              return (
+          <div className="overflow-x-auto">
+            <div className="inline-flex border border-gray-300 rounded-sm overflow-hidden">
+              {approvalLines.map((line, idx) => (
                 <div
-                  key={idx}
-                  className="flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-200 bg-gray-50"
+                  key={`${line.id || "line"}-${idx}`}
+                  className="w-32 shrink-0 border-r border-gray-300 last:border-r-0"
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-9 h-9 rounded-full bg-blue-500 text-white font-semibold flex items-center justify-center shrink-0">
-                      {idx + 1}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">
-                        {line.name || `사용자 ${line.id}`}
-                        {line.position && (
-                          <span className="ml-1 font-normal text-gray-500">
-                            {line.position}
-                          </span>
-                        )}
-                      </p>
-                      <p className="text-xs text-gray-500 truncate">
-                        {line.department || "부서 미지정"}
-                      </p>
-                    </div>
+                  <div className="h-8 bg-gray-200 border-b border-gray-300 flex items-center justify-center px-2">
+                    <p className="text-sm text-gray-800 whitespace-nowrap">
+                      ({idx + 1}) {getApprovalStageLabel(line)}
+                    </p>
                   </div>
-
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={normalizeDecisionType(line.decision_type)}
-                      disabled
-                      className={`px-2.5 py-1.5 text-sm border border-gray-300 rounded-lg cursor-not-allowed ${
-                        isAgreementSelected
-                          ? "bg-gray-100 text-gray-400"
-                          : "bg-gray-50 text-gray-500"
-                      }`}
-                    >
-                      {APPROVAL_DECISION_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-
-                    <select
-                      value={agreementOption}
-                      disabled
-                      className="px-2.5 py-1.5 text-sm border border-gray-300 rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed"
-                    >
-                      {APPROVAL_AGREEMENT_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
+                  <div className="h-20 bg-white flex items-center justify-center px-2">
+                    <p className="text-xl font-medium text-gray-900 whitespace-nowrap overflow-hidden text-ellipsis">
+                      {line.name || `사용자 ${line.id}`}
+                      {line.position ? ` ${line.position}` : ""}
+                    </p>
                   </div>
                 </div>
-              );
-            })}
+              ))}
+            </div>
           </div>
         )}
       </div>
