@@ -10,7 +10,6 @@ import {
   XCircle,
   Clock,
   User,
-  Send,
   MessageSquare,
   Printer,
   Download,
@@ -361,23 +360,6 @@ export default function ApprovalDetail() {
             >
               <FileEdit size={16} />
               수정
-            </button>
-            <button
-              onClick={async () => {
-                if (!window.confirm("문서를 제출하시겠습니까?")) return;
-                try {
-                  await api.post(`/approval/documents/${id}/submit/`);
-                  alert("문서가 제출되었습니다.");
-                  loadDocument();
-                } catch (err) {
-                  console.error("Submit failed:", err);
-                  alert("제출 중 오류가 발생했습니다.");
-                }
-              }}
-              className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
-            >
-              <Send size={16} />
-              제출
             </button>
             <button
               onClick={handleCancel}

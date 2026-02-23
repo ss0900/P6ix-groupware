@@ -23,7 +23,6 @@ import {
 } from "lucide-react";
 
 const ATTENDANCE_TEMPLATE_VALUE = "__attendance__";
-const ATTENDANCE_TEMPLATE_TITLE = "근태계";
 const ATTENDANCE_TYPE_OPTIONS = [
   "결근",
   "유급휴가",
@@ -169,6 +168,12 @@ const createDefaultAttendanceData = () => {
     endDate: today,
     remark: "",
   };
+};
+
+const getAttendanceDocumentTitle = ({ leaveReason, userName }) => {
+  const normalizedReason = leaveReason || "근태사유";
+  const normalizedUserName = userName || "성명";
+  return `[${normalizedReason}] ${normalizedUserName}`;
 };
 
 const normalizeAttendanceData = (rawData) => {
@@ -1626,6 +1631,7 @@ export default function ApprovalForm() {
       if (isNumericTemplateId(formData.template)) {
         data.append("template", formData.template);
       }
+      data.append("submit", submit ? "true" : "false");
 
       // 결재선 추가
       data.append(
@@ -1643,27 +1649,23 @@ export default function ApprovalForm() {
         data.append("attachments", file);
       });
 
-      let docId = id;
-
       if (isEdit) {
         await api.patch(`/approval/documents/${id}/`, data, {
           headers: { "Content-Type": "multipart/form-data" },
         });
       } else {
-        const res = await api.post("/approval/documents/", data, {
+        await api.post("/approval/documents/", data, {
           headers: { "Content-Type": "multipart/form-data" },
         });
-        docId = res.data.id;
       }
 
-      // 제출
+      // 상신
       if (submit) {
-        await api.post(`/approval/documents/${docId}/submit/`);
-        alert("문서가 제출되었습니다.");
+        alert("문서가 상신되었습니다.");
         navigate("/approval");
       } else {
         alert("임시저장되었습니다.");
-        navigate(`/approval/${docId}`);
+        navigate("/approval/draft");
       }
     } catch (err) {
       console.error("Save failed:", err);
@@ -1699,10 +1701,14 @@ export default function ApprovalForm() {
         userName: attendanceUserName,
         attendanceData,
       });
+      const nextTitle = getAttendanceDocumentTitle({
+        leaveReason: attendanceData.leaveReason,
+        userName: attendanceUserName,
+      });
       setFormData((prev) => ({
         ...prev,
         template: templateValue,
-        title: ATTENDANCE_TEMPLATE_TITLE,
+        title: nextTitle,
         content: nextContent,
       }));
       return;
@@ -1712,7 +1718,6 @@ export default function ApprovalForm() {
   };
 
   const isAttendanceTemplate = formData.template === ATTENDANCE_TEMPLATE_VALUE;
-
   useEffect(() => {
     if (!isAttendanceTemplate) return;
     const nextContent = buildAttendanceTemplateContent({
@@ -1720,8 +1725,14 @@ export default function ApprovalForm() {
       userName: attendanceUserName,
       attendanceData,
     });
+    const nextTitle = getAttendanceDocumentTitle({
+      leaveReason: attendanceData.leaveReason,
+      userName: attendanceUserName,
+    });
     setFormData((prev) =>
-      prev.content === nextContent ? prev : { ...prev, content: nextContent },
+      prev.content === nextContent && prev.title === nextTitle
+        ? prev
+        : { ...prev, content: nextContent, title: nextTitle },
     );
   }, [
     isAttendanceTemplate,
@@ -1768,7 +1779,7 @@ export default function ApprovalForm() {
             className="flex items-center gap-2 px-5 py-2 bg-sky-500 text-white rounded-lg hover:bg-sky-600 transition-colors disabled:opacity-50"
           >
             <Send size={18} />
-            제출
+            상신
           </button>
         </div>
       </div>

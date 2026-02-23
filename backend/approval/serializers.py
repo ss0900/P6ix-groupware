@@ -388,12 +388,13 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
     attachments = serializers.ListField(
         child=serializers.FileField(), write_only=True, required=False
     )
+    submit = serializers.BooleanField(write_only=True, required=False, default=False)
 
     class Meta:
         model = Document
         fields = [
             "id", "title", "content", "form_data",
-            "preservation_period", "template", "approval_lines", "attachments"
+            "preservation_period", "template", "approval_lines", "attachments", "submit"
         ]
 
     def to_internal_value(self, data):
@@ -439,8 +440,14 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
         return super().to_internal_value(normalized)
 
     def create(self, validated_data):
+        should_submit = validated_data.pop("submit", False)
         approval_lines_data = validated_data.pop("approval_lines", [])
         attachments_data = validated_data.pop("attachments", [])
+
+        if should_submit:
+            validated_data["status"] = "pending"
+            validated_data["submitted_at"] = timezone.now()
+
         document = Document.objects.create(**validated_data)
 
         # 결재선 생성
@@ -450,8 +457,17 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
                 approver_id=line_data.get("approver"),
                 order=idx,
                 approval_type=line_data.get("approval_type", "approval"),
-                status="waiting" if idx > 0 else "pending"
+                status="pending" if should_submit and idx == 0 else "waiting"
             )
+
+        if should_submit:
+            user = self.context.get("request").user if self.context.get("request") else None
+            if user and approval_lines_data:
+                ApprovalAction.objects.create(
+                    document=document,
+                    actor=user,
+                    action="submit",
+                )
 
         # 첨부파일 저장
         user = self.context.get("request").user if self.context.get("request") else None
@@ -465,6 +481,90 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
             )
 
         return document
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        request = self.context.get("request")
+        user = request.user if request else None
+        if user and instance.author_id != user.id:
+            raise serializers.ValidationError(
+                {"detail": "문서 작성자만 수정할 수 있습니다."}
+            )
+
+        should_submit = validated_data.pop("submit", False)
+        approval_lines_data = validated_data.pop("approval_lines", None)
+        attachments_data = validated_data.pop("attachments", [])
+
+        for field in ["title", "content", "form_data", "preservation_period", "template"]:
+            if field in validated_data:
+                setattr(instance, field, validated_data[field])
+
+        if approval_lines_data is not None:
+            instance.approval_lines.all().delete()
+            for idx, line_data in enumerate(approval_lines_data):
+                ApprovalLine.objects.create(
+                    document=instance,
+                    approver_id=line_data.get("approver"),
+                    order=idx,
+                    approval_type=line_data.get("approval_type", "approval"),
+                    status="pending" if should_submit and idx == 0 else "waiting",
+                )
+        elif should_submit:
+            lines = list(instance.approval_lines.order_by("order"))
+            for line in lines:
+                line.status = "waiting"
+                line.acted_at = None
+                line.comment = ""
+                line.save(update_fields=["status", "acted_at", "comment"])
+            if lines:
+                first_line = lines[0]
+                first_line.status = "pending"
+                first_line.save(update_fields=["status"])
+
+        if should_submit:
+            instance.status = "pending"
+            instance.submitted_at = timezone.now()
+            instance.completed_at = None
+
+            if user:
+                ApprovalAction.objects.create(
+                    document=instance,
+                    actor=user,
+                    action="submit",
+                )
+
+        instance.save()
+
+        for file in attachments_data:
+            Attachment.objects.create(
+                document=instance,
+                file=file,
+                filename=file.name,
+                file_size=file.size,
+                uploaded_by=user,
+            )
+
+        return instance
+
+    def validate(self, attrs):
+        should_submit = attrs.get("submit")
+        if not should_submit:
+            return attrs
+
+        approval_lines = attrs.get("approval_lines", None)
+        if approval_lines is not None and not approval_lines:
+            raise serializers.ValidationError(
+                {"approval_lines": "제출하려면 결재선을 설정해주세요."}
+            )
+
+        if approval_lines is None:
+            instance = getattr(self, "instance", None)
+            if instance is None or not instance.approval_lines.exists():
+                raise serializers.ValidationError(
+                    {"approval_lines": "제출하려면 결재선을 설정해주세요."}
+                )
+
+        return attrs
 
 
 class DocumentSubmitSerializer(serializers.Serializer):

@@ -47,7 +47,9 @@ export default function ResourceReservation() {
   const [loading, setLoading] = useState(false);
 
   // 주간 뷰 날짜
-  const [weekStart, setWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
+  const [weekStart, setWeekStart] = useState(
+    startOfWeek(new Date(), { weekStartsOn: 1 }),
+  );
 
   // 예약 폼
   const [showForm, setShowForm] = useState(false);
@@ -62,7 +64,10 @@ export default function ResourceReservation() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await resourceApi.list({ resource_type: selectedType, is_active: true });
+        const res = await resourceApi.list({
+          resource_type: selectedType,
+          is_active: true,
+        });
         setResources(res.data?.results ?? res.data ?? []);
         if (!selectedResource) {
           setSelectedResource(res.data?.[0] ?? res.data?.results?.[0] ?? null);
@@ -118,7 +123,8 @@ export default function ResourceReservation() {
   // 주 이동
   const goToPrevWeek = () => setWeekStart(addDays(weekStart, -7));
   const goToNextWeek = () => setWeekStart(addDays(weekStart, 7));
-  const goToThisWeek = () => setWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }));
+  const goToThisWeek = () =>
+    setWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }));
 
   // 예약 제출
   const handleSubmit = async (e) => {
@@ -135,11 +141,19 @@ export default function ResourceReservation() {
       });
       alert("예약이 신청되었습니다.");
       setShowForm(false);
-      setFormData({ date: format(new Date(), "yyyy-MM-dd"), startTime: "09:00", endTime: "10:00", purpose: "" });
+      setFormData({
+        date: format(new Date(), "yyyy-MM-dd"),
+        startTime: "09:00",
+        endTime: "10:00",
+        purpose: "",
+      });
       fetchReservations();
     } catch (err) {
       console.error("예약 실패:", err);
-      const msg = err.response?.data?.non_field_errors?.[0] || err.response?.data?.detail || "예약에 실패했습니다.";
+      const msg =
+        err.response?.data?.non_field_errors?.[0] ||
+        err.response?.data?.detail ||
+        "예약에 실패했습니다.";
       alert(msg);
     }
   };
@@ -221,7 +235,9 @@ export default function ResourceReservation() {
               {selectedResource?.name || "자원을 선택하세요"}
             </h1>
             {selectedResource?.location && (
-              <p className="text-sm text-gray-500">{selectedResource.location}</p>
+              <p className="text-sm text-gray-500">
+                {selectedResource.location}
+              </p>
             )}
           </div>
           <div className="flex items-center gap-2">
@@ -239,14 +255,20 @@ export default function ResourceReservation() {
         {/* 주간 네비게이션 */}
         <div className="px-4 py-2 border-b border-gray-200 flex items-center justify-between bg-gray-50">
           <div className="flex items-center gap-2">
-            <button onClick={goToPrevWeek} className="p-1 hover:bg-gray-200 rounded">
+            <button
+              onClick={goToPrevWeek}
+              className="p-1 hover:bg-gray-200 rounded"
+            >
               <ChevronLeft size={18} />
             </button>
             <span className="text-sm font-medium text-gray-700">
               {format(weekStart, "yyyy년 M월 d일", { locale: ko })} ~{" "}
               {format(addDays(weekStart, 6), "M월 d일", { locale: ko })}
             </span>
-            <button onClick={goToNextWeek} className="p-1 hover:bg-gray-200 rounded">
+            <button
+              onClick={goToNextWeek}
+              className="p-1 hover:bg-gray-200 rounded"
+            >
               <ChevronRight size={18} />
             </button>
           </div>
@@ -272,7 +294,9 @@ export default function ResourceReservation() {
             <div className="grid grid-cols-7 gap-2">
               {weekDays.map((date) => {
                 const dayReservations = getReservationsForDate(date);
-                const isToday = format(date, "yyyy-MM-dd") === format(new Date(), "yyyy-MM-dd");
+                const isToday =
+                  format(date, "yyyy-MM-dd") ===
+                  format(new Date(), "yyyy-MM-dd");
 
                 return (
                   <div
@@ -281,31 +305,41 @@ export default function ResourceReservation() {
                       isToday ? "border-sky-300 bg-sky-50" : "border-gray-200"
                     }`}
                   >
-                    <div className={`text-center mb-2 ${isToday ? "text-sky-600" : "text-gray-700"}`}>
+                    <div
+                      className={`text-center mb-2 ${isToday ? "text-sky-600" : "text-gray-700"}`}
+                    >
                       <div className="text-xs text-gray-500">
                         {format(date, "EEE", { locale: ko })}
                       </div>
-                      <div className={`text-lg font-semibold ${isToday ? "text-sky-600" : ""}`}>
+                      <div
+                        className={`text-lg font-semibold ${isToday ? "text-sky-600" : ""}`}
+                      >
                         {format(date, "d")}
                       </div>
                     </div>
                     <div className="space-y-1">
                       {dayReservations.map((rsv) => {
-                        const statusStyle = STATUS_STYLES[rsv.status] || STATUS_STYLES.pending;
+                        const statusStyle =
+                          STATUS_STYLES[rsv.status] || STATUS_STYLES.pending;
                         return (
                           <div
                             key={rsv.id}
                             className={`text-xs p-1.5 rounded ${statusStyle.bg} ${statusStyle.text}`}
                           >
                             <div className="font-medium">
-                              {rsv.start?.slice(11, 16)} ~ {rsv.end?.slice(11, 16)}
+                              {rsv.start?.slice(11, 16)} ~{" "}
+                              {rsv.end?.slice(11, 16)}
                             </div>
-                            <div className="truncate">{rsv.purpose || rsv.reserved_by_name}</div>
+                            <div className="truncate">
+                              {rsv.purpose || rsv.reserved_by_name}
+                            </div>
                           </div>
                         );
                       })}
                       {dayReservations.length === 0 && (
-                        <div className="text-xs text-gray-300 text-center py-4">예약 없음</div>
+                        <div className="text-xs text-gray-300 text-center py-4">
+                          예약 없음
+                        </div>
                       )}
                     </div>
                   </div>
@@ -317,10 +351,13 @@ export default function ResourceReservation() {
 
         {/* 내 예약 목록 */}
         <div className="border-t border-gray-200 p-4 bg-gray-50">
-          <h3 className="text-sm font-semibold text-gray-700 mb-2">내 예약 현황</h3>
+          <h3 className="text-sm font-semibold text-gray-700 mb-2">
+            내 예약 현황
+          </h3>
           <div className="flex gap-2 overflow-x-auto pb-2">
             {myReservations.slice(0, 5).map((rsv) => {
-              const statusStyle = STATUS_STYLES[rsv.status] || STATUS_STYLES.pending;
+              const statusStyle =
+                STATUS_STYLES[rsv.status] || STATUS_STYLES.pending;
               return (
                 <div
                   key={rsv.id}
@@ -330,14 +367,19 @@ export default function ResourceReservation() {
                     <span className="text-sm font-medium text-gray-800">
                       {rsv.resource_name}
                     </span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${statusStyle.bg} ${statusStyle.text}`}>
+                    <span
+                      className={`text-xs px-2 py-0.5 rounded-full ${statusStyle.bg} ${statusStyle.text}`}
+                    >
                       {statusStyle.label}
                     </span>
                   </div>
                   <div className="text-xs text-gray-500">
-                    {rsv.start?.slice(0, 10)} {rsv.start?.slice(11, 16)} ~ {rsv.end?.slice(11, 16)}
+                    {rsv.start?.slice(0, 10)} {rsv.start?.slice(11, 16)} ~{" "}
+                    {rsv.end?.slice(11, 16)}
                   </div>
-                  <div className="text-xs text-gray-600 mt-1 truncate">{rsv.purpose}</div>
+                  <div className="text-xs text-gray-600 mt-1 truncate">
+                    {rsv.purpose}
+                  </div>
                 </div>
               );
             })}
@@ -351,29 +393,42 @@ export default function ResourceReservation() {
       {/* 예약 폼 모달 */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black bg-opacity-30" onClick={() => setShowForm(false)} />
+          <div
+            className="absolute inset-0 bg-black bg-opacity-30"
+            onClick={() => setShowForm(false)}
+          />
           <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">예약 신청</h2>
-              <button onClick={() => setShowForm(false)} className="p-1 hover:bg-gray-100 rounded">
+              <button
+                onClick={() => setShowForm(false)}
+                className="p-1 hover:bg-gray-100 rounded"
+              >
                 <X size={20} />
               </button>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">자원</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  자원
+                </label>
                 <div className="px-3 py-2 bg-gray-100 rounded-lg text-sm">
-                  {selectedResource?.name} ({RESOURCE_TYPE_LABELS[selectedResource?.resource_type]})
+                  {selectedResource?.name} (
+                  {RESOURCE_TYPE_LABELS[selectedResource?.resource_type]})
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">날짜</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  날짜
+                </label>
                 <input
                   type="date"
                   value={formData.date}
-                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, date: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                   min={format(new Date(), "yyyy-MM-dd")}
                 />
@@ -381,31 +436,43 @@ export default function ResourceReservation() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">시작 시간</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    시작 시간
+                  </label>
                   <input
                     type="time"
                     value={formData.startTime}
-                    onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, startTime: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">종료 시간</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    종료 시간
+                  </label>
                   <input
                     type="time"
                     value={formData.endTime}
-                    onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({ ...formData, endTime: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">목적</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  목적
+                </label>
                 <input
                   type="text"
                   value={formData.purpose}
-                  onChange={(e) => setFormData({ ...formData, purpose: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, purpose: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                   placeholder="예약 목적을 입력하세요"
                 />
