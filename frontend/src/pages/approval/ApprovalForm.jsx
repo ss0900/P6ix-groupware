@@ -19,87 +19,101 @@ import {
 const ATTENDANCE_TEMPLATE_VALUE = "__attendance__";
 const ATTENDANCE_TEMPLATE_TITLE = "근태계";
 const ATTENDANCE_TEMPLATE_CONTENT = `
-<div style="font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif; font-size:14px; line-height:1.6; color:#111827;">
-  <h1 style="text-align:center; font-size:32px; margin:0 0 18px;">근태계</h1>
+<div class="attendance-template leading-relaxed text-gray-900">
+  <h1 class="text-center text-4xl font-normal mb-4">근태계</h1>
 
-  <table style="width:100%; border-collapse:collapse; table-layout:fixed; margin-bottom:12px;">
-    <thead>
+  <table class="doc-table w-full table-fixed mb-3">
+    <colgroup>
+      <col style="width:12%;" />
+      <col style="width:12%;" />
+      <col style="width:15%;" />
+      <col style="width:15%;" />
+      <col style="width:23%;" />
+      <col style="width:23%;" />
+    </colgroup>
+    <thead class="doc-thead">
       <tr>
-        <th style="border:1px solid #9ca3af; padding:8px; background:#f3f4f6;">부서</th>
-        <th style="border:1px solid #9ca3af; padding:8px; background:#f3f4f6;">성명</th>
-        <th style="border:1px solid #9ca3af; padding:8px; background:#f3f4f6;">근태구분</th>
-        <th style="border:1px solid #9ca3af; padding:8px; background:#f3f4f6;">근태사유</th>
-        <th style="border:1px solid #9ca3af; padding:8px; background:#f3f4f6;">기간</th>
-        <th style="border:1px solid #9ca3af; padding:8px; background:#f3f4f6;">비고 (상세사유 기재)</th>
+        <th class="doc-th">부서</th>
+        <th class="doc-th">성명</th>
+        <th class="doc-th">근태구분</th>
+        <th class="doc-th">근태사유</th>
+        <th class="doc-th">기간</th>
+        <th class="doc-th-end">비고 (상세사유 기재)</th>
       </tr>
     </thead>
     <tbody>
       <tr>
-        <td style="border:1px solid #9ca3af; padding:8px;">전략사업본부</td>
-        <td style="border:1px solid #9ca3af; padding:8px;">박수연 주임</td>
-        <td style="border:1px solid #9ca3af; padding:8px;">
-          <select disabled style="width:100%; border:1px solid #d1d5db; border-radius:4px; padding:4px 6px;">
+        <td class="doc-td text-left">전략사업본부</td>
+        <td class="doc-td text-left">박수연 주임</td>
+        <td class="doc-td">
+          <select disabled class="input-sm bg-gray-50">
             <option selected>선택</option>
           </select>
         </td>
-        <td style="border:1px solid #9ca3af; padding:8px;">
-          <select disabled style="width:100%; border:1px solid #d1d5db; border-radius:4px; padding:4px 6px;">
+        <td class="doc-td">
+          <select disabled class="input-sm bg-gray-50">
             <option selected>선택</option>
           </select>
         </td>
-        <td style="border:1px solid #9ca3af; padding:8px; white-space:nowrap;">
-          <input type="date" value="2026-02-23" disabled style="border:1px solid #d1d5db; border-radius:4px; padding:4px 6px;" />
-          ~
-          <input type="date" value="2026-02-23" disabled style="border:1px solid #d1d5db; border-radius:4px; padding:4px 6px;" />
-          (1일)
+        <td class="doc-td text-left whitespace-nowrap">
+          <div class="flex items-center gap-1 text-[11px]">
+            <input type="date" value="2026-02-23" disabled class="input-sm !w-auto bg-gray-50" />
+            <span>~</span>
+            <input type="date" value="2026-02-23" disabled class="input-sm !w-auto bg-gray-50" />
+            <span>(1일)</span>
+          </div>
         </td>
-        <td style="border:1px solid #9ca3af; padding:8px;"></td>
+        <td class="doc-td text-left"></td>
       </tr>
     </tbody>
   </table>
 
-  <p style="margin:4px 0;">※ 본 근태계는 해당 부서를 경유, 관리부에 미리 제출해 주시기 바랍니다.</p>
-  <p style="margin:4px 0;">※ 근태사유 중 증빙이 필요한 경우(예비군, 민방위 등)는 추후 관리부에 서류를 제출해 주시기 바랍니다.</p>
-  <p style="margin:4px 0 12px 0;">※ 사유는 다음에 제시하는 것 중 선택하여 기입하십시오.</p>
+  <p class="mb-1">※ 본 근태계는 해당 부서를 경유, 관리부에 미리 제출해 주시기 바랍니다.</p>
+  <p class="mb-1">※ 근태사유 중 증빙이 필요한 경우(예비군, 민방위 등)는 추후 관리부에 서류를 제출해 주시기 바랍니다.</p>
+  <p class="mb-3">※ 사유는 다음에 제시하는 것 중 선택하여 기입하십시오.</p>
 
-  <table style="width:100%; border-collapse:collapse; table-layout:fixed; margin-bottom:14px;">
-    <thead>
+  <table class="doc-table w-full table-fixed mb-4">
+    <colgroup>
+      <col style="width:26%;" />
+      <col style="width:74%;" />
+    </colgroup>
+    <thead class="doc-thead">
       <tr>
-        <th style="width:26%; border:1px solid #9ca3af; padding:8px; background:#f3f4f6;">근태구분</th>
-        <th style="border:1px solid #9ca3af; padding:8px; background:#f3f4f6;">근태사유</th>
+        <th class="doc-th">근태구분</th>
+        <th class="doc-th-end">근태사유</th>
       </tr>
     </thead>
     <tbody>
       <tr>
-        <td style="border:1px solid #9ca3af; padding:8px; font-weight:600;">결근</td>
-        <td style="border:1px solid #9ca3af; padding:8px;">무계 결근, 유계 결근</td>
+        <td class="doc-td font-semibold">결근</td>
+        <td class="doc-td text-left">무계 결근, 유계 결근</td>
       </tr>
       <tr>
-        <td style="border:1px solid #9ca3af; padding:8px; font-weight:600;">유급휴가</td>
-        <td style="border:1px solid #9ca3af; padding:8px;">연/월차 휴가, 생리휴가, 산전/후 휴가</td>
+        <td class="doc-td font-semibold">유급휴가</td>
+        <td class="doc-td text-left">연/월차 휴가, 생리휴가, 산전/후 휴가</td>
       </tr>
       <tr>
-        <td style="border:1px solid #9ca3af; padding:8px; font-weight:600;">경조휴가</td>
-        <td style="border:1px solid #9ca3af; padding:8px;">
-          결혼: 본인결혼(5일), 자녀(1일), 형제자매/배우자 형제자매(1일)<br/>
-          회갑/고희: 부모/배우자 부모(1일)<br/>
-          사망: 부모/배우자(5일), 배우자 부모(5일), 본인/배우자의 조부모(2일), 자녀(2일), 본인/배우자의 형제자매(3일)<br/>
-          배우자의 출산: 10일 (1회 분할 가능, 90일 이내 신청)<br/>
+        <td class="doc-td font-semibold">경조휴가</td>
+        <td class="doc-td text-left leading-6">
+          결혼: 본인결혼(5일), 자녀(1일), 형제자매/배우자 형제자매(1일)<br />
+          회갑/고희: 부모/배우자 부모(1일)<br />
+          사망: 부모/배우자(5일), 배우자 부모(5일), 본인/배우자의 조부모(2일), 자녀(2일), 본인/배우자의 형제자매(3일)<br />
+          배우자의 출산: 10일 (1회 분할 가능, 90일 이내 신청)<br />
           기타:
         </td>
       </tr>
       <tr>
-        <td style="border:1px solid #9ca3af; padding:8px; font-weight:600;">병가</td>
-        <td style="border:1px solid #9ca3af; padding:8px;">병가</td>
+        <td class="doc-td font-semibold">병가</td>
+        <td class="doc-td text-left">병가</td>
       </tr>
       <tr>
-        <td style="border:1px solid #9ca3af; padding:8px; font-weight:600;">공가</td>
-        <td style="border:1px solid #9ca3af; padding:8px;">예비군 훈련, 민방위 훈련</td>
+        <td class="doc-td font-semibold">공가</td>
+        <td class="doc-td text-left">예비군 훈련, 민방위 훈련</td>
       </tr>
     </tbody>
   </table>
 
-  <p style="text-align:center; margin:0;">상기와 같이 근태계를 제출하오니 승인하여 주시기 바랍니다.</p>
+  <p class="text-center">상기와 같이 근태계를 제출하오니 승인하여 주시기 바랍니다.</p>
 </div>
 `;
 
@@ -514,7 +528,7 @@ export default function ApprovalForm() {
         <div>
           <label className="block text-sm text-gray-600 mb-1">내용</label>
           {isAttendanceTemplate ? (
-            <div className="rounded-lg border border-gray-300 bg-white p-4">
+            <div className="bg-transparent p-0">
               <div
                 className="max-h-[560px] overflow-auto"
                 dangerouslySetInnerHTML={{ __html: formData.content }}

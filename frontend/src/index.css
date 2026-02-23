@@ -616,3 +616,14 @@ code {
 .react-hot-toast {
   transform: none !important;
 }
+
+/* 근태계 템플릿 폰트 크기(로컬 범위) */
+.attendance-template,
+.attendance-template .doc-thead,
+.attendance-template .doc-th,
+.attendance-template .doc-th-end,
+.attendance-template .doc-td,
+.attendance-template .input-sm,
+.attendance-template p {
+  font-size: 14px;
+}
