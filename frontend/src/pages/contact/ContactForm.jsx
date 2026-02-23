@@ -114,14 +114,30 @@ const RecipientSelectModal = ({
   });
 
   const groupedUsers = filteredUsers.reduce((acc, user) => {
-    const companyName = getUserCompanyName(user);
-    if (!acc[companyName]) acc[companyName] = [];
-    acc[companyName].push(user);
+    const departmentName = getUserDepartmentName(user) || "부서 미지정";
+    const departmentId =
+      user?.primary_membership?.department_id ??
+      user?.department?.id ??
+      user?.department_id ??
+      null;
+    const groupKey =
+      departmentId != null
+        ? `department-${departmentId}`
+        : `department-name-${departmentName}`;
+
+    if (!acc[groupKey]) {
+      acc[groupKey] = {
+        groupKey,
+        departmentName,
+        users: [],
+      };
+    }
+    acc[groupKey].users.push(user);
     return acc;
   }, {});
 
-  const groupedUserEntries = Object.entries(groupedUsers).sort((a, b) =>
-    a[0].localeCompare(b[0], "ko"),
+  const groupedUserEntries = Object.values(groupedUsers).sort((a, b) =>
+    a.departmentName.localeCompare(b.departmentName, "ko"),
   );
 
   const selectedUsers = selectedIds
@@ -138,10 +154,10 @@ const RecipientSelectModal = ({
     setSelectedIds((prev) => prev.filter((id) => id !== userId));
   };
 
-  const addCompanyUsers = (companyUsers) => {
+  const addDepartmentUsers = (departmentUsers) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      companyUsers.forEach((user) => next.add(user.id));
+      departmentUsers.forEach((user) => next.add(user.id));
       return Array.from(next);
     });
   };
@@ -191,22 +207,22 @@ const RecipientSelectModal = ({
               </div>
             ) : (
               <div className="space-y-3">
-                {groupedUserEntries.map(([companyName, companyUsers]) => (
+                {groupedUserEntries.map(({ groupKey, departmentName, users: departmentUsers }) => (
                   <div
-                    key={companyName}
+                    key={groupKey}
                     className="border border-gray-200 rounded-xl p-3 bg-gray-50/50"
                   >
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2 min-w-0">
                         <p className="text-sm font-medium text-gray-900 truncate">
-                          {companyName}
+                          {departmentName}
                         </p>
                         <span className="px-2 py-0.5 text-xs bg-gray-200 text-gray-700 rounded-full">
-                          {companyUsers.length}명
+                          {departmentUsers.length}명
                         </span>
                       </div>
                       <button
-                        onClick={() => addCompanyUsers(companyUsers)}
+                        onClick={() => addDepartmentUsers(departmentUsers)}
                         className="px-2 py-1 text-xs font-medium text-green-700 bg-green-100 rounded-lg hover:bg-green-200"
                       >
                         전체추가
@@ -214,9 +230,9 @@ const RecipientSelectModal = ({
                     </div>
 
                     <div className="space-y-1">
-                      {companyUsers.map((user) => {
+                      {departmentUsers.map((user) => {
                         const fullName = getUserDisplayName(user);
-                        const department = getUserDepartmentName(user);
+                        const company = getUserCompanyName(user);
                         const position = getUserPositionName(user);
 
                         return (
@@ -237,7 +253,7 @@ const RecipientSelectModal = ({
                                 </p>
                                 <p className="text-xs text-gray-500 truncate">
                                   {user.username}
-                                  {department ? ` · ${department}` : ""}
+                                  {company ? ` · ${company}` : ""}
                                 </p>
                               </div>
                               <span className="inline-flex items-center gap-1 text-xs text-green-700">
