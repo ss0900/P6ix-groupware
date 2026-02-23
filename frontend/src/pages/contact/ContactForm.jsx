@@ -12,6 +12,8 @@ import {
   Search,
   Users,
   UserPlus,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import api from "../../api/axios";
 import ContactApi from "../../api/ContactApi";
@@ -62,6 +64,7 @@ const RecipientSelectModal = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState([]);
+  const [expandedGroupKeys, setExpandedGroupKeys] = useState({});
 
   useEffect(() => {
     if (!isOpen) return;
@@ -77,6 +80,7 @@ const RecipientSelectModal = ({
       }),
     );
     setSearchQuery("");
+    setExpandedGroupKeys({});
   }, [isOpen, initialSelectedIds, currentUserId, currentUsername, users]);
 
   useEffect(() => {
@@ -162,6 +166,13 @@ const RecipientSelectModal = ({
     });
   };
 
+  const toggleDepartmentGroup = (groupKey) => {
+    setExpandedGroupKeys((prev) => ({
+      ...prev,
+      [groupKey]: !prev[groupKey],
+    }));
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
@@ -207,66 +218,88 @@ const RecipientSelectModal = ({
               </div>
             ) : (
               <div className="space-y-3">
-                {groupedUserEntries.map(({ groupKey, departmentName, users: departmentUsers }) => (
-                  <div
-                    key={groupKey}
-                    className="border border-gray-200 rounded-xl p-3 bg-gray-50/50"
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">
-                          {departmentName}
-                        </p>
-                        <span className="px-2 py-0.5 text-xs bg-gray-200 text-gray-700 rounded-full">
-                          {departmentUsers.length}명
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => addDepartmentUsers(departmentUsers)}
-                        className="px-2 py-1 text-xs font-medium text-green-700 bg-green-100 rounded-lg hover:bg-green-200"
+                {groupedUserEntries.map(
+                  ({ groupKey, departmentName, users: departmentUsers }) => {
+                    const isExpanded = Boolean(expandedGroupKeys[groupKey]);
+                    return (
+                      <div
+                        key={groupKey}
+                        className="border border-gray-200 rounded-xl p-3 bg-gray-50/50"
                       >
-                        전체추가
-                      </button>
-                    </div>
-
-                    <div className="space-y-1">
-                      {departmentUsers.map((user) => {
-                        const fullName = getUserDisplayName(user);
-                        const company = getUserCompanyName(user);
-                        const position = getUserPositionName(user);
-
-                        return (
+                        <div className="flex items-center justify-between">
                           <button
-                            key={user.id}
-                            onClick={() => addRecipient(user.id)}
-                            className="w-full text-left px-2.5 py-2 rounded-lg bg-white border border-gray-200 hover:border-sky-200 hover:bg-sky-50 transition-colors"
+                            type="button"
+                            onClick={() => toggleDepartmentGroup(groupKey)}
+                            className="inline-flex min-w-0 items-center gap-2 text-left"
                           >
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="min-w-0">
-                                <p className="text-sm font-medium text-gray-900 truncate">
-                                  {fullName}
-                                  {position && (
-                                    <span className="ml-1 text-gray-500 font-normal">
-                                      {position}
-                                    </span>
-                                  )}
-                                </p>
-                                <p className="text-xs text-gray-500 truncate">
-                                  {user.username}
-                                  {company ? ` · ${company}` : ""}
-                                </p>
-                              </div>
-                              <span className="inline-flex items-center gap-1 text-xs text-green-700">
-                                <UserPlus size={14} />
-                                추가
-                              </span>
-                            </div>
+                            {isExpanded ? (
+                              <ChevronDown
+                                size={16}
+                                className="text-gray-500 shrink-0"
+                              />
+                            ) : (
+                              <ChevronRight
+                                size={16}
+                                className="text-gray-500 shrink-0"
+                              />
+                            )}
+                            <p className="text-sm font-medium text-gray-900 truncate">
+                              {departmentName}
+                            </p>
+                            <span className="px-2 py-0.5 text-xs bg-gray-200 text-gray-700 rounded-full">
+                              {departmentUsers.length}명
+                            </span>
                           </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
+                          <button
+                            onClick={() => addDepartmentUsers(departmentUsers)}
+                            className="px-2 py-1 text-xs font-medium text-green-700 bg-green-100 rounded-lg hover:bg-green-200"
+                          >
+                            전체추가
+                          </button>
+                        </div>
+
+                        {isExpanded && (
+                          <div className="mt-2 space-y-1">
+                            {departmentUsers.map((user) => {
+                              const fullName = getUserDisplayName(user);
+                              const company = getUserCompanyName(user);
+                              const position = getUserPositionName(user);
+
+                              return (
+                                <button
+                                  key={user.id}
+                                  onClick={() => addRecipient(user.id)}
+                                  className="w-full text-left px-2.5 py-2 rounded-lg bg-white border border-gray-200 hover:border-sky-200 hover:bg-sky-50 transition-colors"
+                                >
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="min-w-0">
+                                      <p className="text-sm font-medium text-gray-900 truncate">
+                                        {fullName}
+                                        {position && (
+                                          <span className="ml-1 text-gray-500 font-normal">
+                                            {position}
+                                          </span>
+                                        )}
+                                      </p>
+                                      <p className="text-xs text-gray-500 truncate">
+                                        {user.username}
+                                        {company ? ` · ${company}` : ""}
+                                      </p>
+                                    </div>
+                                    <span className="inline-flex items-center gap-1 text-xs text-green-700">
+                                      <UserPlus size={14} />
+                                      추가
+                                    </span>
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  },
+                )}
               </div>
             )}
           </div>
