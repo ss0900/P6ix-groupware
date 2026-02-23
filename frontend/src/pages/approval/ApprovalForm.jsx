@@ -16,7 +16,6 @@ import {
   ChevronUp,
   ChevronDown,
   ChevronRight,
-  GripVertical,
   Upload,
   Paperclip,
   Trash2,
@@ -1510,22 +1509,6 @@ export default function ApprovalForm() {
     }
   };
 
-  // 결재자 제거
-  const handleRemoveApprover = (index) => {
-    setApprovalLines((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  // 결재 유형 변경
-  const handleTypeChange = (index, type) => {
-    setApprovalLines((prev) =>
-      prev.map((item, i) =>
-        i === index
-          ? { ...item, approval_type: normalizeApprovalType(type) }
-          : item,
-      ),
-    );
-  };
-
   // 파일 선택
   const handleFileSelect = (e) => {
     const files = Array.from(e.target.files);
@@ -2116,6 +2099,9 @@ export default function ApprovalForm() {
             결재선 관리
           </button>
         </div>
+        <p className="text-xs text-gray-500">
+          이 영역은 읽기 전용입니다. 결재선 수정은 결재선 관리에서만 가능합니다.
+        </p>
 
         {approvalLines.length === 0 ? (
           <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg">
@@ -2124,45 +2110,67 @@ export default function ApprovalForm() {
           </div>
         ) : (
           <div className="space-y-2">
-            {approvalLines.map((line, idx) => (
-              <div
-                key={idx}
-                className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200"
-              >
-                <GripVertical size={16} className="text-gray-400 cursor-grab" />
-                <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
-                  <User size={16} className="text-gray-500" />
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium text-gray-900">
-                    {idx + 1}. {line.name}
-                    {line.position && (
-                      <span className="text-gray-500 ml-1">
-                        {line.position}
-                      </span>
-                    )}
-                  </p>
-                  {line.department && (
-                    <p className="text-xs text-gray-500">{line.department}</p>
-                  )}
-                </div>
-                <select
-                  value={line.approval_type}
-                  onChange={(e) => handleTypeChange(idx, e.target.value)}
-                  className="px-2 py-1 text-sm border border-gray-300 rounded-lg"
+            {approvalLines.map((line, idx) => {
+              const agreementOption = mapApprovalTypeToAgreementOption(
+                line.approval_type,
+              );
+              const isAgreementSelected = agreementOption === "agreement";
+              return (
+                <div
+                  key={idx}
+                  className="flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-200 bg-gray-50"
                 >
-                  <option value="approval">결재</option>
-                  <option value="agreement">합의</option>
-                  <option value="reference">참조</option>
-                </select>
-                <button
-                  onClick={() => handleRemoveApprover(idx)}
-                  className="p-1 text-gray-400 hover:text-red-500"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-            ))}
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-full bg-blue-500 text-white font-semibold flex items-center justify-center shrink-0">
+                      {idx + 1}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        {line.name || `사용자 ${line.id}`}
+                        {line.position && (
+                          <span className="ml-1 font-normal text-gray-500">
+                            {line.position}
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-xs text-gray-500 truncate">
+                        {line.department || "부서 미지정"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={normalizeDecisionType(line.decision_type)}
+                      disabled
+                      className={`px-2.5 py-1.5 text-sm border border-gray-300 rounded-lg cursor-not-allowed ${
+                        isAgreementSelected
+                          ? "bg-gray-100 text-gray-400"
+                          : "bg-gray-50 text-gray-500"
+                      }`}
+                    >
+                      {APPROVAL_DECISION_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+
+                    <select
+                      value={agreementOption}
+                      disabled
+                      className="px-2.5 py-1.5 text-sm border border-gray-300 rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed"
+                    >
+                      {APPROVAL_AGREEMENT_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
