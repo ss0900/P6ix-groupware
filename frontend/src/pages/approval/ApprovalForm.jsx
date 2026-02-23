@@ -1180,6 +1180,384 @@ const ApproverSelectModal = ({
   );
 };
 
+const ReferenceSelectModal = ({
+  isOpen,
+  onClose,
+  users,
+  departmentOrderById,
+  positionLevelById,
+  initialSelectedIds,
+  excludedUserIds,
+  currentUserId,
+  currentUsername,
+  onSave,
+}) => {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [expandedGroupKeys, setExpandedGroupKeys] = useState({});
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const excludedIdSet = new Set(
+      (excludedUserIds || []).map((idValue) => String(idValue)),
+    );
+    const uniqueIds = [];
+    const seen = new Set();
+    initialSelectedIds.forEach((userId) => {
+      if (userId == null) return;
+      const key = String(userId);
+      if (excludedIdSet.has(key)) return;
+      if (seen.has(key)) return;
+      seen.add(key);
+      uniqueIds.push(userId);
+    });
+    setSelectedIds(uniqueIds);
+    setSearchQuery("");
+    setExpandedGroupKeys({});
+  }, [isOpen, initialSelectedIds, excludedUserIds]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const handleEsc = (event) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleEsc);
+    return () => window.removeEventListener("keydown", handleEsc);
+  }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const selectedIdSet = new Set(selectedIds.map((idValue) => String(idValue)));
+  const excludedIdSet = new Set(
+    (excludedUserIds || []).map((idValue) => String(idValue)),
+  );
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+
+  const filteredUsers = users.filter((targetUser) => {
+    const targetId = String(targetUser.id);
+    const isCurrentById =
+      currentUserId != null && targetId === String(currentUserId);
+    const isCurrentByUsername =
+      Boolean(currentUsername) && targetUser.username === currentUsername;
+    if (isCurrentById || isCurrentByUsername) return false;
+    if (excludedIdSet.has(targetId)) return false;
+    if (selectedIdSet.has(targetId)) return false;
+    if (!normalizedQuery) return true;
+    return getUserSearchText(targetUser).includes(normalizedQuery);
+  });
+
+  const groupedUsers = filteredUsers.reduce((acc, targetUser) => {
+    const departmentName = getUserDepartmentName(targetUser) || "부서 미지정";
+    const departmentId =
+      targetUser?.primary_membership?.department_id ??
+      targetUser?.department?.id ??
+      targetUser?.department_id ??
+      null;
+    const rawDepartmentOrder =
+      targetUser?.primary_membership?.department_order ??
+      targetUser?.department?.order ??
+      targetUser?.department_order ??
+      (departmentId != null ? departmentOrderById[String(departmentId)] : null);
+    const departmentOrder = Number(rawDepartmentOrder);
+    const normalizedDepartmentOrder = Number.isFinite(departmentOrder)
+      ? departmentOrder
+      : Number.MAX_SAFE_INTEGER;
+    const groupKey =
+      departmentId != null
+        ? `department-${departmentId}`
+        : `department-name-${departmentName}`;
+
+    if (!acc[groupKey]) {
+      acc[groupKey] = {
+        groupKey,
+        departmentName,
+        departmentOrder: normalizedDepartmentOrder,
+        users: [],
+      };
+    }
+
+    acc[groupKey].departmentOrder = Math.min(
+      acc[groupKey].departmentOrder,
+      normalizedDepartmentOrder,
+    );
+    acc[groupKey].users.push(targetUser);
+    return acc;
+  }, {});
+
+  const groupedUserEntries = Object.values(groupedUsers)
+    .map((group) => ({
+      ...group,
+      users: [...group.users].sort((a, b) =>
+        compareUsersByPositionThenName(a, b, positionLevelById),
+      ),
+    }))
+    .sort((a, b) => {
+      if (a.departmentOrder !== b.departmentOrder) {
+        return a.departmentOrder - b.departmentOrder;
+      }
+      return a.departmentName.localeCompare(b.departmentName, "ko");
+    });
+
+  const selectedUsers = selectedIds
+    .map((userId) =>
+      users.find((targetUser) => String(targetUser.id) === String(userId)),
+    )
+    .filter(Boolean);
+
+  const addReferenceUser = (userId) => {
+    setSelectedIds((prev) => {
+      const key = String(userId);
+      if (prev.some((idValue) => String(idValue) === key)) return prev;
+      return [...prev, userId];
+    });
+  };
+
+  const removeReferenceUser = (userId) => {
+    const targetKey = String(userId);
+    setSelectedIds((prev) =>
+      prev.filter((idValue) => String(idValue) !== targetKey),
+    );
+  };
+
+  const addDepartmentUsers = (departmentUsers) => {
+    setSelectedIds((prev) => {
+      const next = [...prev];
+      const seen = new Set(prev.map((idValue) => String(idValue)));
+      departmentUsers.forEach((targetUser) => {
+        const key = String(targetUser.id);
+        if (seen.has(key)) return;
+        seen.add(key);
+        next.push(targetUser.id);
+      });
+      return next;
+    });
+  };
+
+  const toggleDepartmentGroup = (groupKey) => {
+    setExpandedGroupKeys((prev) => ({
+      ...prev,
+      [groupKey]: !prev[groupKey],
+    }));
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative z-10 mx-4 w-full max-w-5xl h-[88vh] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900">
+            참조인 선택 관리
+          </h3>
+          <button
+            onClick={onClose}
+            className="p-1 text-gray-400 rounded-lg hover:bg-gray-100 hover:text-gray-600"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-2">
+          <div className="p-4 border-b md:border-b-0 md:border-r border-gray-200 overflow-y-auto">
+            <div className="mb-3">
+              <p className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                <Users size={16} />
+                사용자 목록
+              </p>
+            </div>
+
+            <div className="relative mb-4">
+              <Search
+                size={16}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+              />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="이름, 아이디, 회사, 부서로 검색"
+                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none"
+              />
+            </div>
+
+            {groupedUserEntries.length === 0 ? (
+              <div className="py-12 text-center text-sm text-gray-500 border border-dashed border-gray-200 rounded-xl">
+                검색 조건에 맞는 사용자가 없습니다.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {groupedUserEntries.map(
+                  ({ groupKey, departmentName, users: departmentUsers }) => {
+                    const isExpanded = Boolean(expandedGroupKeys[groupKey]);
+                    return (
+                      <div
+                        key={groupKey}
+                        className="border border-gray-200 rounded-xl p-3 bg-gray-50/50"
+                      >
+                        <div className="flex items-center justify-between">
+                          <button
+                            type="button"
+                            onClick={() => toggleDepartmentGroup(groupKey)}
+                            className="inline-flex min-w-0 items-center gap-2 text-left"
+                          >
+                            {isExpanded ? (
+                              <ChevronDown
+                                size={16}
+                                className="text-gray-500 shrink-0"
+                              />
+                            ) : (
+                              <ChevronRight
+                                size={16}
+                                className="text-gray-500 shrink-0"
+                              />
+                            )}
+                            <p className="text-sm font-medium text-gray-900 truncate">
+                              {departmentName}
+                            </p>
+                            <span className="px-2 py-0.5 text-xs bg-gray-200 text-gray-700 rounded-full">
+                              {departmentUsers.length}명
+                            </span>
+                          </button>
+                          <button
+                            onClick={() => addDepartmentUsers(departmentUsers)}
+                            className="px-2 py-1 text-xs font-medium text-green-700 bg-green-100 rounded-lg hover:bg-green-200"
+                          >
+                            전체추가
+                          </button>
+                        </div>
+
+                        {isExpanded && (
+                          <div className="mt-2 space-y-1">
+                            {departmentUsers.map((targetUser) => {
+                              const fullName = getUserDisplayName(targetUser);
+                              const position = getUserPositionName(targetUser);
+
+                              return (
+                                <button
+                                  key={targetUser.id}
+                                  onClick={() =>
+                                    addReferenceUser(targetUser.id)
+                                  }
+                                  className="w-full text-left px-2.5 py-2 rounded-lg bg-white border border-gray-200 hover:border-sky-200 hover:bg-sky-50 transition-colors"
+                                >
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="min-w-0">
+                                      <p className="text-sm font-medium text-gray-900 truncate">
+                                        {fullName}
+                                        {position && (
+                                          <span className="ml-1 text-gray-500 font-normal">
+                                            {position}
+                                          </span>
+                                        )}
+                                      </p>
+                                    </div>
+                                    <span className="inline-flex items-center gap-1 text-xs text-green-700">
+                                      <UserPlus size={14} />
+                                      추가
+                                    </span>
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  },
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="p-4 overflow-y-auto">
+            <div className="mb-4 flex items-center justify-between">
+              <p className="text-sm font-semibold text-gray-800">
+                선택된 참조인 ({selectedUsers.length}명)
+              </p>
+              {selectedUsers.length > 0 && (
+                <button
+                  onClick={() => setSelectedIds([])}
+                  className="text-xs text-gray-500 hover:text-red-500"
+                >
+                  전체제거
+                </button>
+              )}
+            </div>
+
+            {selectedUsers.length === 0 ? (
+              <div className="h-full min-h-[240px] flex flex-col items-center justify-center text-center text-gray-400">
+                <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-3">
+                  <Users size={28} />
+                </div>
+                <p className="text-sm">왼쪽 목록에서 참조인을 선택하세요.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {selectedUsers.map((targetUser) => {
+                  const fullName = getUserDisplayName(targetUser);
+                  const department = getUserDepartmentName(targetUser);
+                  const position = getUserPositionName(targetUser);
+
+                  return (
+                    <div
+                      key={targetUser.id}
+                      className="flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-200 bg-white"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">
+                          {fullName}
+                          {position && (
+                            <span className="ml-1 text-gray-500 font-normal">
+                              {position}
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-xs text-gray-500 truncate">
+                          {department}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => removeReferenceUser(targetUser.id)}
+                        className="p-1 text-gray-400 rounded-md hover:bg-red-50 hover:text-red-500"
+                        aria-label={`${fullName} 제거`}
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="px-6 py-3 border-t border-gray-200 flex items-center justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+          >
+            닫기
+          </button>
+          <button
+            onClick={() => onSave(selectedIds)}
+            className="px-4 py-2 text-sm text-white bg-sky-500 rounded-lg hover:bg-sky-600"
+          >
+            저장
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function ApprovalForm() {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -1189,6 +1567,7 @@ export default function ApprovalForm() {
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [showUserModal, setShowUserModal] = useState(false);
+  const [showReferenceModal, setShowReferenceModal] = useState(false);
 
   // 폼 데이터
   const [formData, setFormData] = useState({
@@ -1198,6 +1577,7 @@ export default function ApprovalForm() {
     preservation_period: 5,
   });
   const [approvalLines, setApprovalLines] = useState([]);
+  const [referenceUsers, setReferenceUsers] = useState([]);
   const [attachments, setAttachments] = useState([]);
   const [existingAttachments, setExistingAttachments] = useState([]);
   const [users, setUsers] = useState([]);
@@ -1336,11 +1716,19 @@ export default function ApprovalForm() {
   }, [loadUsers, loadDepartments, loadPositions, loadApprovalLinePresets]);
 
   useEffect(() => {
-    if (!showUserModal) return;
+    if (!showUserModal && !showReferenceModal) return;
     loadDepartments();
     loadPositions();
-    loadApprovalLinePresets();
-  }, [showUserModal, loadDepartments, loadPositions, loadApprovalLinePresets]);
+    if (showUserModal) {
+      loadApprovalLinePresets();
+    }
+  }, [
+    showUserModal,
+    showReferenceModal,
+    loadDepartments,
+    loadPositions,
+    loadApprovalLinePresets,
+  ]);
 
   // 문서 로드 (수정 모드)
   useEffect(() => {
@@ -1367,7 +1755,7 @@ export default function ApprovalForm() {
           content: doc.content,
           preservation_period: doc.preservation_period || 5,
         });
-        setApprovalLines(
+        const normalizedLines =
           doc.approval_lines?.map((line) => ({
             id: line.approver,
             name: line.approver_name,
@@ -1376,7 +1764,26 @@ export default function ApprovalForm() {
             company: "",
             approval_type: normalizeApprovalType(line.approval_type),
             decision_type: "approval",
-          })) || [],
+          })) || [];
+
+        setApprovalLines(
+          normalizedLines.filter(
+            (line) => normalizeApprovalType(line.approval_type) !== "reference",
+          ),
+        );
+        setReferenceUsers(
+          normalizedLines
+            .filter(
+              (line) =>
+                normalizeApprovalType(line.approval_type) === "reference",
+            )
+            .map((line) => ({
+              id: line.id,
+              name: line.name || `사용자 ${line.id}`,
+              position: line.position || "",
+              department: line.department || "",
+              company: line.company || "",
+            })),
         );
         setExistingAttachments(doc.attachments || []);
       } catch (err) {
@@ -1398,17 +1805,20 @@ export default function ApprovalForm() {
         );
 
         if (!targetUser) {
+          const normalizedType = normalizeApprovalType(line.approval_type);
           return {
             id: line.id,
             name: line.name || `사용자 ${line.id}`,
             position: line.position || "",
             department: line.department || "",
             company: line.company || "",
-            approval_type: normalizeApprovalType(line.approval_type),
+            approval_type:
+              normalizedType === "reference" ? "approval" : normalizedType,
             decision_type: normalizeDecisionType(line.decision_type),
           };
         }
 
+        const normalizedType = normalizeApprovalType(line.approval_type);
         return {
           id: targetUser.id,
           name: getUserDisplayName(targetUser) || targetUser.username,
@@ -1416,12 +1826,50 @@ export default function ApprovalForm() {
           department:
             getUserDepartmentName(targetUser) || line.department || "",
           company: getUserCompanyName(targetUser) || line.company || "",
-          approval_type: normalizeApprovalType(line.approval_type),
+          approval_type:
+            normalizedType === "reference" ? "approval" : normalizedType,
           decision_type: normalizeDecisionType(line.decision_type),
         };
       }),
     );
     setShowUserModal(false);
+  };
+
+  const handleSaveReferenceSelection = (selectedIds) => {
+    const uniqueIds = [];
+    const seen = new Set();
+    selectedIds.forEach((idValue) => {
+      if (idValue == null) return;
+      const key = String(idValue);
+      if (seen.has(key)) return;
+      seen.add(key);
+      uniqueIds.push(idValue);
+    });
+
+    setReferenceUsers(
+      uniqueIds.map((idValue) => {
+        const targetUser = users.find(
+          (candidate) => String(candidate.id) === String(idValue),
+        );
+        if (!targetUser) {
+          return {
+            id: idValue,
+            name: `사용자 ${idValue}`,
+            position: "",
+            department: "",
+            company: "",
+          };
+        }
+        return {
+          id: targetUser.id,
+          name: getUserDisplayName(targetUser) || targetUser.username,
+          position: getUserPositionName(targetUser) || "",
+          department: getUserDepartmentName(targetUser) || "",
+          company: getUserCompanyName(targetUser) || "",
+        };
+      }),
+    );
+    setShowReferenceModal(false);
   };
 
   const handleSaveApprovalLinePreset = async (selectedLines) => {
@@ -1451,7 +1899,10 @@ export default function ApprovalForm() {
         lines: selectedLines.map((line, index) => ({
           approver: line.id,
           order: index,
-          approval_type: normalizeApprovalType(line.approval_type),
+          approval_type:
+            normalizeApprovalType(line.approval_type) === "reference"
+              ? "approval"
+              : normalizeApprovalType(line.approval_type),
           decision_type: normalizeDecisionType(line.decision_type),
         })),
       });
@@ -1633,15 +2084,28 @@ export default function ApprovalForm() {
       }
       data.append("submit", submit ? "true" : "false");
 
-      // 결재선 추가
+      const approvalLinePayload = approvalLines.map((line) => ({
+        approver: line.id,
+        approval_type:
+          normalizeApprovalType(line.approval_type) === "reference"
+            ? "approval"
+            : normalizeApprovalType(line.approval_type),
+      }));
+      const approverIdSet = new Set(
+        approvalLinePayload.map((line) => String(line.approver)),
+      );
+      const referenceLinePayload = referenceUsers
+        .filter((line) => line?.id != null)
+        .filter((line) => !approverIdSet.has(String(line.id)))
+        .map((line) => ({
+          approver: line.id,
+          approval_type: "reference",
+        }));
+
+      // 결재선 + 참조인 추가
       data.append(
         "approval_lines",
-        JSON.stringify(
-          approvalLines.map((line) => ({
-            approver: line.id,
-            approval_type: line.approval_type,
-          })),
-        ),
+        JSON.stringify([...approvalLinePayload, ...referenceLinePayload]),
       );
 
       // 새 첨부파일 추가
@@ -2146,26 +2610,85 @@ export default function ApprovalForm() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <div className="inline-flex border border-gray-300 rounded-sm overflow-hidden">
-              {approvalLines.map((line, idx) => (
-                <div
-                  key={`${line.id || "line"}-${idx}`}
-                  className="w-32 shrink-0 border-r border-gray-300 last:border-r-0"
-                >
-                  <div className="h-8 bg-gray-200 border-b border-gray-300 flex items-center justify-center px-2">
-                    <p className="text-sm text-gray-800 whitespace-nowrap">
+            <table className="doc-table table-fixed">
+              <colgroup>
+                {approvalLines.map((line, idx) => (
+                  <col
+                    key={`${line.id || "line-col"}-${idx}`}
+                    style={{ width: "170px" }}
+                  />
+                ))}
+              </colgroup>
+              <thead className="doc-thead">
+                <tr>
+                  {approvalLines.map((line, idx) => (
+                    <th
+                      key={`${line.id || "line-head"}-${idx}`}
+                      className={
+                        idx === approvalLines.length - 1
+                          ? "doc-th-end"
+                          : "doc-th"
+                      }
+                    >
                       ({idx + 1}) {getApprovalStageLabel(line)}
-                    </p>
-                  </div>
-                  <div className="h-20 bg-white flex items-center justify-center px-2">
-                    <p className="text-xl font-medium text-gray-900 whitespace-nowrap overflow-hidden text-ellipsis">
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  {approvalLines.map((line, idx) => (
+                    <td
+                      key={`${line.id || "line-body"}-${idx}`}
+                      className="doc-td h-20 text-center whitespace-nowrap text-xl"
+                    >
                       {line.name || `사용자 ${line.id}`}
                       {line.position ? ` ${line.position}` : ""}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
+                    </td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* 참조인 설정 */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-gray-700">참조인 설정</h3>
+          <button
+            onClick={() => setShowReferenceModal(true)}
+            className="flex items-center gap-1 px-3 py-1.5 text-sm text-sky-600 bg-sky-50 rounded-lg hover:bg-sky-100 transition-colors"
+          >
+            <Plus size={16} />
+            참조인 관리
+          </button>
+        </div>
+        <p className="text-xs text-gray-500">
+          이 영역은 읽기 전용입니다. 참조인 수정은 참조인 관리에서만 가능합니다.
+        </p>
+
+        {referenceUsers.length === 0 ? (
+          <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg">
+            <Users size={32} className="mx-auto mb-2 text-gray-300" />
+            <p>참조인을 추가해주세요</p>
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {referenceUsers.map((line, idx) => (
+              <div
+                key={`${line.id || "reference-label"}-${idx}`}
+                className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-700"
+              >
+                <span className="font-medium text-gray-800">
+                  {line.name || `사용자 ${line.id}`}
+                </span>
+                {line.position && (
+                  <span className="text-gray-500">{line.position}</span>
+                )}
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -2274,6 +2797,18 @@ export default function ApprovalForm() {
         onUpdatePreset={handleUpdateApprovalLinePreset}
         onDeletePreset={handleDeleteApprovalLinePreset}
         onSave={handleSaveApproverSelection}
+      />
+      <ReferenceSelectModal
+        isOpen={showReferenceModal}
+        onClose={() => setShowReferenceModal(false)}
+        users={users}
+        departmentOrderById={departmentOrderById}
+        positionLevelById={positionLevelById}
+        initialSelectedIds={referenceUsers.map((line) => line.id)}
+        excludedUserIds={approvalLines.map((line) => line.id)}
+        currentUserId={user?.id}
+        currentUsername={user?.username}
+        onSave={handleSaveReferenceSelection}
       />
     </div>
   );
