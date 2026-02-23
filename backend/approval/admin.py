@@ -31,8 +31,8 @@ class AttachmentInline(admin.TabularInline):
 
 @admin.register(Document)
 class DocumentAdmin(admin.ModelAdmin):
-    list_display = ["document_number", "title", "author", "status", "priority", "drafted_at"]
-    list_filter = ["status", "priority", "template"]
+    list_display = ["document_number", "title", "author", "status", "drafted_at"]
+    list_filter = ["status", "template"]
     search_fields = ["title", "content", "document_number", "author__username"]
     raw_id_fields = ["author", "template"]
     inlines = [ApprovalLineInline, ApprovalActionInline, AttachmentInline]

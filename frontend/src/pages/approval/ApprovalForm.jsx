@@ -147,7 +147,6 @@ export default function ApprovalForm() {
     template: "",
     title: "",
     content: "",
-    priority: "normal",
     preservation_period: 5,
   });
   const [approvalLines, setApprovalLines] = useState([]);
@@ -179,7 +178,6 @@ export default function ApprovalForm() {
           template: doc.template || "",
           title: doc.title,
           content: doc.content,
-          priority: doc.priority,
           preservation_period: doc.preservation_period || 5,
         });
         setApprovalLines(
@@ -279,7 +277,6 @@ export default function ApprovalForm() {
       const data = new FormData();
       data.append("title", formData.title);
       data.append("content", formData.content);
-      data.append("priority", formData.priority);
       data.append("preservation_period", formData.preservation_period);
       if (formData.template) {
         data.append("template", formData.template);
@@ -378,43 +375,25 @@ export default function ApprovalForm() {
       <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
         <h3 className="text-sm font-semibold text-gray-700">기본 정보</h3>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* 양식 선택 */}
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">
-              결재 양식
-            </label>
-            <select
-              value={formData.template}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, template: e.target.value }))
-              }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none"
-            >
-              <option value="">양식 선택</option>
-              {templates.map((t) => (
-                <option key={t.id} value={t.id}>
-                  [{t.category_display}] {t.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* 우선순위 */}
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">우선순위</label>
-            <select
-              value={formData.priority}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, priority: e.target.value }))
-              }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none"
-            >
-              <option value="normal">일반</option>
-              <option value="urgent">긴급</option>
-              <option value="important">중요</option>
-            </select>
-          </div>
+        {/* 양식 선택 */}
+        <div>
+          <label className="block text-sm text-gray-600 mb-1">
+            결재 양식
+          </label>
+          <select
+            value={formData.template}
+            onChange={(e) =>
+              setFormData((prev) => ({ ...prev, template: e.target.value }))
+            }
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none"
+          >
+            <option value="">양식 선택</option>
+            {templates.map((t) => (
+              <option key={t.id} value={t.id}>
+                [{t.category_display}] {t.name}
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* 제목 */}

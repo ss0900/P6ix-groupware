@@ -94,7 +94,6 @@ class DocumentListSerializer(serializers.ModelSerializer):
     template_name = serializers.CharField(source="template.name", read_only=True)
     template_category = serializers.CharField(source="template.category", read_only=True)
     status_display = serializers.CharField(source="get_status_display", read_only=True)
-    priority_display = serializers.CharField(source="get_priority_display", read_only=True)
     current_approver_name = serializers.SerializerMethodField()
     final_approver_name = serializers.SerializerMethodField()
     approval_lines = ApprovalLineSerializer(many=True, read_only=True)
@@ -104,7 +103,6 @@ class DocumentListSerializer(serializers.ModelSerializer):
         model = Document
         fields = [
             "id", "document_number", "title", "status", "status_display", 
-            "priority", "priority_display",
             "template", "template_name", "template_category",
             "author", "author_name", "author_position",
             "current_approver_name", "final_approver_name",
@@ -143,7 +141,6 @@ class DocumentDetailSerializer(serializers.ModelSerializer):
     template_name = serializers.CharField(source="template.name", read_only=True)
     template_category = serializers.CharField(source="template.category", read_only=True)
     status_display = serializers.CharField(source="get_status_display", read_only=True)
-    priority_display = serializers.CharField(source="get_priority_display", read_only=True)
     preservation_display = serializers.CharField(source="get_preservation_period_display", read_only=True)
     approval_lines = ApprovalLineSerializer(many=True, read_only=True)
     actions = ApprovalActionSerializer(many=True, read_only=True)
@@ -156,7 +153,6 @@ class DocumentDetailSerializer(serializers.ModelSerializer):
         fields = [
             "id", "document_number", "title", "content", "form_data",
             "status", "status_display",
-            "priority", "priority_display",
             "preservation_period", "preservation_display",
             "template", "template_name", "template_category",
             "author", "author_name", "author_position", "author_department",
@@ -207,7 +203,7 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Document
         fields = [
-            "id", "title", "content", "form_data", "priority", 
+            "id", "title", "content", "form_data",
             "preservation_period", "template", "approval_lines", "attachments"
         ]
 

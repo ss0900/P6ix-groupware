@@ -43,11 +43,6 @@ class Document(models.Model):
         ("rejected", "반려"),
         ("canceled", "취소"),
     ]
-    PRIORITY_CHOICES = [
-        ("normal", "일반"),
-        ("urgent", "긴급"),
-        ("important", "중요"),
-    ]
     PRESERVATION_CHOICES = [
         (1, "1년"),
         (3, "3년"),
@@ -67,7 +62,6 @@ class Document(models.Model):
     content = models.TextField("내용", blank=True)
     form_data = models.JSONField("양식 데이터", default=dict, blank=True, help_text="양식 필드 값")
     status = models.CharField("상태", max_length=20, choices=STATUS_CHOICES, default="draft")
-    priority = models.CharField("우선순위", max_length=20, choices=PRIORITY_CHOICES, default="normal")
     preservation_period = models.IntegerField("보존기간", choices=PRESERVATION_CHOICES, default=5)
     
     # 작성자
