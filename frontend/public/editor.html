@@ -231,10 +231,6 @@
       } = window.CKEDITOR;
       const {
         getEmailInlineStylesTransformations,
-        AIChat,
-        AIEditorIntegration,
-        AIQuickActions,
-        AIReviewMode,
         CaseChange,
         Comments,
         ExportPdf,
@@ -287,9 +283,6 @@
             "|",
             "insertMergeField",
             "previewMergeFields",
-            "|",
-            "toggleAi",
-            "aiQuickActions",
             "|",
             "importWord",
             "exportWord",
@@ -350,10 +343,6 @@
           shouldNotGroupWhenFull: false,
         },
         plugins: [
-          AIChat,
-          AIEditorIntegration,
-          AIQuickActions,
-          AIReviewMode,
           Alignment,
           Autoformat,
           AutoImage,
@@ -456,30 +445,8 @@
           Underline,
           WordCount,
         ],
-        ai: {
-          container: {
-            type: "overlay",
-            side: "right",
-          },
-          chat: {
-            models: {},
-            context: {
-              document: {
-                enabled: true,
-              },
-              urls: {
-                enabled: true,
-              },
-              files: {
-                enabled: true,
-              },
-            },
-          },
-        },
         balloonToolbar: [
           "comment",
-          "|",
-          "aiQuickActions",
           "|",
           "bold",
           "italic",
