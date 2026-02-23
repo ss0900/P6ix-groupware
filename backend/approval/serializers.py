@@ -10,8 +10,8 @@ class DocumentTemplateSerializer(serializers.ModelSerializer):
     class Meta:
         model = DocumentTemplate
         fields = [
-            "id", "name", "description", "category", "category_display",
-            "content_template", "form_fields", "is_active", "created_at", "updated_at"
+            "id", "name", "category", "category_display",
+            "content", "is_active", "created_at", "updated_at"
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
 

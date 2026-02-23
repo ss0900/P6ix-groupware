@@ -7,7 +7,7 @@ from .models import DocumentTemplate, Document, ApprovalLine, ApprovalAction, At
 class DocumentTemplateAdmin(admin.ModelAdmin):
     list_display = ["name", "category", "is_active", "created_at"]
     list_filter = ["category", "is_active"]
-    search_fields = ["name", "description"]
+    search_fields = ["name", "content"]
 
 
 class ApprovalLineInline(admin.TabularInline):

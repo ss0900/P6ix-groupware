@@ -57,7 +57,7 @@ const TemplateModal = ({
         <form onSubmit={onSubmit} className="space-y-4">
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">
-              양식명 <span className="text-red-500">*</span>
+              양식명<span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -116,55 +116,19 @@ const TemplateModal = ({
 
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">
-              설명
+              내용
             </label>
             <textarea
-              value={formData.description}
+              value={formData.content}
               onChange={(event) =>
                 setFormData((prev) => ({
                   ...prev,
-                  description: event.target.value,
-                }))
-              }
-              rows={3}
-              className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500"
-              placeholder="양식 설명을 입력하세요"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              내용 템플릿
-            </label>
-            <textarea
-              value={formData.content_template}
-              onChange={(event) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  content_template: event.target.value,
+                  content: event.target.value,
                 }))
               }
               rows={8}
               className="w-full resize-y rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500"
-              placeholder="초기 문서 템플릿 내용을 입력하세요"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              양식 필드(JSON)
-            </label>
-            <textarea
-              value={formData.form_fields}
-              onChange={(event) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  form_fields: event.target.value,
-                }))
-              }
-              rows={8}
-              className="w-full resize-y rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500"
-              placeholder='예) {"fields":[{"name":"amount","type":"number"}]}'
+              placeholder="양식 내용을 입력하세요"
             />
           </div>
 
@@ -202,10 +166,8 @@ export default function ApprovalTemplateList() {
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
-    description: "",
+    content: "",
     category: "general",
-    content_template: "",
-    form_fields: "{}",
     is_active: true,
   });
 
@@ -233,7 +195,7 @@ export default function ApprovalTemplateList() {
     return templates.filter(
       (template) =>
         template.name?.toLowerCase().includes(query) ||
-        template.description?.toLowerCase().includes(query),
+        template.content?.toLowerCase().includes(query),
     );
   }, [templates, searchQuery]);
 
@@ -241,10 +203,8 @@ export default function ApprovalTemplateList() {
     setEditingTemplate(null);
     setFormData({
       name: "",
-      description: "",
+      content: "",
       category: selectedCategory || "general",
-      content_template: "",
-      form_fields: "{}",
       is_active: true,
     });
     setModalOpen(true);
@@ -254,10 +214,8 @@ export default function ApprovalTemplateList() {
     setEditingTemplate(template);
     setFormData({
       name: template.name || "",
-      description: template.description || "",
+      content: template.content || "",
       category: template.category || "general",
-      content_template: template.content_template || "",
-      form_fields: JSON.stringify(template.form_fields || {}, null, 2),
       is_active: Boolean(template.is_active),
     });
     setModalOpen(true);
@@ -276,23 +234,10 @@ export default function ApprovalTemplateList() {
       return;
     }
 
-    let parsedFormFields = {};
-    const rawFormFields = formData.form_fields.trim();
-    if (rawFormFields) {
-      try {
-        parsedFormFields = JSON.parse(rawFormFields);
-      } catch (error) {
-        alert("양식 필드(JSON) 형식이 올바르지 않습니다.");
-        return;
-      }
-    }
-
     const payload = {
       name: formData.name.trim(),
-      description: formData.description.trim(),
+      content: formData.content,
       category: formData.category,
-      content_template: formData.content_template,
-      form_fields: parsedFormFields,
       is_active: formData.is_active,
     };
 
@@ -396,7 +341,7 @@ export default function ApprovalTemplateList() {
         <div className="flex items-center border-b border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-600">
           <div className="flex-1">양식명</div>
           <div className="w-24 text-center">상태</div>
-          <div className="w-32 text-center">작성일</div>
+          <div className="w-32 text-center">생성일</div>
           <div className="w-28 text-center">관리</div>
           <div className="w-10" />
         </div>
@@ -426,9 +371,9 @@ export default function ApprovalTemplateList() {
                       {template.category_display || getCategoryLabel(template.category)}
                     </span>
                   </div>
-                  {template.description && (
+                  {template.content && (
                     <p className="ml-6 mt-1 truncate text-sm text-gray-500">
-                      {template.description}
+                      {template.content}
                     </p>
                   )}
                 </div>

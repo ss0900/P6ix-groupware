@@ -17,10 +17,8 @@ class DocumentTemplate(models.Model):
     ]
     
     name = models.CharField("양식명", max_length=100)
-    description = models.TextField("설명", blank=True)
     category = models.CharField("분류", max_length=50, choices=CATEGORY_CHOICES, default="general")
-    content_template = models.TextField("내용 템플릿", blank=True, help_text="HTML 또는 Markdown 형식")
-    form_fields = models.JSONField("양식 필드", default=dict, blank=True, help_text="동적 양식 필드 정의")
+    content = models.TextField("내용", blank=True)
     is_active = models.BooleanField("활성화", default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
