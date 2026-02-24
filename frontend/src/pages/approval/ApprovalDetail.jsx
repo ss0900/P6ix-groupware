@@ -1,6 +1,7 @@
-// src/pages/approval/ApprovalDetail.jsx
-import React, { useEffect, useState } from "react";
+﻿// src/pages/approval/ApprovalDetail.jsx
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { createPortal } from "react-dom";
 import api from "../../api/axios";
 import { useAuth } from "../../context/AuthContext";
 import {
@@ -17,6 +18,7 @@ import {
 import ApprovalTimeline from "./components/ApprovalTimeline";
 
 const APPROVAL_LINE_TYPE_SET = new Set(["approval", "agreement", "reference"]);
+const MAX_REFERENCE_LABELS = 7;
 
 const normalizeApprovalType = (value) =>
   APPROVAL_LINE_TYPE_SET.has(value) ? value : "approval";
@@ -82,6 +84,13 @@ export default function ApprovalDetail() {
   const [loading, setLoading] = useState(true);
   const [decisionComment, setDecisionComment] = useState("");
   const [processing, setProcessing] = useState(false);
+  const [showReferenceOverflow, setShowReferenceOverflow] = useState(false);
+  const [referenceOverflowPosition, setReferenceOverflowPosition] = useState({
+    top: 0,
+    left: 0,
+  });
+  const referenceOverflowButtonRef = useRef(null);
+  const referenceOverflowPopoverRef = useRef(null);
 
   const getCurrentUserIdCandidates = () =>
     [user?.id, user?.user_id]
@@ -107,6 +116,7 @@ export default function ApprovalDetail() {
 
   // 문서 로드
   const loadDocument = async () => {
+    setShowReferenceOverflow(false);
     try {
       const res = await api.get(`/approval/documents/${id}/`);
       setDocument(res.data);
@@ -122,6 +132,49 @@ export default function ApprovalDetail() {
   useEffect(() => {
     loadDocument();
   }, [id]);
+
+  const updateReferenceOverflowPosition = () => {
+    if (!referenceOverflowButtonRef.current) return;
+    const rect = referenceOverflowButtonRef.current.getBoundingClientRect();
+    setReferenceOverflowPosition({
+      top: rect.bottom + 8,
+      left: rect.right,
+    });
+  };
+
+  const handleReferenceOverflowToggle = () => {
+    if (showReferenceOverflow) {
+      setShowReferenceOverflow(false);
+      return;
+    }
+    updateReferenceOverflowPosition();
+    setShowReferenceOverflow(true);
+  };
+
+  useEffect(() => {
+    if (!showReferenceOverflow) return;
+
+    const handleClickOutside = (event) => {
+      const target = event.target;
+      if (referenceOverflowButtonRef.current?.contains(target)) return;
+      if (referenceOverflowPopoverRef.current?.contains(target)) return;
+      setShowReferenceOverflow(false);
+    };
+
+    const handleViewportChange = () => {
+      updateReferenceOverflowPosition();
+    };
+
+    window.addEventListener("resize", handleViewportChange);
+    window.addEventListener("scroll", handleViewportChange, true);
+    window.document.addEventListener("mousedown", handleClickOutside);
+
+    return () => {
+      window.removeEventListener("resize", handleViewportChange);
+      window.removeEventListener("scroll", handleViewportChange, true);
+      window.document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showReferenceOverflow]);
 
   const isMyTurn = () => {
     if (!document || !user || document.status !== "pending") return false;
@@ -248,6 +301,9 @@ export default function ApprovalDetail() {
       name: line.approver_name || "미지정",
       position: line.approver_position || "",
     }));
+  const visibleReferenceUsers = referenceUsers.slice(0, MAX_REFERENCE_LABELS);
+  const hiddenReferenceUsers = referenceUsers.slice(MAX_REFERENCE_LABELS);
+  const hasOverflowReferenceUsers = referenceUsers.length > MAX_REFERENCE_LABELS;
   const sortedApprovalLines = (document.approval_lines || [])
     .filter((line) => normalizeApprovalType(line.approval_type) !== "reference")
     .sort((a, b) => Number(a?.order ?? 0) - Number(b?.order ?? 0));
@@ -468,8 +524,8 @@ export default function ApprovalDetail() {
                       {referenceUsers.length === 0 ? (
                         <p className="font-medium text-gray-900">-</p>
                       ) : (
-                        <div className="flex justify-center gap-2 py-0.5">
-                          {referenceUsers.map((refUser, idx) => (
+                        <div className="relative flex justify-center gap-2 py-0.5">
+                          {visibleReferenceUsers.map((refUser, idx) => (
                             <div
                               key={`${refUser.id || "reference"}-${idx}`}
                               className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs text-gray-700"
@@ -484,6 +540,44 @@ export default function ApprovalDetail() {
                               )}
                             </div>
                           ))}
+                          {hasOverflowReferenceUsers && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setShowReferenceOverflow((prev) => !prev)
+                                }
+                                className="inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-100"
+                                aria-label="숨겨진 참조인 보기"
+                              >
+                                +{hiddenReferenceUsers.length}
+                              </button>
+                              {showReferenceOverflow && (
+                                <div className="absolute right-0 top-full z-20 mt-2 w-80 rounded-lg border border-gray-200 bg-white p-3 text-left shadow-lg">
+                                  <p className="mb-2 text-xs font-semibold text-gray-500">
+                                    추가 참조인
+                                  </p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {hiddenReferenceUsers.map((refUser, idx) => (
+                                      <div
+                                        key={`${refUser.id || "hidden-reference"}-${idx}`}
+                                        className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs text-gray-700"
+                                      >
+                                        <span className="font-medium text-gray-800">
+                                          {refUser.name}
+                                        </span>
+                                        {refUser.position && (
+                                          <span className="text-gray-500">
+                                            {refUser.position}
+                                          </span>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </>
+                          )}
                         </div>
                       )}
                     </td>
