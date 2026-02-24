@@ -24,6 +24,9 @@ from .serializers import (
     ApprovalDecisionSerializer, ApprovalActionSerializer,
     AttachmentSerializer, BulkDecisionSerializer,
     ApprovalLinePresetSerializer,
+    ACTIONABLE_APPROVAL_TYPES,
+    _activate_next_approval_line,
+    _normalize_reference_pending_lines,
 )
 
 
@@ -46,6 +49,18 @@ class DocumentViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     parser_classes = [JSONParser, MultiPartParser, FormParser]
 
+    def _normalize_pending_documents(self, user):
+        pending_docs = (
+            Document.objects.filter(status="pending")
+            .filter(Q(author=user) | Q(approval_lines__approver=user))
+            .distinct()
+            .prefetch_related("approval_lines")
+        )
+        for document in pending_docs:
+            _normalize_reference_pending_lines(document)
+            if document.status == "pending":
+                _activate_next_approval_line(document)
+
     def get_queryset(self):
         user = self.request.user
         filter_type = self.request.query_params.get("filter", "all")
@@ -53,6 +68,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
         is_read = self.request.query_params.get("is_read")
         search = self.request.query_params.get("search")
         template = self.request.query_params.get("template")
+        self._normalize_pending_documents(user)
 
         qs = Document.objects.select_related("author", "template").prefetch_related(
             "approval_lines", "approval_lines__approver", "attachments"
@@ -71,14 +87,16 @@ class DocumentViewSet(viewsets.ModelViewSet):
             # 내가 결재할 문서 (내 차례)
             qs = qs.filter(
                 approval_lines__approver=user,
-                approval_lines__status="pending"
+                approval_lines__status="pending",
+                approval_lines__approval_type__in=ACTIONABLE_APPROVAL_TYPES,
             )
         
         elif filter_type == "my_completed":
             # 내가 결재한 문서
             qs = qs.filter(
                 approval_lines__approver=user,
-                approval_lines__status__in=["approved", "rejected"]
+                approval_lines__status__in=["approved", "rejected"],
+                approval_lines__approval_type__in=ACTIONABLE_APPROVAL_TYPES,
             )
         
         elif filter_type == "in_progress":
@@ -298,13 +316,15 @@ class DocumentViewSet(viewsets.ModelViewSet):
         # 내가 결재할 문서 (내 차례)
         my_pending_count = Document.objects.filter(
             approval_lines__approver=user,
-            approval_lines__status="pending"
+            approval_lines__status="pending",
+            approval_lines__approval_type__in=ACTIONABLE_APPROVAL_TYPES,
         ).distinct().count()
 
         # 내가 결재한 문서 수
         my_completed_count = Document.objects.filter(
             approval_lines__approver=user,
-            approval_lines__status__in=["approved", "rejected"]
+            approval_lines__status__in=["approved", "rejected"],
+            approval_lines__approval_type__in=ACTIONABLE_APPROVAL_TYPES,
         ).distinct().count()
 
         # 임시저장 수

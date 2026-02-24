@@ -110,7 +110,10 @@ class Document(models.Model):
     @property
     def current_approver(self):
         """현재 결재 차례인 사람"""
-        pending = self.approval_lines.filter(status="pending").order_by("order").first()
+        pending = self.approval_lines.filter(
+            status="pending",
+            approval_type__in=["approval", "agreement"],
+        ).order_by("order").first()
         return pending.approver if pending else None
 
     @property
