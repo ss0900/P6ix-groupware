@@ -2248,6 +2248,114 @@ export default function ApprovalForm() {
         </div>
       </div>
 
+      {/* 결재선 설정 */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-gray-700">
+            결재선 설정 <span className="text-red-500">*</span>
+          </h3>
+          <button
+            onClick={() => setShowUserModal(true)}
+            className="flex items-center gap-1 px-3 py-1.5 text-sm text-sky-600 bg-sky-50 rounded-lg hover:bg-sky-100 transition-colors"
+          >
+            <Plus size={16} />
+            결재선 관리
+          </button>
+        </div>
+        <p className="text-xs text-gray-500">
+          이 영역은 읽기 전용입니다. 결재선 수정은 결재선 관리에서만 가능합니다.
+        </p>
+
+        {approvalLines.length === 0 ? (
+          <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg">
+            <User size={32} className="mx-auto mb-2 text-gray-300" />
+            <p>결재자를 추가해주세요</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="doc-table table-fixed">
+              <colgroup>
+                {approvalLines.map((line, idx) => (
+                  <col
+                    key={`${line.id || "line-col"}-${idx}`}
+                    style={{ width: "170px" }}
+                  />
+                ))}
+              </colgroup>
+              <thead className="doc-thead">
+                <tr>
+                  {approvalLines.map((line, idx) => (
+                    <th
+                      key={`${line.id || "line-head"}-${idx}`}
+                      className={
+                        idx === approvalLines.length - 1
+                          ? "doc-th-end"
+                          : "doc-th"
+                      }
+                    >
+                      ({idx + 1}) {getApprovalStageLabel(line)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  {approvalLines.map((line, idx) => (
+                    <td
+                      key={`${line.id || "line-body"}-${idx}`}
+                      className="doc-td h-20 text-center whitespace-nowrap text-xl"
+                    >
+                      {line.name || `사용자 ${line.id}`}
+                      {line.position ? ` ${line.position}` : ""}
+                    </td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* 참조인 설정 */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-gray-700">참조인 설정</h3>
+          <button
+            onClick={() => setShowReferenceModal(true)}
+            className="flex items-center gap-1 px-3 py-1.5 text-sm text-sky-600 bg-sky-50 rounded-lg hover:bg-sky-100 transition-colors"
+          >
+            <Plus size={16} />
+            참조인 관리
+          </button>
+        </div>
+        <p className="text-xs text-gray-500">
+          이 영역은 읽기 전용입니다. 참조인 수정은 참조인 관리에서만 가능합니다.
+        </p>
+
+        {referenceUsers.length === 0 ? (
+          <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg">
+            <Users size={32} className="mx-auto mb-2 text-gray-300" />
+            <p>참조인을 추가해주세요</p>
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {referenceUsers.map((line, idx) => (
+              <div
+                key={`${line.id || "reference-label"}-${idx}`}
+                className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-700"
+              >
+                <span className="font-medium text-gray-800">
+                  {line.name || `사용자 ${line.id}`}
+                </span>
+                {line.position && (
+                  <span className="text-gray-500">{line.position}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* 기본 정보 */}
       <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
         <h3 className="text-sm font-semibold text-gray-700">기본 정보</h3>
@@ -2585,113 +2693,6 @@ export default function ApprovalForm() {
         </div>
       </div>
 
-      {/* 결재선 설정 */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-gray-700">
-            결재선 설정 <span className="text-red-500">*</span>
-          </h3>
-          <button
-            onClick={() => setShowUserModal(true)}
-            className="flex items-center gap-1 px-3 py-1.5 text-sm text-sky-600 bg-sky-50 rounded-lg hover:bg-sky-100 transition-colors"
-          >
-            <Plus size={16} />
-            결재선 관리
-          </button>
-        </div>
-        <p className="text-xs text-gray-500">
-          이 영역은 읽기 전용입니다. 결재선 수정은 결재선 관리에서만 가능합니다.
-        </p>
-
-        {approvalLines.length === 0 ? (
-          <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg">
-            <User size={32} className="mx-auto mb-2 text-gray-300" />
-            <p>결재자를 추가해주세요</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="doc-table table-fixed">
-              <colgroup>
-                {approvalLines.map((line, idx) => (
-                  <col
-                    key={`${line.id || "line-col"}-${idx}`}
-                    style={{ width: "170px" }}
-                  />
-                ))}
-              </colgroup>
-              <thead className="doc-thead">
-                <tr>
-                  {approvalLines.map((line, idx) => (
-                    <th
-                      key={`${line.id || "line-head"}-${idx}`}
-                      className={
-                        idx === approvalLines.length - 1
-                          ? "doc-th-end"
-                          : "doc-th"
-                      }
-                    >
-                      ({idx + 1}) {getApprovalStageLabel(line)}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  {approvalLines.map((line, idx) => (
-                    <td
-                      key={`${line.id || "line-body"}-${idx}`}
-                      className="doc-td h-20 text-center whitespace-nowrap text-xl"
-                    >
-                      {line.name || `사용자 ${line.id}`}
-                      {line.position ? ` ${line.position}` : ""}
-                    </td>
-                  ))}
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* 참조인 설정 */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-gray-700">참조인 설정</h3>
-          <button
-            onClick={() => setShowReferenceModal(true)}
-            className="flex items-center gap-1 px-3 py-1.5 text-sm text-sky-600 bg-sky-50 rounded-lg hover:bg-sky-100 transition-colors"
-          >
-            <Plus size={16} />
-            참조인 관리
-          </button>
-        </div>
-        <p className="text-xs text-gray-500">
-          이 영역은 읽기 전용입니다. 참조인 수정은 참조인 관리에서만 가능합니다.
-        </p>
-
-        {referenceUsers.length === 0 ? (
-          <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg">
-            <Users size={32} className="mx-auto mb-2 text-gray-300" />
-            <p>참조인을 추가해주세요</p>
-          </div>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            {referenceUsers.map((line, idx) => (
-              <div
-                key={`${line.id || "reference-label"}-${idx}`}
-                className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-700"
-              >
-                <span className="font-medium text-gray-800">
-                  {line.name || `사용자 ${line.id}`}
-                </span>
-                {line.position && (
-                  <span className="text-gray-500">{line.position}</span>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
 
       {/* 첨부파일 */}
       <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
