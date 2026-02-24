@@ -1,6 +1,6 @@
 ﻿// src/pages/approval/ApprovalDetail.jsx
 import React, { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { createPortal } from "react-dom";
 import api from "../../api/axios";
 import { useAuth } from "../../context/AuthContext";
@@ -76,6 +76,7 @@ const StatusBadge = ({ status }) => {
 };
 
 export default function ApprovalDetail() {
+  const location = useLocation();
   const navigate = useNavigate();
   const { id } = useParams();
   const { user } = useAuth();
@@ -118,7 +119,9 @@ export default function ApprovalDetail() {
   const loadDocument = async () => {
     setShowReferenceOverflow(false);
     try {
-      const res = await api.get(`/approval/documents/${id}/`);
+      const filter = new URLSearchParams(location.search).get("filter");
+      const requestConfig = filter ? { params: { filter } } : undefined;
+      const res = await api.get(`/approval/documents/${id}/`, requestConfig);
       setDocument(res.data);
     } catch (err) {
       console.error("Failed to load document:", err);
@@ -131,7 +134,7 @@ export default function ApprovalDetail() {
 
   useEffect(() => {
     loadDocument();
-  }, [id]);
+  }, [id, location.search]);
 
   const updateReferenceOverflowPosition = () => {
     if (!referenceOverflowButtonRef.current) return;

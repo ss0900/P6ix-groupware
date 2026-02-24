@@ -136,9 +136,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
         
         elif filter_type == "all_view":
             # 전체보기 (내가 관련된 모든 문서)
-            qs = qs.filter(
-                Q(author=user) | Q(approval_lines__approver=user)
-            ).exclude(status="draft")
+            qs = qs.exclude(status="draft")
         
         elif filter_type == "public":
             # 내 공문 (내가 관련된 공문 양식 문서)
