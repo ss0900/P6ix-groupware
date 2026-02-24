@@ -16,6 +16,7 @@ export default function ApprovalStamp({
   actedAt,
   order,
   size = "md",
+  isMe = false,
 }) {
   // 상태별 색상 설정
   const statusConfig = {
@@ -93,11 +94,14 @@ export default function ApprovalStamp({
   const formatDate = (dateStr) => {
     if (!dateStr) return "";
     const date = new Date(dateStr);
-    return date.toLocaleDateString("ko-KR", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).replace(/\. /g, "-").replace(".", "");
+    return date
+      .toLocaleDateString("ko-KR", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      })
+      .replace(/\. /g, "-")
+      .replace(".", "");
   };
 
   const formatTime = (dateStr) => {
@@ -112,7 +116,7 @@ export default function ApprovalStamp({
   return (
     <div
       className={`
-        ${config.bg} ${config.border} border rounded-lg
+        ${isMe ? "bg-amber-50 border-amber-300" : `${config.bg} ${config.border}`} border rounded-lg
         ${sizeStyle.container}
         flex flex-col items-center text-center
         transition-all
@@ -124,13 +128,24 @@ export default function ApprovalStamp({
       </div>
 
       {/* 결재자 이름 */}
-      <div className={`font-medium ${config.text} ${sizeStyle.name} truncate max-w-full`}>
-        {approver.name || "미지정"}
+      <div className="flex items-center gap-1 max-w-full">
+        <div
+          className={`font-medium ${config.text} ${sizeStyle.name} truncate max-w-full`}
+        >
+          {approver.name || "미지정"}
+        </div>
+        {isMe && (
+          <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-200 px-1 text-[9px] font-semibold leading-none text-amber-900">
+            나
+          </span>
+        )}
       </div>
 
       {/* 직위 */}
       {approver.position && (
-        <div className={`text-gray-500 ${sizeStyle.position} truncate max-w-full`}>
+        <div
+          className={`text-gray-500 ${sizeStyle.position} truncate max-w-full`}
+        >
           {approver.position}
         </div>
       )}
@@ -146,7 +161,9 @@ export default function ApprovalStamp({
 
       {/* 순서 표시 (선택적) */}
       {order && status === "pending" && (
-        <div className={`mt-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-blue-500 text-white`}>
+        <div
+          className={`mt-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-blue-500 text-white`}
+        >
           {order} 결재중
         </div>
       )}
