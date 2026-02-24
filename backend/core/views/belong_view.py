@@ -520,6 +520,15 @@ class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserListSerializer
     permission_classes = [permissions.IsAuthenticated, IsSuperuserOnly]
 
+    def get_permissions(self):
+        # 사용자 목록/상세 조회는 로그인 사용자에게 허용하고,
+        # 생성/수정/삭제는 기존대로 슈퍼유저만 허용한다.
+        if self.action in ["list", "retrieve"]:
+            permission_classes = [permissions.IsAuthenticated]
+        else:
+            permission_classes = [permissions.IsAuthenticated, IsSuperuserOnly]
+        return [permission() for permission in permission_classes]
+
     def get_queryset(self):
         qs = super().get_queryset()
         search = self.request.query_params.get("search")
