@@ -226,7 +226,7 @@ export default function ApprovalHome() {
       {/* 통계 카드 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div
-          className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer"
+          className="order-1 bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer"
           onClick={() => navigate("/approval/in-progress")}
         >
           <div className="flex items-center gap-3">
@@ -243,7 +243,7 @@ export default function ApprovalHome() {
         </div>
 
         <div
-          className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer"
+          className="order-first bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer"
           onClick={() => navigate("/approval/sent")}
         >
           <div className="flex items-center gap-3">
@@ -260,7 +260,7 @@ export default function ApprovalHome() {
         </div>
 
         <div
-          className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer"
+          className="order-2 bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer"
           onClick={() => navigate("/approval/completed")}
         >
           <div className="flex items-center gap-3">
@@ -277,7 +277,7 @@ export default function ApprovalHome() {
         </div>
 
         <div
-          className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer"
+          className="order-3 bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer"
           onClick={() => navigate("/approval/draft")}
         >
           <div className="flex items-center gap-3">
