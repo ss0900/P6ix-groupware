@@ -127,7 +127,8 @@ export default function ApprovalDetail() {
     if (!document || !user || document.status !== "pending") return false;
 
     return (document.approval_lines || []).some((line) => {
-      const isActionable = normalizeApprovalType(line?.approval_type) !== "reference";
+      const isActionable =
+        normalizeApprovalType(line?.approval_type) !== "reference";
       const isPending = line?.status === "pending";
       const isMe =
         matchesCurrentUserId(line?.approver) ||
@@ -211,12 +212,13 @@ export default function ApprovalDetail() {
         },
       );
       const url = window.URL.createObjectURL(new Blob([res.data]));
-      const link = document.createElement("a");
+      const link = window.document.createElement("a");
       link.href = url;
       link.setAttribute("download", attachment.filename);
-      document.body.appendChild(link);
+      window.document.body.appendChild(link);
       link.click();
       link.remove();
+      window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error("Download failed:", err);
       alert("다운로드에 실패했습니다.");
@@ -398,7 +400,7 @@ export default function ApprovalDetail() {
         </div>
         <div className="xl:row-span-2">
           {isMyTurn() ? (
-            <div className="h-full bg-white rounded-xl border border-gray-200 p-5 flex flex-col min-h-0">
+            <div className="h-[450px] bg-white rounded-xl border border-gray-200 p-5 flex flex-col min-h-0">
               <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
                 <MessageSquare size={16} />
                 결재 처리
@@ -433,62 +435,63 @@ export default function ApprovalDetail() {
           )}
         </div>
         <div className="xl:col-span-2">
-
-      {/* 문서 정보 */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <h3 className="text-sm font-semibold text-gray-700 mb-4">문서 정보</h3>
-        <div className="overflow-x-auto">
-          <table className="doc-table table-auto w-max">
-            <thead className="doc-thead">
-              <tr>
-                <th className="doc-th">상신자</th>
-                <th className="doc-th">상태</th>
-                <th className="doc-th-end">참조</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td className="doc-td h-16 px-5">
-                  <div className="flex flex-col items-center text-center">
-                    <p className="font-medium text-gray-900">
-                      {document.author_name} {document.author_position}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {document.author_department || "-"}
-                    </p>
-                  </div>
-                </td>
-                <td className="doc-td h-16 px-5 text-center">
-                  <StatusBadge status={document.status} />
-                </td>
-                <td className="doc-td h-16 px-5 text-center">
-                  {referenceUsers.length === 0 ? (
-                    <p className="font-medium text-gray-900">-</p>
-                  ) : (
-                    <div className="flex justify-center gap-2 py-0.5">
-                      {referenceUsers.map((refUser, idx) => (
-                        <div
-                          key={`${refUser.id || "reference"}-${idx}`}
-                          className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs text-gray-700"
-                        >
-                          <span className="font-medium text-gray-800">
-                            {refUser.name}
-                          </span>
-                          {refUser.position && (
-                            <span className="text-gray-500">
-                              {refUser.position}
-                            </span>
-                          )}
+          {/* 문서 정보 */}
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <h3 className="text-sm font-semibold text-gray-700 mb-4">
+              문서 정보
+            </h3>
+            <div className="overflow-x-auto">
+              <table className="doc-table table-auto w-max">
+                <thead className="doc-thead">
+                  <tr>
+                    <th className="doc-th">상신자</th>
+                    <th className="doc-th">상태</th>
+                    <th className="doc-th-end">참조</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="doc-td h-16 px-5">
+                      <div className="flex flex-col items-center text-center">
+                        <p className="font-medium text-gray-900">
+                          {document.author_name} {document.author_position}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {document.author_department || "-"}
+                        </p>
+                      </div>
+                    </td>
+                    <td className="doc-td h-16 px-5 text-center">
+                      <StatusBadge status={document.status} />
+                    </td>
+                    <td className="doc-td h-16 px-5 text-center">
+                      {referenceUsers.length === 0 ? (
+                        <p className="font-medium text-gray-900">-</p>
+                      ) : (
+                        <div className="flex justify-center gap-2 py-0.5">
+                          {referenceUsers.map((refUser, idx) => (
+                            <div
+                              key={`${refUser.id || "reference"}-${idx}`}
+                              className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs text-gray-700"
+                            >
+                              <span className="font-medium text-gray-800">
+                                {refUser.name}
+                              </span>
+                              {refUser.position && (
+                                <span className="text-gray-500">
+                                  {refUser.position}
+                                </span>
+                              )}
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+                      )}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
 
