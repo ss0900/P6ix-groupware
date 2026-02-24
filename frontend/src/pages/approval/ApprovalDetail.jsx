@@ -149,18 +149,6 @@ export default function ApprovalDetail() {
     }
   };
 
-  // 날짜 포맷
-  const formatDate = (dateStr) => {
-    if (!dateStr) return "-";
-    return new Date(dateStr).toLocaleDateString("ko-KR", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    }).replace(/\. /g, "-").replace(".", "");
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -176,6 +164,11 @@ export default function ApprovalDetail() {
       </div>
     );
   }
+
+  const referenceApprovers = (document.approval_lines || [])
+    .filter((line) => line.approval_type === "reference")
+    .map((line) => `${line.approver_name}${line.approver_position ? ` ${line.approver_position}` : ""}`)
+    .join(", ");
 
   return (
     <div className="space-y-6">
@@ -231,25 +224,21 @@ export default function ApprovalDetail() {
       {/* 문서 정보 */}
       <div className="bg-white rounded-xl border border-gray-200 p-5">
         <h3 className="text-sm font-semibold text-gray-700 mb-4">문서 정보</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
           <div>
-            <span className="text-gray-500">기안자</span>
+            <span className="text-gray-500">상신자</span>
             <p className="font-medium text-gray-900">
               {document.author_name} {document.author_position}
             </p>
             <p className="text-xs text-gray-400">{document.author_department}</p>
           </div>
           <div>
-            <span className="text-gray-500">기안일</span>
-            <p className="font-medium text-gray-900">{formatDate(document.drafted_at)}</p>
+            <span className="text-gray-500">상태</span>
+            <p className="font-medium text-gray-900">{document.status_display || document.status || "-"}</p>
           </div>
           <div>
-            <span className="text-gray-500">제출일</span>
-            <p className="font-medium text-gray-900">{formatDate(document.submitted_at)}</p>
-          </div>
-          <div>
-            <span className="text-gray-500">완료일</span>
-            <p className="font-medium text-gray-900">{formatDate(document.completed_at)}</p>
+            <span className="text-gray-500">참조</span>
+            <p className="font-medium text-gray-900">{referenceApprovers || "-"}</p>
           </div>
         </div>
       </div>
