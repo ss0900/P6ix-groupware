@@ -91,6 +91,17 @@ function Header({ onMenuClick }) {
       }
 
       const username = user?.username || "";
+      const canReadCompanyDetail = Boolean(user?.is_staff || user?.is_superuser);
+
+      if (!canReadCompanyDetail) {
+        clearLogoCache(username);
+        if (mounted) {
+          setCompanyLogoUrl(null);
+          setCompanyLogoLoading(false);
+        }
+        return;
+      }
+
       const { cachedCompanyId, cachedLogoUrl } = readLogoCache(username);
 
       if (mounted && cachedLogoUrl) {
@@ -125,6 +136,17 @@ function Header({ onMenuClick }) {
           setCompanyLogoLoading(false);
         }
       } catch (err) {
+        if (err?.response?.status === 403) {
+          const username = user?.username || "";
+          clearLogoCache(username);
+          if (mounted) {
+            if (!cachedLogoUrl) {
+              setCompanyLogoUrl(null);
+            }
+            setCompanyLogoLoading(false);
+          }
+          return;
+        }
         // cachedCompanyId가 오래되어 실패할 경우 membership에서 다시 확인 후 재시도
         try {
           const username = user?.username || "";

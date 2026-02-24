@@ -132,6 +132,7 @@ function Dashboard() {
     const loadDashboardData = async () => {
       setLoading(true);
       try {
+        const canViewSalesStats = Boolean(user?.is_staff || user?.is_superuser);
         // 병렬로 API 호출
         const [
           usersRes,
@@ -146,7 +147,9 @@ function Dashboard() {
           api.get("approval/documents/stats/"),
           api.get("chat/notifications/unread-count/"),
           api.get("meeting/schedules/today/"),
-          api.get("operation/leads/stats/"),
+          canViewSalesStats
+            ? api.get("operation/leads/stats/")
+            : Promise.resolve({ data: { by_status: [] } }),
           api.get("approval/documents/?filter=pending"),
           api.get("board/posts/?board=notice")
         ]);
@@ -173,7 +176,7 @@ function Dashboard() {
         
         // 진행 중인 영업 (파이프라인에서 won, lost 제외한 건수)
         let activeDealsCount = 0;
-        if (salesStatsRes.status === 'fulfilled') {
+        if (canViewSalesStats && salesStatsRes.status === 'fulfilled') {
           const byStatus = salesStatsRes.value.data?.by_status ?? [];
           activeDealsCount = byStatus
             .filter(item => !['won', 'lost'].includes(item.status))
@@ -247,7 +250,7 @@ function Dashboard() {
     };
 
     loadDashboardData();
-  }, []);
+  }, [user?.is_staff, user?.is_superuser]);
 
   // 빠른 메뉴 액션
   const quickActions = [
