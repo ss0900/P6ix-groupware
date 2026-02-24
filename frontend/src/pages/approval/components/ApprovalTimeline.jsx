@@ -75,13 +75,14 @@ export default function ApprovalTimeline({ actions = [] }) {
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5">
+    <div className="h-full bg-white rounded-xl border border-gray-200 p-5 flex flex-col min-h-0">
       <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
         <Clock size={16} />
         결재 이력
       </h3>
 
-      <div className="relative">
+      <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+        <div className="relative">
         {/* 타임라인 선 */}
         <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-200"></div>
 
@@ -134,6 +135,7 @@ export default function ApprovalTimeline({ actions = [] }) {
           })}
         </div>
       </div>
+    </div>
     </div>
   );
 }

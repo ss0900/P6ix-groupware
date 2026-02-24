@@ -123,15 +123,18 @@ export default function ApprovalDetail() {
     loadDocument();
   }, [id]);
 
-  // 현재 사용자가 결재 차례인지 확인
   const isMyTurn = () => {
-    if (!document || !user) return false;
-    return document.approval_lines?.some(
-      (line) =>
-        line.status === "pending" &&
-        (matchesCurrentUserId(line.approver) ||
-          matchesCurrentUserName(line.approver_name)),
-    );
+    if (!document || !user || document.status !== "pending") return false;
+
+    return (document.approval_lines || []).some((line) => {
+      const isActionable = normalizeApprovalType(line?.approval_type) !== "reference";
+      const isPending = line?.status === "pending";
+      const isMe =
+        matchesCurrentUserId(line?.approver) ||
+        matchesCurrentUserName(line?.approver_name);
+
+      return isActionable && isPending && isMe;
+    });
   };
 
   // 문서 작성자인지 확인
@@ -156,15 +159,11 @@ export default function ApprovalDetail() {
     return !hasAnyDecision;
   };
 
-  // 결재 처리
   const handleDecision = async (action) => {
-    if (
-      !window.confirm(
-        action === "approve" ? "승인하시겠습니까?" : "반려하시겠습니까?",
-      )
-    ) {
-      return;
-    }
+    const confirmMessage =
+      action === "approve" ? "승인하시겠습니까?" : "반려하시겠습니까?";
+
+    if (!window.confirm(confirmMessage)) return;
 
     setProcessing(true);
     try {
@@ -173,8 +172,8 @@ export default function ApprovalDetail() {
         comment: decisionComment,
       });
       alert(action === "approve" ? "승인되었습니다." : "반려되었습니다.");
-      loadDocument();
       setDecisionComment("");
+      await loadDocument();
     } catch (err) {
       console.error("Decision failed:", err);
       alert("처리 중 오류가 발생했습니다.");
@@ -191,9 +190,7 @@ export default function ApprovalDetail() {
 
     setProcessing(true);
     try {
-      await api.post(`/approval/documents/${id}/cancel/`, {
-        comment: decisionComment,
-      });
+      await api.post(`/approval/documents/${id}/cancel/`, {});
       alert("문서가 취소되었습니다.");
       navigate("/approval");
     } catch (err) {
@@ -311,11 +308,9 @@ export default function ApprovalDetail() {
         </div>
       </div>
 
-      {/* 결재선 + 결재 처리 */}
-      <div
-        className={`grid grid-cols-1 gap-6 ${isMyTurn() ? "xl:grid-cols-3" : ""}`}
-      >
-        <div className={isMyTurn() ? "xl:col-span-2" : ""}>
+      {/* 결재선 + 결재 이력 */}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <div className="xl:col-span-2">
           <div className="bg-white rounded-xl border border-gray-200 p-5">
             <h3 className="text-sm font-semibold text-gray-700 mb-4">결재선</h3>
             {approvalColumns.length === 0 ? (
@@ -401,40 +396,43 @@ export default function ApprovalDetail() {
             )}
           </div>
         </div>
-
-        {isMyTurn() && (
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
-              <MessageSquare size={16} />
-              결재 처리
-            </h3>
-            <textarea
-              value={decisionComment}
-              onChange={(e) => setDecisionComment(e.target.value)}
-              placeholder="의견을 입력하세요 (선택사항)"
-              className="w-full p-3 border border-gray-300 rounded-lg resize-none h-24 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none"
-            />
-            <div className="flex items-center gap-3 mt-4">
-              <button
-                onClick={() => handleDecision("approve")}
-                disabled={processing}
-                className="flex items-center gap-2 px-5 py-2.5 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50"
-              >
-                <CheckCircle size={18} />
-                승인
-              </button>
-              <button
-                onClick={() => handleDecision("reject")}
-                disabled={processing}
-                className="flex items-center gap-2 px-5 py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50"
-              >
-                <XCircle size={18} />
-                반려
-              </button>
+        <div className="xl:row-span-2">
+          {isMyTurn() ? (
+            <div className="h-full bg-white rounded-xl border border-gray-200 p-5 flex flex-col min-h-0">
+              <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                <MessageSquare size={16} />
+                결재 처리
+              </h3>
+              <textarea
+                value={decisionComment}
+                onChange={(e) => setDecisionComment(e.target.value)}
+                placeholder="의견을 입력하세요 (선택사항)"
+                className="w-full flex-1 min-h-[220px] p-3 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none"
+              />
+              <div className="mt-4 flex items-center justify-center gap-3">
+                <button
+                  onClick={() => handleDecision("approve")}
+                  disabled={processing}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50"
+                >
+                  <CheckCircle size={18} />
+                  승인
+                </button>
+                <button
+                  onClick={() => handleDecision("reject")}
+                  disabled={processing}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50"
+                >
+                  <XCircle size={18} />
+                  반려
+                </button>
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          ) : (
+            <ApprovalTimeline actions={document.actions || []} />
+          )}
+        </div>
+        <div className="xl:col-span-2">
 
       {/* 문서 정보 */}
       <div className="bg-white rounded-xl border border-gray-200 p-5">
@@ -491,6 +489,8 @@ export default function ApprovalDetail() {
           </table>
         </div>
       </div>
+        </div>
+      </div>
 
       {/* 문서 내용 */}
       <div className="bg-white rounded-xl border border-gray-200 p-5">
@@ -539,9 +539,6 @@ export default function ApprovalDetail() {
           </div>
         </div>
       )}
-
-      {/* 결재 이력 타임라인 */}
-      <ApprovalTimeline actions={document.actions || []} />
 
       {isAuthor() && document.status === "draft" && (
         <div className="bg-white rounded-xl border border-gray-200 p-5">
