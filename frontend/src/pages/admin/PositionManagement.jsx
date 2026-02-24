@@ -1,10 +1,19 @@
 // src/pages/admin/PositionManagement.jsx
 import React, { useEffect, useState, useCallback } from "react";
 import api from "../../api/axios";
+import { useAuth } from "../../context/AuthContext";
 import { Plus, Edit, Trash2, X, GripVertical } from "lucide-react";
 
 // 직위 편집 모달
-const PositionModal = ({ isOpen, onClose, position, companies, onSave }) => {
+const PositionModal = ({
+  isOpen,
+  onClose,
+  position,
+  companies,
+  onSave,
+  canSelectCompany,
+  fixedCompanyId,
+}) => {
   const [formData, setFormData] = useState({
     name: "",
     level: "",
@@ -20,9 +29,13 @@ const PositionModal = ({ isOpen, onClose, position, companies, onSave }) => {
         company: position.company_id || position.company || "",
       });
     } else {
-      setFormData({ name: "", level: "", company: "" });
+      setFormData({
+        name: "",
+        level: "",
+        company: fixedCompanyId || "",
+      });
     }
-  }, [position]);
+  }, [position, fixedCompanyId]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -53,26 +66,28 @@ const PositionModal = ({ isOpen, onClose, position, companies, onSave }) => {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              회사 <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={formData.company}
-              onChange={(e) =>
-                setFormData({ ...formData, company: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-              required
-            >
-              <option value="">선택</option>
-              {companies.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          {canSelectCompany && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                회사 <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={formData.company}
+                onChange={(e) =>
+                  setFormData({ ...formData, company: e.target.value })
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                required
+              >
+                <option value="">선택</option>
+                {companies.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -131,6 +146,8 @@ const PositionModal = ({ isOpen, onClose, position, companies, onSave }) => {
 };
 
 export default function PositionManagement() {
+  const { user } = useAuth();
+  const isSuperuser = Boolean(user?.is_superuser);
   const [companies, setCompanies] = useState([]);
   const [positions, setPositions] = useState([]);
   const [selectedCompany, setSelectedCompany] = useState("");
@@ -181,10 +198,17 @@ export default function PositionManagement() {
 
   // 저장 핸들러
   const handleSavePosition = async (data, positionId) => {
+    const targetCompany =
+      data.company ||
+      selectedCompany ||
+      editingPosition?.company_id ||
+      editingPosition?.company;
+    const payload = { ...data, company: targetCompany };
+
     if (positionId) {
-      await api.patch(`core/positions/${positionId}/`, data);
+      await api.patch(`core/positions/${positionId}/`, payload);
     } else {
-      await api.post("core/positions/", data);
+      await api.post("core/positions/", payload);
     }
     loadData();
   };
@@ -219,21 +243,23 @@ export default function PositionManagement() {
       </div>
 
       {/* 회사 필터 */}
-      <div className="flex items-center gap-4">
-        <label className="text-sm font-medium text-gray-700">회사 선택:</label>
-        <select
-          value={selectedCompany}
-          onChange={(e) => setSelectedCompany(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-        >
-          <option value="">전체</option>
-          {companies.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-      </div>
+      {isSuperuser && (
+        <div className="flex items-center gap-4">
+          <label className="text-sm font-medium text-gray-700">회사 선택:</label>
+          <select
+            value={selectedCompany}
+            onChange={(e) => setSelectedCompany(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+          >
+            <option value="">전체</option>
+            {companies.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* 직위 목록 */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -325,6 +351,8 @@ export default function PositionManagement() {
         position={editingPosition}
         companies={companies}
         onSave={handleSavePosition}
+        canSelectCompany={isSuperuser}
+        fixedCompanyId={selectedCompany}
       />
     </div>
   );

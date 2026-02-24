@@ -65,6 +65,7 @@ export default function ApprovalList() {
   const pathParts = location.pathname.split("/").filter(Boolean);
   const currentPath = pathParts.length > 1 ? pathParts[1] : "all";
   const filterConfig = FILTER_MAP[currentPath] || FILTER_MAP["all"];
+  const isDraftPage = currentPath === "draft";
 
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -74,6 +75,10 @@ export default function ApprovalList() {
   const [selectedIds, setSelectedIds] = useState([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const getDocumentNavigatePath = useCallback(
+    (docId) => (isDraftPage ? `/approval/${docId}/edit` : `/approval/${docId}`),
+    [isDraftPage],
+  );
 
   // 문서 목록 로드
   const loadDocuments = useCallback(async () => {
@@ -341,11 +346,17 @@ export default function ApprovalList() {
           <div className="w-10 text-center">
             <Paperclip size={14} className="inline text-gray-400" />
           </div>
-          <div className="w-24 text-center">문서번호</div>
-          <div className="w-20 text-center">상신자</div>
-          <div className="w-32 text-center">상신일</div>
-          <div className="w-24 text-center">최종결재자</div>
-          <div className="w-20 text-center">상태</div>
+          {isDraftPage ? (
+            <div className="w-32 text-center">작성일</div>
+          ) : (
+            <>
+              <div className="w-24 text-center">문서번호</div>
+              <div className="w-20 text-center">상신자</div>
+              <div className="w-32 text-center">상신일</div>
+              <div className="w-24 text-center">최종결재자</div>
+              <div className="w-20 text-center">상태</div>
+            </>
+          )}
         </div>
 
         {/* 문서 목록 */}
@@ -363,6 +374,7 @@ export default function ApprovalList() {
             documents.map((doc) => (
               <div
                 key={doc.id}
+                onClick={() => navigate(getDocumentNavigatePath(doc.id))}
                 className={`flex items-center px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors ${
                   selectedIds.includes(doc.id) ? "bg-sky-50" : ""
                 } ${!doc.is_read ? "font-medium" : ""}`}
@@ -390,10 +402,7 @@ export default function ApprovalList() {
                 </div>
 
                 {/* 제목 */}
-                <div
-                  className="flex-1 truncate"
-                  onClick={() => navigate(`/approval/${doc.id}`)}
-                >
+                <div className="flex-1 truncate">
                   {doc.template_name && (
                     <span className="text-sky-600 mr-1">
                       [{doc.template_name}]
@@ -409,30 +418,38 @@ export default function ApprovalList() {
                   )}
                 </div>
 
-                {/* 문서번호 */}
-                <div className="w-24 text-center text-xs text-gray-500">
-                  {doc.document_number || "-"}
-                </div>
+                {isDraftPage ? (
+                  <div className="w-32 text-center text-xs text-gray-500">
+                    {formatDate(doc.drafted_at)}
+                  </div>
+                ) : (
+                  <>
+                    {/* 문서번호 */}
+                    <div className="w-24 text-center text-xs text-gray-500">
+                      {doc.document_number || "-"}
+                    </div>
 
-                {/* 상신자 */}
-                <div className="w-20 text-center text-sm text-gray-600 truncate">
-                  {doc.author_name}
-                </div>
+                    {/* 상신자 */}
+                    <div className="w-20 text-center text-sm text-gray-600 truncate">
+                      {doc.author_name}
+                    </div>
 
-                {/* 상신일 */}
-                <div className="w-32 text-center text-xs text-gray-500">
-                  {formatDate(doc.submitted_at || doc.drafted_at)}
-                </div>
+                    {/* 상신일 */}
+                    <div className="w-32 text-center text-xs text-gray-500">
+                      {formatDate(doc.submitted_at || doc.drafted_at)}
+                    </div>
 
-                {/* 최종결재자 */}
-                <div className="w-24 text-center text-sm text-gray-600 truncate">
-                  {doc.final_approver_name || "-"}
-                </div>
+                    {/* 최종결재자 */}
+                    <div className="w-24 text-center text-sm text-gray-600 truncate">
+                      {doc.final_approver_name || "-"}
+                    </div>
 
-                {/* 상태 */}
-                <div className="w-20 text-center">
-                  <StatusBadge status={doc.status} />
-                </div>
+                    {/* 상태 */}
+                    <div className="w-20 text-center">
+                      <StatusBadge status={doc.status} />
+                    </div>
+                  </>
+                )}
               </div>
             ))
           )}

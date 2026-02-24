@@ -20,10 +20,15 @@ import AdminLayout from "./pages/admin/AdminLayout";
 
 // Admin
 import UserList from "./pages/system/UserList";
+import MyInfo from "./pages/system/MyInfo";
+import MyPage from "./pages/system/MyPage";
+import MyMenuLayout from "./pages/system/MyMenuLayout";
 import UserForm from "./pages/admin/UserForm";
+import UserDetail from "./pages/admin/UserDetail";
 import OrganizationChart from "./pages/admin/OrganizationChart";
 import PositionManagement from "./pages/admin/PositionManagement";
 import CompanyManagement from "./pages/admin/CompanyManagement";
+import DepartmentManagement from "./pages/admin/DepartmentManagement";
 
 // Approval
 import ApprovalHome from "./pages/approval/ApprovalHome";
@@ -41,9 +46,13 @@ import BoardWrite from "./pages/board/BoardWrite";
 import ScheduleCalendar from "./pages/schedule/ScheduleCalendar";
 import ScheduleForm from "./pages/schedule/ScheduleForm";
 import ScheduleDetail from "./pages/schedule/ScheduleDetail";
+import ResourceReservation from "./pages/schedule/ResourceReservation";
 
 // Archive
 import ArchiveList from "./pages/archive/ArchiveList";
+import ArchiveTrash from "./pages/archive/ArchiveTrash";
+import ArchiveAttachments from "./pages/archive/ArchiveAttachments";
+import ArchiveTemporary from "./pages/archive/ArchiveTemporary";
 
 // Help
 import HelpCenter from "./pages/help/HelpCenter";
@@ -67,6 +76,7 @@ import Inbox from "./pages/operation/Inbox";
 import TodoCalendar from "./pages/operation/TodoCalendar";
 import CustomerList from "./pages/operation/CustomerList";
 import CustomerDetail from "./pages/operation/CustomerDetail";
+import CustomerForm from "./pages/operation/CustomerForm";
 import QuoteList from "./pages/operation/QuoteList";
 import QuoteForm from "./pages/operation/QuoteForm";
 import QuoteTemplateList from "./pages/operation/QuoteTemplateList";
@@ -76,6 +86,21 @@ import TenderList from "./pages/operation/TenderList";
 import TenderForm from "./pages/operation/TenderForm";
 import RevenueManagement from "./pages/operation/RevenueManagement";
 import EmailCenter from "./pages/operation/EmailCenter";
+
+// Project (프로젝트 관리)
+import ProjectLayout from "./pages/project/ProjectLayout";
+import ProjectBoard from "./pages/project/ProjectBoard";
+import ProjectManage from "./pages/project/ProjectManage";
+import TaskList from "./pages/project/TaskList";
+import TaskForm from "./pages/project/TaskForm";
+import TaskDetail from "./pages/project/TaskDetail";
+import TimesheetWeek from "./pages/project/TimesheetWeek";
+import TimesheetMonth from "./pages/project/TimesheetMonth";
+import TimesheetSummary from "./pages/project/TimesheetSummary";
+import DiaryWeek from "./pages/project/DiaryWeek";
+import DiaryDay from "./pages/project/DiaryDay";
+import WeeklyReport from "./pages/project/WeeklyReport";
+import SalesWeeklyReport from "./pages/project/SalesWeeklyReport";
 
 // Protected Route Wrapper
 const ProtectedRoute = ({ children }) => {
@@ -115,6 +140,29 @@ const PublicRoute = ({ children }) => {
   return children;
 };
 
+const SuperuserRoute = ({ children }) => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
+      </div>
+    );
+  }
+
+  if (!user?.is_superuser) {
+    return <Navigate to="/admin/organization" replace />;
+  }
+
+  return children;
+};
+
+const AdminIndexRedirect = () => {
+  const { user } = useAuth();
+  return <Navigate to={user?.is_superuser ? "users" : "organization"} replace />;
+};
+
 function AppRouter() {
   return (
     <Routes>
@@ -140,6 +188,13 @@ function AppRouter() {
         {/* Dashboard - with sidebar layout */}
         <Route path="" element={<DashboardLayout />}>
           <Route index element={<Dashboard />} />
+        </Route>
+
+        {/* 내 메뉴 - with sidebar layout */}
+        <Route path="" element={<MyMenuLayout />}>
+          <Route path="my-info" element={<MyInfo />} />
+          <Route path="my-page" element={<MyPage />} />
+          <Route path="help" element={<HelpCenter />} />
         </Route>
 
         {/* 전자결재 - with sidebar layout */}
@@ -173,32 +228,67 @@ function AppRouter() {
 
         {/* 회의/일정 - with sidebar layout */}
         <Route path="schedule" element={<ScheduleLayout />}>
-          <Route index element={<Navigate to="calendar" replace />} />
-          <Route path="calendar" element={<ScheduleCalendar />} />
+          <Route index element={<Navigate to="calendar/all" replace />} />
+          {/* 일정관리 - scope별 캘린더 */}
+          <Route path="calendar/all" element={<ScheduleCalendar scope="all" />} />
+          <Route path="calendar/shared" element={<ScheduleCalendar scope="shared" />} />
+          <Route path="calendar/personal" element={<ScheduleCalendar scope="personal" />} />
+          {/* 레거시 calendar 경로 */}
+          <Route path="calendar" element={<Navigate to="all" replace />} />
+          {/* 카테고리별 일정 */}
+          <Route path="category/headquarters" element={<ScheduleCalendar category="headquarters" />} />
+          <Route path="category/:calendarId" element={<ScheduleCalendar />} />
+          {/* 일정 CRUD */}
           <Route path="new" element={<ScheduleForm />} />
           <Route path=":id" element={<ScheduleDetail />} />
           <Route path=":id/edit" element={<ScheduleForm />} />
-          <Route path="meeting" element={<ScheduleCalendar />} />
-          <Route
-            path="room"
-            element={<div className="p-6">회의실 관리 (준비 중)</div>}
-          />
+          {/* 자원 예약 */}
+          <Route path="resources" element={<ResourceReservation />} />
+          {/* 레거시 리다이렉트 */}
+          <Route path="meeting/plan" element={<Navigate to="../calendar/all" replace />} />
+          <Route path="meeting/rooms" element={<Navigate to="../resources" replace />} />
         </Route>
 
         {/* 자료실 - with sidebar layout */}
         <Route path="archive" element={<ArchiveLayout />}>
           <Route index element={<Navigate to="main" replace />} />
           <Route path="main" element={<ArchiveList />} />
+          <Route path="trash" element={<ArchiveTrash />} />
+          <Route path="attachments" element={<ArchiveAttachments />} />
+          <Route path="temporary" element={<ArchiveTemporary />} />
+        </Route>
+
+        {/* 프로젝트 - with sidebar layout */}
+        <Route path="project" element={<ProjectLayout />}>
+          <Route index element={<Navigate to="board" replace />} />
+          <Route path="board" element={<ProjectBoard />} />
+          <Route path="manage" element={<ProjectManage />} />
+          <Route path="tasks" element={<TaskList />} />
+          <Route path="tasks/new" element={<TaskForm />} />
+          <Route path="tasks/:id" element={<TaskDetail />} />
+          <Route path="tasks/:id/edit" element={<TaskForm />} />
+          {/* 타임시트 */}
+          <Route path="timesheet/week" element={<TimesheetWeek />} />
+          <Route path="timesheet/month" element={<TimesheetMonth />} />
+          <Route path="timesheet/summary" element={<TimesheetSummary />} />
+          {/* 업무일지 */}
+          <Route path="diary/week" element={<DiaryWeek />} />
+          <Route path="diary/day" element={<DiaryDay />} />
+          {/* 주간업무 */}
+          <Route path="weekly-report" element={<WeeklyReport />} />
+          <Route path="sales-weekly" element={<SalesWeeklyReport />} />
         </Route>
 
         {/* 관리자 - with sidebar layout */}
         <Route path="admin" element={<AdminLayout />}>
-          <Route index element={<Navigate to="users" replace />} />
-          <Route path="users" element={<UserList />} />
-          <Route path="users/add" element={<UserForm />} />
-          <Route path="users/:id" element={<UserForm />} />
-          <Route path="companies" element={<CompanyManagement />} />
+          <Route index element={<AdminIndexRedirect />} />
+          <Route path="users" element={<SuperuserRoute><UserList /></SuperuserRoute>} />
+          <Route path="users/add" element={<SuperuserRoute><UserForm /></SuperuserRoute>} />
+          <Route path="users/:id" element={<SuperuserRoute><UserDetail /></SuperuserRoute>} />
+          <Route path="users/:id/edit" element={<SuperuserRoute><UserForm /></SuperuserRoute>} />
+          <Route path="companies" element={<SuperuserRoute><CompanyManagement /></SuperuserRoute>} />
           <Route path="organization" element={<OrganizationChart />} />
+          <Route path="departments" element={<DepartmentManagement />} />
           <Route path="positions" element={<PositionManagement />} />
         </Route>
 
@@ -245,6 +335,7 @@ function AppRouter() {
 
             <Route path="customers" element={<CustomerList />} />
             <Route path="customers/:id" element={<CustomerDetail />} />
+            <Route path="customers/:id/edit" element={<CustomerForm />} />
 
             <Route path="quotes" element={<QuoteList />} />
             <Route path="quotes/new" element={<QuoteForm />} />
@@ -294,6 +385,10 @@ function AppRouter() {
             path="customers/:id"
             element={<Navigate to="../sales/customers/:id" replace />}
           />
+          <Route
+            path="customers/:id/edit"
+            element={<Navigate to="../sales/customers/:id/edit" replace />}
+          />
 
           <Route
             path="quotes"
@@ -334,8 +429,6 @@ function AppRouter() {
           />
         </Route>
 
-        {/* 도움말 */}
-        <Route path="help" element={<HelpCenter />} />
       </Route>
 
       {/* 404 */}

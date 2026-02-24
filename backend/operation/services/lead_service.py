@@ -189,27 +189,62 @@ class LeadService:
     @transaction.atomic
     def send_quote(quote, user):
         """
-        견적서 발송 처리 및 자동 활동 기록
-        
-        Args:
-            quote: Quote 인스턴스
-            user: 발송자
-        
-        Returns:
-            LeadActivity 인스턴스
+        견적서 발송 처리 및 자동 활동 기록 (실제 이메일 발송 포함)
         """
         from operation.models import LeadActivity
+        from django.core.mail import send_mail
+        from django.conf import settings
+
+        # 1. 수신자 확인
+        recipient_email = None
+        if quote.contact and quote.contact.email:
+            recipient_email = quote.contact.email
+        elif quote.lead and quote.lead.contact and quote.lead.contact.email:
+            recipient_email = quote.lead.contact.email
         
+        email_result = "이메일 미발송 (수신자 없음)"
+        
+        # 2. 이메일 발송
+        if recipient_email:
+            try:
+                # PDF 다운로드 링크 (가정) - 실제 운영 시 도메인 주소 필요
+                download_link = f"{settings.ALLOWED_HOSTS[0]}:8000/media/quotes/{quote.id}.pdf" 
+                # (참고: 운영 환경에서는 settings.SITE_URL 등을 활용해야 함)
+
+                subject = f"[견적서] {quote.title}"
+                company_name = quote.company.name if quote.company else '고객'
+                message = f"""
+                안녕하세요, {company_name}님.
+                
+                요청하신 견적서를 송부드립니다.
+                아래 링크에서 확인하실 수 있습니다.
+                {download_link}
+                
+                감사합니다.
+                """
+                
+                send_mail(
+                    subject,
+                    message,
+                    settings.DEFAULT_FROM_EMAIL,
+                    [recipient_email],
+                    fail_silently=False,
+                )
+                email_result = f"이메일 발송 성공 ({recipient_email})"
+            except Exception as e:
+                email_result = f"이메일 발송 실패: {str(e)}"
+                print(f"Email sending failed: {e}")
+
         quote.status = 'sent'
         quote.sent_at = timezone.now()
         quote.save()
         
-        # 활동 로그 생성
+        # 3. 활동 로그 생성
         activity = LeadActivity.objects.create(
             lead=quote.lead,
             activity_type='quote_sent',
             title=f"견적서 발송: {quote.quote_number}",
-            content=f"견적 금액: {quote.total_amount:,}원",
+            content=f"견적 금액: {quote.total_amount:,}원\n[전송 결과] {email_result}",
             created_by=user
         )
         

@@ -56,6 +56,7 @@ class RecipientSerializer(serializers.ModelSerializer):
 class MessageListSerializer(serializers.ModelSerializer):
     """메시지 목록용 시리얼라이저"""
     sender = UserSimpleSerializer(read_only=True)
+    recipient_names = serializers.SerializerMethodField()
     read_count = serializers.IntegerField(read_only=True)
     total_recipients = serializers.IntegerField(read_only=True)
     read_status = serializers.CharField(read_only=True)
@@ -65,11 +66,18 @@ class MessageListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Message
         fields = [
-            "id", "title", "sender", "is_draft", "is_to_self",
+            "id", "title", "sender", "recipient_names", "is_draft", "is_to_self",
             "is_starred", "is_deleted", "created_at", "updated_at",
             "read_count", "total_recipients", "read_status",
             "has_attachments", "comment_count"
         ]
+
+    def get_recipient_names(self, obj):
+        names = []
+        for relation in obj.recipients.select_related("recipient").all():
+            user = relation.recipient
+            names.append(f"{user.last_name}{user.first_name}".strip() or user.username)
+        return ", ".join(names)
 
     def get_has_attachments(self, obj):
         return obj.attachments.exists()

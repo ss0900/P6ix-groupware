@@ -1,5 +1,6 @@
 # backend/approval/views.py
 from rest_framework import viewsets, status
+from rest_framework.mixins import ListModelMixin, CreateModelMixin, DestroyModelMixin, UpdateModelMixin
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -8,13 +9,21 @@ from django.db.models import Q, Count
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 
-from .models import DocumentTemplate, Document, ApprovalLine, ApprovalAction, Attachment
+from .models import (
+    DocumentTemplate,
+    Document,
+    ApprovalLine,
+    ApprovalAction,
+    Attachment,
+    ApprovalLinePreset,
+)
 from .serializers import (
     DocumentTemplateSerializer,
     DocumentListSerializer, DocumentDetailSerializer, 
     DocumentCreateSerializer, DocumentSubmitSerializer,
     ApprovalDecisionSerializer, ApprovalActionSerializer,
-    AttachmentSerializer, BulkDecisionSerializer
+    AttachmentSerializer, BulkDecisionSerializer,
+    ApprovalLinePresetSerializer,
 )
 
 
@@ -152,7 +161,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action == "list":
             return DocumentListSerializer
-        elif self.action == "create":
+        elif self.action in ["create", "update", "partial_update"]:
             return DocumentCreateSerializer
         return DocumentDetailSerializer
 
@@ -184,27 +193,11 @@ class DocumentViewSet(viewsets.ModelViewSet):
                 {"error": "문서 작성자만 제출할 수 있습니다."},
                 status=status.HTTP_403_FORBIDDEN
             )
-        
-        if document.status != "draft":
-            return Response(
-                {"error": "임시저장 상태의 문서만 제출할 수 있습니다."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
 
-        # 결재선이 있는지 확인
-        if not document.approval_lines.exists():
-            return Response(
-                {"error": "결재선을 먼저 설정해주세요."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        serializer = DocumentSubmitSerializer(
-            document, data={}, context={"request": request}
+        return Response(
+            {"error": "정책상 submit API를 통한 상신은 허용되지 않습니다. 문서 작성 화면에서 바로 제출해주세요."},
+            status=status.HTTP_403_FORBIDDEN
         )
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-
-        return Response({"message": "문서가 제출되었습니다."})
 
     @action(detail=True, methods=["post"])
     def decide(self, request, pk=None):
@@ -427,3 +420,24 @@ class AttachmentViewSet(viewsets.ReadOnlyModelViewSet):
             filename=attachment.filename
         )
         return response
+
+
+class ApprovalLinePresetViewSet(
+    ListModelMixin,
+    CreateModelMixin,
+    UpdateModelMixin,
+    DestroyModelMixin,
+    viewsets.GenericViewSet,
+):
+    """저장 결재선 ViewSet"""
+
+    serializer_class = ApprovalLinePresetSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return ApprovalLinePreset.objects.filter(owner=self.request.user).prefetch_related(
+            "items",
+            "items__approver",
+            "items__approver__memberships__department",
+            "items__approver__memberships__position",
+        )

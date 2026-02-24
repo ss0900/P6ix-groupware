@@ -43,8 +43,8 @@ function LeadForm() {
       setPipelines(pipelinesData);
       setCompanies(companiesData.results || companiesData);
 
-      // 기본 파이프라인 선택
-      if (pipelinesData.length > 0 && !formData.pipeline) {
+      // 기본 파이프라인 선택 (신규 생성 시에만)
+      if (!isEdit && pipelinesData.length > 0 && !formData.pipeline) {
         const defaultPipeline =
           pipelinesData.find((p) => p.is_default) || pipelinesData[0];
         setFormData((prev) => ({ ...prev, pipeline: defaultPipeline.id }));

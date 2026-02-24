@@ -336,12 +336,12 @@ export default function SidebarLayout({
 
   return (
     <div
-      className="bg-[#f9fafb] min-h-[calc(100vh-60px)] md:h-[calc(100vh-60px)] flex relative md:overflow-hidden"
+      className="bg-[#f9fafb] h-[calc(100dvh-60px)] flex relative overflow-hidden"
       style={{ maxWidth: "100vw", overflowX: "hidden" }}
     >
       <aside
         ref={sidebarRef}
-        className={`hidden md:flex flex-col bg-white border-r transition-all duration-300 ${
+        className={`hidden md:flex h-full flex-col bg-white border-r transition-all duration-300 ${
           sidebarCollapsed ? "w-14" : "w-56"
         }`}
       >
@@ -375,7 +375,7 @@ export default function SidebarLayout({
                 onClick={() => navigate(`${basePath}/mypage`)}
                 className="px-2 py-1 rounded hover:bg-gray-100 text-left"
               >
-                마이페이지
+                내 정보
               </button>
             </div>
           )}
@@ -398,7 +398,7 @@ export default function SidebarLayout({
         </nav>
 
         {/* LOGOUT */}
-        <div className="border-t p-2 w-full">
+        <div className="border-t p-2 w-full mt-auto">
           <button
             onClick={handleLogout}
             className={`flex items-center gap-2 w-full py-2 rounded ${
@@ -423,7 +423,7 @@ export default function SidebarLayout({
       )}
 
       <main
-        className={`flex-1 md:overflow-auto md:h-full ${
+        className={`flex-1 overflow-y-auto min-h-0 ${
           noPadding ? "p-0" : "p-4 md:p-6"
         }`}
         style={{

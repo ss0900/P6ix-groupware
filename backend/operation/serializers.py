@@ -43,7 +43,7 @@ class CustomerContactSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomerContact
         fields = [
-            'id', 'company', 'company_name', 'name', 'position', 
+            'id', 'company', 'company_name', 'name', 'priority', 'position', 
             'department', 'email', 'phone', 'mobile', 
             'is_primary', 'notes', 'created_at', 'updated_at'
         ]
@@ -183,6 +183,7 @@ class LeadActivitySerializer(serializers.ModelSerializer):
             'id', 'lead', 'activity_type', 'activity_type_display',
             'title', 'content',
             'from_stage', 'from_stage_name', 'to_stage', 'to_stage_name',
+            'activity_date',
             'created_by', 'created_by_name', 'created_at'
         ]
         read_only_fields = ['created_by']
@@ -324,7 +325,7 @@ class SalesLeadDetailSerializer(serializers.ModelSerializer):
     created_by_data = SimpleUserSerializer(source='created_by', read_only=True)
     
     # 관련 데이터
-    activities = LeadActivitySerializer(many=True, read_only=True)
+    activities = serializers.SerializerMethodField()
     tasks = LeadTaskSerializer(many=True, read_only=True)
     files = LeadFileSerializer(many=True, read_only=True)
     
@@ -352,6 +353,13 @@ class SalesLeadDetailSerializer(serializers.ModelSerializer):
     
     def get_quotes_count(self, obj):
         return obj.quotes.count()
+    
+    def get_activities(self, obj):
+        from django.db.models.functions import Coalesce
+        activities = obj.activities.annotate(
+            effective_date=Coalesce('activity_date', 'created_at')
+        ).order_by('-effective_date')
+        return LeadActivitySerializer(activities, many=True).data
 
 
 class SalesLeadCreateSerializer(serializers.ModelSerializer):
@@ -474,12 +482,22 @@ class QuoteTemplateSerializer(serializers.ModelSerializer):
 
 class QuoteItemSerializer(serializers.ModelSerializer):
     """견적 항목 Serializer"""
+    discount_type_display = serializers.CharField(source='get_discount_type_display', read_only=True)
     
     class Meta:
         model = QuoteItem
         fields = [
-            'id', 'quote', 'order', 'name', 'description',
-            'specification', 'unit', 'quantity', 'unit_price', 'amount', 'notes'
+            'id', 'quote', 'order',
+            # 구분/섹션
+            'category',
+            # 품목 정보
+            'name', 'description', 'specification', 'unit',
+            # 수량/금액
+            'quantity', 'unit_price', 'amount',
+            # 할인
+            'discount_type', 'discount_type_display', 'discount_value', 'is_discount_item',
+            # 비고
+            'remarks', 'notes'
         ]
         read_only_fields = ['amount', 'quote']
 
@@ -491,6 +509,9 @@ class QuoteSerializer(serializers.ModelSerializer):
     company_name = serializers.CharField(source='company.name', read_only=True)
     contact_name = serializers.CharField(source='contact.name', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
+    tax_mode_display = serializers.CharField(source='get_tax_mode_display', read_only=True)
+    rounding_type_display = serializers.CharField(source='get_rounding_type_display', read_only=True)
+    validity_type_display = serializers.CharField(source='get_validity_type_display', read_only=True)
     created_by_name = serializers.SerializerMethodField()
     
     class Meta:
@@ -498,14 +519,33 @@ class QuoteSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'lead', 'lead_title', 'company', 'company_name',
             'contact', 'contact_name',
-            'quote_number', 'title', 'template',
-            'header_text', 'footer_text', 'terms',
-            'subtotal', 'tax_rate', 'tax_amount', 'total_amount',
-            'valid_until', 'status', 'status_display', 'sent_at',
-            'notes', 'items',
-            'created_by', 'created_by_name', 'created_at', 'updated_at'
+            'quote_number', 'title',
+            # 문서 식별/버전
+            'revision', 'attachment_label',
+            # 수신/참조
+            'recipient_label', 'cc_recipients',
+            # 날짜/유효기간
+            'issue_date', 'validity_type', 'validity_type_display', 'validity_days', 'valid_until',
+            # 납품/결제 조건
+            'delivery_date', 'delivery_note', 'payment_terms',
+            # 템플릿
+            'template', 'header_text', 'footer_text', 'terms',
+            # 세금/라운딩
+            'tax_mode', 'tax_mode_display', 'tax_rate',
+            'rounding_type', 'rounding_type_display', 'rounding_unit',
+            # 금액
+            'subtotal', 'tax_amount', 'total_amount', 'total_amount_korean',
+            # 비고/메모
+            'customer_notes', 'internal_memo', 'show_notes_on_separate_page', 'notes',
+            # 상태
+            'status', 'status_display', 'sent_at',
+            # 메타
+            'items', 'created_by', 'created_by_name', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['created_by', 'quote_number', 'subtotal', 'tax_amount', 'total_amount']
+        read_only_fields = [
+            'created_by', 'quote_number', 'subtotal', 'tax_amount',
+            'total_amount', 'total_amount_korean'
+        ]
     
     def get_created_by_name(self, obj):
         if obj.created_by:
@@ -522,8 +562,22 @@ class QuoteCreateSerializer(serializers.ModelSerializer):
         model = Quote
         fields = [
             'lead', 'company', 'contact', 'title', 'template',
+            # 문서 식별/버전
+            'revision', 'attachment_label',
+            # 수신/참조
+            'recipient_label', 'cc_recipients',
+            # 날짜/유효기간
+            'issue_date', 'validity_type', 'validity_days', 'valid_until',
+            # 납품/결제 조건
+            'delivery_date', 'delivery_note', 'payment_terms',
+            # 템플릿/텍스트
             'header_text', 'footer_text', 'terms',
-            'tax_rate', 'valid_until', 'notes', 'items'
+            # 세금/라운딩
+            'tax_mode', 'tax_rate', 'rounding_type', 'rounding_unit',
+            # 비고/메모
+            'customer_notes', 'internal_memo', 'show_notes_on_separate_page', 'notes',
+            # 항목
+            'items'
         ]
     
     def validate(self, attrs):
@@ -557,10 +611,23 @@ class QuoteCreateSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
+        from django.utils import timezone
+        from datetime import timedelta
+        
         items_data = validated_data.pop('items', [])
         
+        # 견적일자 기본값 설정
+        if not validated_data.get('issue_date'):
+            validated_data['issue_date'] = timezone.now().date()
+        
+        # 유효기간 계산 (validity_type에 따라)
+        validity_type = validated_data.get('validity_type', 'days')
+        if validity_type == 'days' and not validated_data.get('valid_until'):
+            validity_days = validated_data.get('validity_days', 30)
+            issue_date = validated_data.get('issue_date')
+            validated_data['valid_until'] = issue_date + timedelta(days=validity_days)
+        
         # 견적번호 자동 생성
-        from django.utils import timezone
         today = timezone.now().strftime('%Y%m%d')
         # ✅ workspace별 시퀀스(추후 quote_number unique를 workspace로 바꿀 때도 안전)
         workspace = self.context.get("workspace")
@@ -586,13 +653,25 @@ class QuoteCreateSerializer(serializers.ModelSerializer):
         for idx, item_data in enumerate(items_data):
             QuoteItem.objects.create(quote=quote, order=idx, **item_data)
         
-        # 합계 계산
+        # 합계 계산 (라운딩/VAT 모드 적용)
         quote.calculate_totals()
         
         return quote
 
     def update(self, instance, validated_data):
+        from django.utils import timezone
+        from datetime import timedelta
+        
         items_data = validated_data.pop("items", None)
+        
+        # 유효기간 재계산 (validity_type이 days이고 값이 변경된 경우)
+        validity_type = validated_data.get('validity_type', instance.validity_type)
+        if validity_type == 'days':
+            validity_days = validated_data.get('validity_days', instance.validity_days)
+            issue_date = validated_data.get('issue_date', instance.issue_date)
+            if issue_date:
+                validated_data['valid_until'] = issue_date + timedelta(days=validity_days)
+        
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()

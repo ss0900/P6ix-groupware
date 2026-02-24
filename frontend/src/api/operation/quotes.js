@@ -47,6 +47,16 @@ const QuoteService = {
     return response.data;
   },
 
+  acceptQuote: async (id) => {
+    const response = await api.post(`/operation/quotes/${id}/accept/`);
+    return response.data;
+  },
+
+  rejectQuote: async (id) => {
+    const response = await api.post(`/operation/quotes/${id}/reject/`);
+    return response.data;
+  },
+
   addItem: async (quoteId, itemData) => {
     const response = await api.post(`/operation/quotes/${quoteId}/add_item/`, itemData);
     return response.data;

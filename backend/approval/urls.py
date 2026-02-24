@@ -9,6 +9,7 @@ router = DefaultRouter()
 router.register("templates", views.DocumentTemplateViewSet, basename="template")
 router.register("documents", views.DocumentViewSet, basename="document")
 router.register("attachments", views.AttachmentViewSet, basename="attachment")
+router.register("line-presets", views.ApprovalLinePresetViewSet, basename="line-preset")
 
 urlpatterns = [
     path("", include(router.urls)),

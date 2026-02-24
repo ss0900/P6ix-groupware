@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     "board",
     "meeting",
     "resources",
+    "project",
 
     "chat",
     "timeline",
@@ -173,6 +174,17 @@ MEDIA_ROOT = BASE_DIR / "media"
 
 # (선택) 업로드 용량 제한(필요 시)
 # DATA_UPLOAD_MAX_MEMORY_SIZE = 20 * 1024 * 1024  # 20MB
+
+# -----------------------------
+# Email (SMTP) Settings
+# -----------------------------
+EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
+EMAIL_HOST = env("EMAIL_HOST", default="smtp.gmail.com")
+EMAIL_PORT = env.int("EMAIL_PORT", default=587)
+EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
+EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="noreply@p6ix.com")
 
 # -----------------------------
 # DRF / JWT (SimpleJWT)

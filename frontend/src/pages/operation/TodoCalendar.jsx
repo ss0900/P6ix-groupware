@@ -131,6 +131,16 @@ function TodoCalendar() {
   const days = getDaysInMonth();
   const weekDays = ["일", "월", "화", "수", "목", "금", "토"];
 
+  const formatTime = (dateStr) => {
+    if (!dateStr) return "";
+    const date = new Date(dateStr);
+    return date.toLocaleTimeString("ko-KR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -287,15 +297,23 @@ function TodoCalendar() {
                       <FiTarget className="w-4 h-4 mt-0.5 text-orange-500" />
                     )}
                     <div className="flex-1">
-                      <p
-                        className={`text-sm font-medium ${
-                          event.is_completed
-                            ? "line-through text-gray-400"
-                            : "text-gray-900"
-                        }`}
-                      >
-                        {event.title}
-                      </p>
+                      <div className="flex justify-between items-start">
+                        <p
+                          className={`text-sm font-medium ${
+                            event.is_completed
+                              ? "line-through text-gray-400"
+                              : "text-gray-900"
+                          }`}
+                        >
+                          {event.title}
+                        </p>
+                        {(event.event_type === "task" ||
+                          event.event_type === "tender_deadline") && (
+                          <span className="text-xs text-blue-600 font-medium whitespace-nowrap ml-2">
+                            {formatTime(event.start)}
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-gray-500 mt-1">
                         {event.lead_title}
                       </p>

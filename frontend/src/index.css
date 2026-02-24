@@ -505,14 +505,78 @@ code {
 }
 
 @media print {
+  /* === 페이지 설정 === */
+  @page {
+    size: A4;
+    margin: 10mm;
+  }
+
+  /* === 숨길 요소 (버튼, 사이드바, 헤더 등) === */
+  .no-print,
+  header,
+  nav,
+  .sidebar,
+  .header,
+  button,
+  [type="submit"],
+  .btn-basic,
+  .btn-primary,
+  .btn-cancel,
+  .btn-delete {
+    display: none !important;
+  }
+
+  /* === 레이아웃 초기화 === */
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    background: white !important;
+  }
+
+  .main-content {
+    margin-left: 0 !important;
+    padding: 0 !important;
+  }
+
   .print-root {
     display: block !important;
     min-height: auto !important;
     height: auto !important;
   }
-  
-  .no-print {
-    display: none !important;
+
+  /* === 컨텐츠 박스 스타일 === */
+  .page-box {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin-bottom: 10mm !important;
+  }
+
+  /* === 테이블 배경색 유지 === */
+  thead,
+  th,
+  .doc-thead,
+  .doc-th,
+  .doc-th-end,
+  .tbl-label-bg {
+    background-color: #f3f4f6 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* === 입력 필드를 텍스트처럼 표시 === */
+  input, select, textarea {
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  /* === 페이지 나눔 방지 === */
+  .print-avoid-break,
+  tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
 }
 
@@ -551,4 +615,22 @@ code {
 
 .react-hot-toast {
   transform: none !important;
+}
+
+/* 근태계 템플릿 폰트 크기(로컬 범위) */
+.attendance-template,
+.attendance-template .doc-thead,
+.attendance-template .doc-th,
+.attendance-template .doc-th-end,
+.attendance-template .doc-td,
+.attendance-template .input-sm,
+.attendance-template p {
+  font-size: 14px;
+}
+
+.attendance-template .attendance-guide-table .doc-th,
+.attendance-template .attendance-guide-table .doc-th-end,
+.attendance-template .attendance-guide-table .doc-td {
+  padding-top: 4px;
+  padding-bottom: 4px;
 }

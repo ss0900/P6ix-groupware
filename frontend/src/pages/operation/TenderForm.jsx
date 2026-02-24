@@ -152,7 +152,7 @@ function TenderForm() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              연관 리드
+              연관 리드 <span className="text-red-500">*</span>
             </label>
             <select
               value={formData.lead}
@@ -160,6 +160,7 @@ function TenderForm() {
                 setFormData({ ...formData, lead: e.target.value })
               }
               className="input-base"
+              required
             >
               <option value="">선택</option>
               {leads.map((lead) => (

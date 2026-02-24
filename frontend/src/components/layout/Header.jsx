@@ -10,6 +10,14 @@ import ChatPanel from "../chat/ChatPanel";
 import NotificationPanel from "../notification/NotificationPanel";
 import Menu from "./Menu";
 
+const getLogoCacheKeys = (username) => {
+  const safeUsername = username || "anonymous";
+  return {
+    companyIdKey: `header:company:${safeUsername}:id`,
+    logoUrlKey: `header:company:${safeUsername}:logo`,
+  };
+};
+
 function Header({ onMenuClick }) {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
@@ -17,6 +25,8 @@ function Header({ onMenuClick }) {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [companyLogoUrl, setCompanyLogoUrl] = useState(null);
+  const [companyLogoLoading, setCompanyLogoLoading] = useState(true);
 
   // 알림 개수 로드
   useEffect(() => {
@@ -34,6 +44,124 @@ function Header({ onMenuClick }) {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    let mounted = true;
+
+    const clearLogoCache = (username) => {
+      if (!username) return;
+      const { companyIdKey, logoUrlKey } = getLogoCacheKeys(username);
+      localStorage.removeItem(companyIdKey);
+      localStorage.removeItem(logoUrlKey);
+    };
+
+    const readLogoCache = (username) => {
+      if (!username) return { cachedCompanyId: null, cachedLogoUrl: null };
+      const { companyIdKey, logoUrlKey } = getLogoCacheKeys(username);
+      return {
+        cachedCompanyId: localStorage.getItem(companyIdKey),
+        cachedLogoUrl: localStorage.getItem(logoUrlKey),
+      };
+    };
+
+    const writeLogoCache = (username, companyId, logoUrl) => {
+      if (!username) return;
+      const { companyIdKey, logoUrlKey } = getLogoCacheKeys(username);
+      localStorage.setItem(companyIdKey, String(companyId));
+      if (logoUrl) {
+        localStorage.setItem(logoUrlKey, logoUrl);
+      } else {
+        localStorage.removeItem(logoUrlKey);
+      }
+    };
+
+    const fetchPrimaryCompanyId = async () => {
+      const membershipRes = await api.get("core/membership/me/");
+      const memberships = membershipRes.data?.results ?? membershipRes.data ?? [];
+      const primaryMembership =
+        memberships.find((membership) => membership.is_primary) || memberships[0];
+      return primaryMembership?.company || null;
+    };
+
+    const loadCompanyLogo = async () => {
+      if (!user) {
+        if (mounted) {
+          setCompanyLogoUrl(null);
+          setCompanyLogoLoading(false);
+        }
+        return;
+      }
+
+      const username = user?.username || "";
+      const { cachedCompanyId, cachedLogoUrl } = readLogoCache(username);
+
+      if (mounted && cachedLogoUrl) {
+        setCompanyLogoUrl(cachedLogoUrl);
+        setCompanyLogoLoading(false);
+      } else if (mounted) {
+        setCompanyLogoLoading(true);
+      }
+
+      try {
+        let companyId = cachedCompanyId;
+
+        if (!companyId) {
+          companyId = await fetchPrimaryCompanyId();
+        }
+
+        if (!companyId) {
+          if (mounted) {
+            setCompanyLogoUrl(null);
+            setCompanyLogoLoading(false);
+          }
+          clearLogoCache(username);
+          return;
+        }
+
+        const companyRes = await api.get(`core/companies/${companyId}/`);
+        const nextLogoUrl = companyRes.data?.logo || null;
+        writeLogoCache(username, companyId, nextLogoUrl);
+
+        if (mounted) {
+          setCompanyLogoUrl(nextLogoUrl);
+          setCompanyLogoLoading(false);
+        }
+      } catch (err) {
+        // cachedCompanyId가 오래되어 실패할 경우 membership에서 다시 확인 후 재시도
+        try {
+          const username = user?.username || "";
+          const fallbackCompanyId = await fetchPrimaryCompanyId();
+          if (!fallbackCompanyId) {
+            throw new Error("No company id");
+          }
+          const fallbackCompanyRes = await api.get(`core/companies/${fallbackCompanyId}/`);
+          const fallbackLogoUrl = fallbackCompanyRes.data?.logo || null;
+          writeLogoCache(username, fallbackCompanyId, fallbackLogoUrl);
+          if (mounted) {
+            setCompanyLogoUrl(fallbackLogoUrl);
+            setCompanyLogoLoading(false);
+          }
+          return;
+        } catch (fallbackErr) {
+          const username = user?.username || "";
+          clearLogoCache(username);
+        }
+
+        if (mounted) {
+          if (!cachedLogoUrl) {
+            setCompanyLogoUrl(null);
+          }
+          setCompanyLogoLoading(false);
+        }
+      }
+    };
+
+    loadCompanyLogo();
+
+    return () => {
+      mounted = false;
+    };
+  }, [user]);
+
   const handleLogout = async () => {
     await logout();
     navigate("/login");
@@ -49,8 +177,8 @@ function Header({ onMenuClick }) {
 
   return (
     <>
-      <header className="sticky top-0 z-50 bg-[#1e1e2f] shadow-md">
-        <div className="w-full px-6 py-3 flex items-center">
+      <header className="sticky top-0 z-50 bg-[#1e1e2f] shadow-md h-[60px]">
+        <div className="w-full h-full px-6 flex items-center">
           {/* Left Section - Logo */}
           <div className="flex items-center gap-4 shrink-0">
             <button
@@ -64,7 +192,25 @@ function Header({ onMenuClick }) {
               onClick={goDashboard}
               className="text-white font-bold text-xl hover:opacity-90 transition-opacity whitespace-nowrap"
             >
-              P6ix Groupware
+              {companyLogoLoading ? (
+                <span
+                  className="block h-8 w-[180px] rounded bg-slate-700 animate-pulse"
+                  aria-hidden="true"
+                />
+              ) : companyLogoUrl ? (
+                <img
+                  src={companyLogoUrl}
+                  alt="Company Logo"
+                  className="h-8 w-auto max-w-[220px] object-contain"
+                  onError={() => {
+                    setCompanyLogoUrl(null);
+                    const { logoUrlKey } = getLogoCacheKeys(user?.username);
+                    localStorage.removeItem(logoUrlKey);
+                  }}
+                />
+              ) : (
+                "P6ix Groupware"
+              )}
             </button>
           </div>
 
@@ -147,12 +293,12 @@ function Header({ onMenuClick }) {
                     <button
                       onClick={() => {
                         setShowUserMenu(false);
-                        navigate("/admin/users");
+                        navigate("/my-info");
                       }}
                       className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                     >
                       <User size={16} />
-                      마이페이지
+                      내 정보
                     </button>
                     <button
                       onClick={handleLogout}

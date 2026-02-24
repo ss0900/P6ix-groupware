@@ -20,7 +20,7 @@ export default function ApprovalTimeline({ actions = [] }) {
       icon: Send,
       bg: "bg-blue-100",
       iconColor: "text-blue-500",
-      label: "제출",
+      label: "상신",
     },
     approve: {
       icon: CheckCircle,
@@ -58,13 +58,16 @@ export default function ApprovalTimeline({ actions = [] }) {
   const formatDate = (dateStr) => {
     if (!dateStr) return "";
     const date = new Date(dateStr);
-    return date.toLocaleDateString("ko-KR", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    }).replace(/\. /g, "-").replace(".", "");
+    return date
+      .toLocaleDateString("ko-KR", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+      .replace(/\. /g, "-")
+      .replace(".", "");
   };
 
   if (actions.length === 0) {
@@ -121,7 +124,9 @@ export default function ApprovalTimeline({ actions = [] }) {
                   </div>
 
                   {action.comment && (
-                    <p className="text-sm text-gray-600 mt-1">{action.comment}</p>
+                    <p className="text-sm text-gray-600 mt-1">
+                      {action.comment}
+                    </p>
                   )}
                 </div>
               </div>

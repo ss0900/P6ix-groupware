@@ -21,6 +21,18 @@ class MessageViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        # Detail/action requests should be resolvable regardless of list folder filters.
+        if self.action != "list":
+            queryset = Message.objects.filter(
+                Q(sender=user) | Q(recipients__recipient=user)
+            )
+            if self.action in ["update", "partial_update", "destroy"]:
+                queryset = queryset.filter(sender=user)
+            return queryset.annotate(
+                _read_count=Count("recipients", filter=Q(recipients__is_read=True)),
+                _total_recipients=Count("recipients")
+            ).distinct().order_by("-updated_at")
+
         folder = self.request.query_params.get("folder", "all")
         search = self.request.query_params.get("search", "")
         starred = self.request.query_params.get("starred", "")
@@ -81,8 +93,8 @@ class MessageViewSet(viewsets.ModelViewSet):
 
         # 읽음 상태 주석
         queryset = queryset.annotate(
-            read_count=Count("recipients", filter=Q(recipients__is_read=True)),
-            total_recipients=Count("recipients")
+            _read_count=Count("recipients", filter=Q(recipients__is_read=True)),
+            _total_recipients=Count("recipients")
         )
 
         return queryset.distinct().order_by("-updated_at")

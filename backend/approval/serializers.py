@@ -1,7 +1,19 @@
 # backend/approval/serializers.py
+import json
+
 from rest_framework import serializers
+from django.contrib.auth import get_user_model
+from django.db import transaction
 from django.utils import timezone
-from .models import DocumentTemplate, Document, ApprovalLine, ApprovalAction, Attachment
+from .models import (
+    DocumentTemplate,
+    Document,
+    ApprovalLine,
+    ApprovalAction,
+    Attachment,
+    ApprovalLinePreset,
+    ApprovalLinePresetItem,
+)
 
 
 class DocumentTemplateSerializer(serializers.ModelSerializer):
@@ -10,8 +22,8 @@ class DocumentTemplateSerializer(serializers.ModelSerializer):
     class Meta:
         model = DocumentTemplate
         fields = [
-            "id", "name", "description", "category", "category_display",
-            "content_template", "form_fields", "is_active", "created_at", "updated_at"
+            "id", "name", "category", "category_display",
+            "content", "is_active", "created_at", "updated_at"
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
 
@@ -37,6 +49,7 @@ class ApprovalLineSerializer(serializers.ModelSerializer):
     approver_name = serializers.SerializerMethodField()
     approver_position = serializers.SerializerMethodField()
     approver_department = serializers.SerializerMethodField()
+    approver_sign = serializers.SerializerMethodField()
     status_display = serializers.CharField(source="get_status_display", read_only=True)
     type_display = serializers.CharField(source="get_approval_type_display", read_only=True)
 
@@ -44,6 +57,7 @@ class ApprovalLineSerializer(serializers.ModelSerializer):
         model = ApprovalLine
         fields = [
             "id", "approver", "approver_name", "approver_position", "approver_department",
+            "approver_sign",
             "order", "approval_type", "type_display", "status", "status_display",
             "comment", "acted_at", "is_read", "read_at"
         ]
@@ -65,6 +79,190 @@ class ApprovalLineSerializer(serializers.ModelSerializer):
         if membership and membership.department:
             return membership.department.name
         return ""
+
+    def get_approver_sign(self, obj):
+        if not obj.approver or not obj.approver.sign_file:
+            return None
+        request = self.context.get("request")
+        sign_url = obj.approver.sign_file.url
+        return request.build_absolute_uri(sign_url) if request else sign_url
+
+
+class ApprovalLinePresetItemSerializer(serializers.ModelSerializer):
+    approver_name = serializers.SerializerMethodField()
+    approver_position = serializers.SerializerMethodField()
+    approver_department = serializers.SerializerMethodField()
+    type_display = serializers.CharField(source="get_approval_type_display", read_only=True)
+
+    class Meta:
+        model = ApprovalLinePresetItem
+        fields = [
+            "id",
+            "approver",
+            "approver_name",
+            "approver_position",
+            "approver_department",
+            "order",
+            "approval_type",
+            "type_display",
+        ]
+        read_only_fields = ["id"]
+
+    def get_approver_name(self, obj):
+        return f"{obj.approver.last_name}{obj.approver.first_name}" if obj.approver else ""
+
+    def get_approver_position(self, obj):
+        membership = obj.approver.memberships.filter(is_primary=True).first()
+        if membership and membership.position:
+            return membership.position.name
+        return ""
+
+    def get_approver_department(self, obj):
+        membership = obj.approver.memberships.filter(is_primary=True).first()
+        if membership and membership.department:
+            return membership.department.name
+        return ""
+
+
+class ApprovalLinePresetSerializer(serializers.ModelSerializer):
+    items = ApprovalLinePresetItemSerializer(many=True, read_only=True)
+    lines = serializers.ListField(child=serializers.DictField(), write_only=True, required=False)
+    line_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ApprovalLinePreset
+        fields = [
+            "id",
+            "name",
+            "line_count",
+            "items",
+            "lines",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "line_count", "items", "created_at", "updated_at"]
+
+    def get_line_count(self, obj):
+        return obj.items.count()
+
+    def _normalize_lines(self, lines_data):
+        normalized_lines = []
+        seen_approver_ids = set()
+        valid_types = {choice[0] for choice in ApprovalLine.TYPE_CHOICES}
+        raw_approver_ids = []
+        for line_data in lines_data:
+            approver_id = line_data.get("approver")
+            if approver_id is None:
+                continue
+
+            try:
+                parsed_approver_id = int(approver_id)
+            except (TypeError, ValueError):
+                continue
+
+            approver_key = str(parsed_approver_id)
+            if approver_key in seen_approver_ids:
+                continue
+
+            approval_type = line_data.get("approval_type", "approval")
+            if approval_type not in valid_types:
+                approval_type = "approval"
+
+            seen_approver_ids.add(approver_key)
+            raw_approver_ids.append(parsed_approver_id)
+            normalized_lines.append(
+                {
+                    "approver_id": parsed_approver_id,
+                    "approval_type": approval_type,
+                }
+            )
+
+        valid_approver_ids = set(
+            get_user_model()
+            .objects.filter(id__in=raw_approver_ids)
+            .values_list("id", flat=True)
+        )
+        normalized_lines = [
+            line
+            for line in normalized_lines
+            if line["approver_id"] in valid_approver_ids
+        ]
+        return normalized_lines
+
+    def _validate_name(self, owner, name, instance=None):
+        if not name:
+            raise serializers.ValidationError({"name": "결재선 이름을 입력해주세요."})
+
+        duplicate_qs = ApprovalLinePreset.objects.filter(owner=owner, name=name)
+        if instance is not None:
+            duplicate_qs = duplicate_qs.exclude(id=instance.id)
+
+        if duplicate_qs.exists():
+            raise serializers.ValidationError({"name": "이미 같은 이름의 결재선이 있습니다."})
+
+        return name
+
+    @transaction.atomic
+    def create(self, validated_data):
+        lines_data = validated_data.pop("lines", [])
+        name = (validated_data.get("name") or "").strip()
+        request = self.context.get("request")
+        owner = getattr(request, "user", None)
+
+        if owner is None or not owner.is_authenticated:
+            raise serializers.ValidationError("결재선 저장 권한이 없습니다.")
+
+        if not lines_data:
+            raise serializers.ValidationError({"lines": "결재선 항목이 비어 있습니다."})
+
+        normalized_lines = self._normalize_lines(lines_data)
+        if not normalized_lines:
+            raise serializers.ValidationError({"lines": "유효한 결재선 항목이 없습니다."})
+
+        preset = ApprovalLinePreset.objects.filter(owner=owner, name=name).first()
+        if preset is None:
+            validated_name = self._validate_name(owner, name)
+            preset = ApprovalLinePreset.objects.create(owner=owner, name=validated_name)
+        else:
+            preset.name = self._validate_name(owner, name, instance=preset)
+            preset.updated_at = timezone.now()
+            preset.save(update_fields=["name", "updated_at"])
+            preset.items.all().delete()
+
+        for idx, line in enumerate(normalized_lines):
+            ApprovalLinePresetItem.objects.create(
+                preset=preset,
+                approver_id=line["approver_id"],
+                order=idx,
+                approval_type=line["approval_type"],
+            )
+
+        return preset
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        name = (validated_data.get("name", instance.name) or "").strip()
+        lines_data = validated_data.get("lines", None)
+
+        instance.name = self._validate_name(instance.owner, name, instance=instance)
+        instance.updated_at = timezone.now()
+        instance.save(update_fields=["name", "updated_at"])
+
+        if lines_data is not None:
+            normalized_lines = self._normalize_lines(lines_data)
+            if not normalized_lines:
+                raise serializers.ValidationError({"lines": "유효한 결재선 항목이 없습니다."})
+
+            instance.items.all().delete()
+            for idx, line in enumerate(normalized_lines):
+                ApprovalLinePresetItem.objects.create(
+                    preset=instance,
+                    approver_id=line["approver_id"],
+                    order=idx,
+                    approval_type=line["approval_type"],
+                )
+
+        return instance
 
 
 class ApprovalActionSerializer(serializers.ModelSerializer):
@@ -94,7 +292,6 @@ class DocumentListSerializer(serializers.ModelSerializer):
     template_name = serializers.CharField(source="template.name", read_only=True)
     template_category = serializers.CharField(source="template.category", read_only=True)
     status_display = serializers.CharField(source="get_status_display", read_only=True)
-    priority_display = serializers.CharField(source="get_priority_display", read_only=True)
     current_approver_name = serializers.SerializerMethodField()
     final_approver_name = serializers.SerializerMethodField()
     approval_lines = ApprovalLineSerializer(many=True, read_only=True)
@@ -104,7 +301,6 @@ class DocumentListSerializer(serializers.ModelSerializer):
         model = Document
         fields = [
             "id", "document_number", "title", "status", "status_display", 
-            "priority", "priority_display",
             "template", "template_name", "template_category",
             "author", "author_name", "author_position",
             "current_approver_name", "final_approver_name",
@@ -140,10 +336,10 @@ class DocumentDetailSerializer(serializers.ModelSerializer):
     author_name = serializers.SerializerMethodField()
     author_position = serializers.SerializerMethodField()
     author_department = serializers.SerializerMethodField()
+    author_sign = serializers.SerializerMethodField()
     template_name = serializers.CharField(source="template.name", read_only=True)
     template_category = serializers.CharField(source="template.category", read_only=True)
     status_display = serializers.CharField(source="get_status_display", read_only=True)
-    priority_display = serializers.CharField(source="get_priority_display", read_only=True)
     preservation_display = serializers.CharField(source="get_preservation_period_display", read_only=True)
     approval_lines = ApprovalLineSerializer(many=True, read_only=True)
     actions = ApprovalActionSerializer(many=True, read_only=True)
@@ -156,10 +352,9 @@ class DocumentDetailSerializer(serializers.ModelSerializer):
         fields = [
             "id", "document_number", "title", "content", "form_data",
             "status", "status_display",
-            "priority", "priority_display",
             "preservation_period", "preservation_display",
             "template", "template_name", "template_category",
-            "author", "author_name", "author_position", "author_department",
+            "author", "author_name", "author_position", "author_department", "author_sign",
             "current_approver_name", "final_approver_name",
             "is_read",
             "drafted_at", "submitted_at", "completed_at",
@@ -182,6 +377,13 @@ class DocumentDetailSerializer(serializers.ModelSerializer):
             return membership.department.name
         return ""
 
+    def get_author_sign(self, obj):
+        if not obj.author or not obj.author.sign_file:
+            return None
+        request = self.context.get("request")
+        sign_url = obj.author.sign_file.url
+        return request.build_absolute_uri(sign_url) if request else sign_url
+
     def get_current_approver_name(self, obj):
         approver = obj.current_approver
         if approver:
@@ -203,17 +405,66 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
     attachments = serializers.ListField(
         child=serializers.FileField(), write_only=True, required=False
     )
+    submit = serializers.BooleanField(write_only=True, required=False, default=False)
 
     class Meta:
         model = Document
         fields = [
-            "id", "title", "content", "form_data", "priority", 
-            "preservation_period", "template", "approval_lines", "attachments"
+            "id", "title", "content", "form_data",
+            "preservation_period", "template", "approval_lines", "attachments", "submit"
         ]
 
+    def to_internal_value(self, data):
+        normalized = data
+
+        # multipart/form-data에서는 approval_lines가 문자열(JSON)로 들어오므로
+        # 리스트로 역직렬화해서 ListField 검증을 통과시키도록 보정한다.
+        if hasattr(data, "lists"):
+            normalized = {}
+            for key, values in data.lists():
+                if not values:
+                    normalized[key] = None
+                elif len(values) == 1:
+                    normalized[key] = values[0]
+                else:
+                    normalized[key] = values
+        elif isinstance(data, dict):
+            normalized = dict(data)
+
+        raw_approval_lines = (
+            normalized.get("approval_lines")
+            if isinstance(normalized, dict)
+            else None
+        )
+        if isinstance(raw_approval_lines, str):
+            raw_text = raw_approval_lines.strip()
+            if raw_text:
+                try:
+                    parsed = json.loads(raw_text)
+                except json.JSONDecodeError as exc:
+                    raise serializers.ValidationError(
+                        {"approval_lines": "결재선 데이터 형식이 올바르지 않습니다."}
+                    ) from exc
+            else:
+                parsed = []
+
+            if not isinstance(parsed, list):
+                raise serializers.ValidationError(
+                    {"approval_lines": "결재선 데이터 형식이 올바르지 않습니다."}
+                )
+            normalized["approval_lines"] = parsed
+
+        return super().to_internal_value(normalized)
+
     def create(self, validated_data):
+        should_submit = validated_data.pop("submit", False)
         approval_lines_data = validated_data.pop("approval_lines", [])
         attachments_data = validated_data.pop("attachments", [])
+
+        if should_submit:
+            validated_data["status"] = "pending"
+            validated_data["submitted_at"] = timezone.now()
+
         document = Document.objects.create(**validated_data)
 
         # 결재선 생성
@@ -223,8 +474,17 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
                 approver_id=line_data.get("approver"),
                 order=idx,
                 approval_type=line_data.get("approval_type", "approval"),
-                status="waiting" if idx > 0 else "pending"
+                status="pending" if should_submit and idx == 0 else "waiting"
             )
+
+        if should_submit:
+            user = self.context.get("request").user if self.context.get("request") else None
+            if user and approval_lines_data:
+                ApprovalAction.objects.create(
+                    document=document,
+                    actor=user,
+                    action="submit",
+                )
 
         # 첨부파일 저장
         user = self.context.get("request").user if self.context.get("request") else None
@@ -238,6 +498,90 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
             )
 
         return document
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        request = self.context.get("request")
+        user = request.user if request else None
+        if user and instance.author_id != user.id:
+            raise serializers.ValidationError(
+                {"detail": "문서 작성자만 수정할 수 있습니다."}
+            )
+
+        should_submit = validated_data.pop("submit", False)
+        approval_lines_data = validated_data.pop("approval_lines", None)
+        attachments_data = validated_data.pop("attachments", [])
+
+        for field in ["title", "content", "form_data", "preservation_period", "template"]:
+            if field in validated_data:
+                setattr(instance, field, validated_data[field])
+
+        if approval_lines_data is not None:
+            instance.approval_lines.all().delete()
+            for idx, line_data in enumerate(approval_lines_data):
+                ApprovalLine.objects.create(
+                    document=instance,
+                    approver_id=line_data.get("approver"),
+                    order=idx,
+                    approval_type=line_data.get("approval_type", "approval"),
+                    status="pending" if should_submit and idx == 0 else "waiting",
+                )
+        elif should_submit:
+            lines = list(instance.approval_lines.order_by("order"))
+            for line in lines:
+                line.status = "waiting"
+                line.acted_at = None
+                line.comment = ""
+                line.save(update_fields=["status", "acted_at", "comment"])
+            if lines:
+                first_line = lines[0]
+                first_line.status = "pending"
+                first_line.save(update_fields=["status"])
+
+        if should_submit:
+            instance.status = "pending"
+            instance.submitted_at = timezone.now()
+            instance.completed_at = None
+
+            if user:
+                ApprovalAction.objects.create(
+                    document=instance,
+                    actor=user,
+                    action="submit",
+                )
+
+        instance.save()
+
+        for file in attachments_data:
+            Attachment.objects.create(
+                document=instance,
+                file=file,
+                filename=file.name,
+                file_size=file.size,
+                uploaded_by=user,
+            )
+
+        return instance
+
+    def validate(self, attrs):
+        should_submit = attrs.get("submit")
+        if not should_submit:
+            return attrs
+
+        approval_lines = attrs.get("approval_lines", None)
+        if approval_lines is not None and not approval_lines:
+            raise serializers.ValidationError(
+                {"approval_lines": "제출하려면 결재선을 설정해주세요."}
+            )
+
+        if approval_lines is None:
+            instance = getattr(self, "instance", None)
+            if instance is None or not instance.approval_lines.exists():
+                raise serializers.ValidationError(
+                    {"approval_lines": "제출하려면 결재선을 설정해주세요."}
+                )
+
+        return attrs
 
 
 class DocumentSubmitSerializer(serializers.Serializer):

@@ -117,29 +117,42 @@ export default function PostForm() {
       </div>
 
       {/* 폼 */}
-      <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
+      <form
+        onSubmit={handleSubmit}
+        className="bg-white rounded-xl border border-gray-200 p-6 space-y-6"
+      >
         {/* 게시판 선택 */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">게시판 *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            게시판 *
+          </label>
           <select
             value={formData.board}
-            onChange={(e) => setFormData({ ...formData, board: e.target.value })}
+            onChange={(e) =>
+              setFormData({ ...formData, board: e.target.value })
+            }
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
             required
           >
             {boards.map((b) => (
-              <option key={b.id} value={b.id}>{b.name}</option>
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
             ))}
           </select>
         </div>
 
         {/* 제목 */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">제목 *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            제목 <span className="text-red-500">*</span>
+          </label>
           <input
             type="text"
             value={formData.title}
-            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+            onChange={(e) =>
+              setFormData({ ...formData, title: e.target.value })
+            }
             placeholder="제목을 입력하세요"
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
             required
@@ -148,10 +161,14 @@ export default function PostForm() {
 
         {/* 내용 */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">내용 *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            내용 *
+          </label>
           <textarea
             value={formData.content}
-            onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+            onChange={(e) =>
+              setFormData({ ...formData, content: e.target.value })
+            }
             placeholder="내용을 입력하세요"
             rows={15}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none"
@@ -165,7 +182,9 @@ export default function PostForm() {
             <input
               type="checkbox"
               checked={formData.is_notice}
-              onChange={(e) => setFormData({ ...formData, is_notice: e.target.checked })}
+              onChange={(e) =>
+                setFormData({ ...formData, is_notice: e.target.checked })
+              }
               className="w-4 h-4 rounded border-gray-300 text-blue-600"
             />
             <span className="text-sm text-gray-700">공지로 등록</span>
@@ -174,7 +193,9 @@ export default function PostForm() {
             <input
               type="checkbox"
               checked={formData.is_secret}
-              onChange={(e) => setFormData({ ...formData, is_secret: e.target.checked })}
+              onChange={(e) =>
+                setFormData({ ...formData, is_secret: e.target.checked })
+              }
               className="w-4 h-4 rounded border-gray-300 text-blue-600"
             />
             <span className="text-sm text-gray-700">비밀글</span>

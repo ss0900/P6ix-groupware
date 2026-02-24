@@ -17,10 +17,8 @@ class DocumentTemplate(models.Model):
     ]
     
     name = models.CharField("양식명", max_length=100)
-    description = models.TextField("설명", blank=True)
     category = models.CharField("분류", max_length=50, choices=CATEGORY_CHOICES, default="general")
-    content_template = models.TextField("내용 템플릿", blank=True, help_text="HTML 또는 Markdown 형식")
-    form_fields = models.JSONField("양식 필드", default=dict, blank=True, help_text="동적 양식 필드 정의")
+    content = models.TextField("내용", blank=True)
     is_active = models.BooleanField("활성화", default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -43,11 +41,6 @@ class Document(models.Model):
         ("rejected", "반려"),
         ("canceled", "취소"),
     ]
-    PRIORITY_CHOICES = [
-        ("normal", "일반"),
-        ("urgent", "긴급"),
-        ("important", "중요"),
-    ]
     PRESERVATION_CHOICES = [
         (1, "1년"),
         (3, "3년"),
@@ -67,7 +60,6 @@ class Document(models.Model):
     content = models.TextField("내용", blank=True)
     form_data = models.JSONField("양식 데이터", default=dict, blank=True, help_text="양식 필드 값")
     status = models.CharField("상태", max_length=20, choices=STATUS_CHOICES, default="draft")
-    priority = models.CharField("우선순위", max_length=20, choices=PRIORITY_CHOICES, default="normal")
     preservation_period = models.IntegerField("보존기간", choices=PRESERVATION_CHOICES, default=5)
     
     # 작성자
@@ -175,6 +167,63 @@ class ApprovalLine(models.Model):
 
     def __str__(self):
         return f"{self.document.title} - {self.order}. {self.approver}"
+
+
+class ApprovalLinePreset(models.Model):
+    """사용자별 저장 결재선"""
+
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="approval_line_presets",
+        verbose_name="소유자",
+    )
+    name = models.CharField("결재선 이름", max_length=100)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "결재선 프리셋"
+        verbose_name_plural = "결재선 프리셋"
+        ordering = ["-updated_at", "-id"]
+        unique_together = [["owner", "name"]]
+
+    def __str__(self):
+        return f"{self.owner} - {self.name}"
+
+
+class ApprovalLinePresetItem(models.Model):
+    """저장 결재선 항목"""
+
+    preset = models.ForeignKey(
+        ApprovalLinePreset,
+        on_delete=models.CASCADE,
+        related_name="items",
+        verbose_name="결재선 프리셋",
+    )
+    approver = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="approval_line_preset_items",
+        verbose_name="결재자",
+    )
+    order = models.PositiveIntegerField("순서", default=0)
+    approval_type = models.CharField(
+        "결재 유형",
+        max_length=20,
+        choices=ApprovalLine.TYPE_CHOICES,
+        default="approval",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "결재선 프리셋 항목"
+        verbose_name_plural = "결재선 프리셋 항목"
+        ordering = ["preset", "order"]
+        unique_together = [["preset", "order"]]
+
+    def __str__(self):
+        return f"{self.preset.name} - {self.order}. {self.approver}"
 
 
 class ApprovalAction(models.Model):

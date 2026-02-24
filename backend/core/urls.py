@@ -25,11 +25,23 @@ urlpatterns += [
     path("companies/<int:pk>/", belong_view.CompanyViewSet.as_view({
         "get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"
     }), name="companies-detail"),
+    path(
+        "companies/<int:pk>/upload-logo/",
+        belong_view.CompanyViewSet.as_view({"post": "upload_logo"}),
+        name="companies-upload-logo",
+    ),
 
     path("departments/", belong_view.DepartmentViewSet.as_view({"get": "list", "post": "create"}), name="departments-list"),
+    path("departments/org-chart/", belong_view.DepartmentViewSet.as_view({"get": "org_chart"}), name="departments-org-chart"),
     path("departments/<int:pk>/", belong_view.DepartmentViewSet.as_view({
         "get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"
     }), name="departments-detail"),
+
+    path("organizations/", belong_view.OrganizationViewSet.as_view({"get": "list", "post": "create"}), name="organizations-list"),
+    path("organizations/available-users/", belong_view.OrganizationViewSet.as_view({"get": "available_users"}), name="organizations-available-users"),
+    path("organizations/<int:pk>/", belong_view.OrganizationViewSet.as_view({
+        "get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"
+    }), name="organizations-detail"),
 
     path("positions/", belong_view.PositionViewSet.as_view({"get": "list", "post": "create"}), name="positions-list"),
     path("positions/<int:pk>/", belong_view.PositionViewSet.as_view({

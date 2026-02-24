@@ -1,4 +1,4 @@
-// src/pages/admin/UserForm.jsx
+﻿// src/pages/admin/UserForm.jsx
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../../api/axios";
@@ -86,13 +86,36 @@ export default function UserForm() {
 
   // 필터링된 부서/직위 (선택된 회사 기준)
   const filteredDepartments = departments.filter(
-    (d) => !formData.company || String(d.company) === String(formData.company)
+    (d) => !formData.company || String(d.company) === String(formData.company),
   );
   const filteredPositions = positions.filter(
     (p) =>
       !formData.company ||
-      String(p.company_id || p.company) === String(formData.company)
+      String(p.company_id || p.company) === String(formData.company),
   );
+
+  const formatPhoneNumber = (digits) => {
+    const onlyDigits = digits.slice(0, 11);
+
+    if (onlyDigits.length <= 3) return onlyDigits;
+    if (onlyDigits.length <= 7) {
+      return `${onlyDigits.slice(0, 3)}-${onlyDigits.slice(3)}`;
+    }
+    return `${onlyDigits.slice(0, 3)}-${onlyDigits.slice(3, 7)}-${onlyDigits.slice(7)}`;
+  };
+
+  const handlePhoneNumberChange = (e) => {
+    const value = e.target.value;
+    const valueWithoutHyphen = value.replace(/-/g, "");
+
+    if (!isEdit && /[^0-9]/.test(valueWithoutHyphen)) {
+      alert("숫자만 입력해주세요.");
+      return;
+    }
+
+    const digits = value.replace(/\D/g, "");
+    setFormData({ ...formData, phone_number: formatPhoneNumber(digits) });
+  };
 
   // 저장
   const handleSubmit = async (e) => {
@@ -105,7 +128,7 @@ export default function UserForm() {
         email: formData.email,
         first_name: formData.first_name,
         last_name: formData.last_name,
-        phone_number: formData.phone_number,
+        phone_number: formData.phone_number.replace(/\D/g, ""),
         is_active: formData.is_active,
         is_staff: formData.is_staff,
       };
@@ -115,18 +138,18 @@ export default function UserForm() {
         payload.password = formData.password;
       }
 
-      // 소속 정보
-      if (formData.company) payload.company = formData.company;
-      if (formData.department) payload.department = formData.department;
-      if (formData.position) payload.position = formData.position;
+      // 소속 정보: 미선택은 null로 명시 저장
+      payload.company = formData.company || null;
+      payload.department = formData.department || null;
+      payload.position = formData.position || null;
 
       if (isEdit) {
         await api.patch(`core/users/${id}/`, payload);
+        navigate(`/admin/users/${id}`);
       } else {
         await api.post("core/users/", payload);
+        navigate("/admin/users");
       }
-
-      navigate("/admin/users");
     } catch (err) {
       console.error(err);
       const msg =
@@ -227,7 +250,7 @@ export default function UserForm() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                비밀번호 {!isEdit && "*"}
+                비밀번호 {!isEdit && <span className="text-red-500">*</span>}
               </label>
               <div className="relative">
                 <input
@@ -270,9 +293,9 @@ export default function UserForm() {
               <input
                 type="tel"
                 value={formData.phone_number}
-                onChange={(e) =>
-                  setFormData({ ...formData, phone_number: e.target.value })
-                }
+                onChange={handlePhoneNumberChange}
+                inputMode="numeric"
+                pattern="[0-9-]*"
                 placeholder="010-0000-0000"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                 required
@@ -387,7 +410,9 @@ export default function UserForm() {
         <div className="flex gap-3 pt-4 border-t border-gray-200">
           <button
             type="button"
-            onClick={() => navigate("/admin/users")}
+            onClick={() =>
+              navigate(isEdit ? `/admin/users/${id}` : "/admin/users")
+            }
             className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium"
           >
             취소

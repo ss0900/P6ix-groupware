@@ -49,6 +49,7 @@ urlpatterns = [
     path("api/timeline/", include("timeline.urls")),
     path("api/contact/", include("contact.urls")),
     path("api/operation/", include("operation.urls")),
+    path("api/project/", include("project.urls")),
 ]
 
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

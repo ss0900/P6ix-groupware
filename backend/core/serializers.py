@@ -3,7 +3,7 @@ from rest_framework import serializers
 from django.contrib.auth import authenticate
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.tokens import RefreshToken
-from .models import CustomUser, UserMembership, Company, Department, Position
+from .models import CustomUser, UserMembership, Company, Department, Position, Organization
 import os                             
 from django.utils import timezone
 
@@ -11,6 +11,8 @@ from django.utils import timezone
 class UserSerializer(serializers.ModelSerializer):
     current_password = serializers.CharField(write_only=True, required=False, allow_blank=True)
     password = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    profile_picture_file = serializers.ImageField(write_only=True, required=False, allow_null=True)
+    clear_sign = serializers.BooleanField(write_only=True, required=False, default=False)
 
     profile_picture = serializers.SerializerMethodField()  # 🔥 추가
 
@@ -20,10 +22,12 @@ class UserSerializer(serializers.ModelSerializer):
             "username", "email", "phone_number",
             "first_name", "last_name",
             "current_password", "password",
+            "profile_picture_file", "clear_sign",
             "sign_file", "profile_picture",  # 🔥 응답 포함
             "is_superuser", # 🔥 Admin 판단용
+            "is_staff",
         ]
-        read_only_fields = ["username", "is_superuser"]
+        read_only_fields = ["username", "is_superuser", "is_staff"]
 
     def get_profile_picture(self, obj):   # 🔥 반드시 이 함수 있어야 함
         if not obj.profile_picture:
@@ -63,10 +67,28 @@ class UserSerializer(serializers.ModelSerializer):
         # 인증만: 아무 것도 안 바꾸고 반환
         only_verify = (
             "current_password" in validated_data and
-            not any(k in validated_data for k in ["email", "phone_number", "password"])
+            not any(
+                k in validated_data
+                for k in [
+                    "email",
+                    "phone_number",
+                    "first_name",
+                    "last_name",
+                    "password",
+                    "profile_picture_file",
+                    "sign_file",
+                    "clear_sign",
+                ]
+            )
         )
         if only_verify:
             return instance
+
+        # serializer 전용 필드 분리
+        validated_data.pop("current_password", None)
+        profile_picture_file = validated_data.pop("profile_picture_file", None)
+        clear_sign = validated_data.pop("clear_sign", False)
+        sign_file = validated_data.pop("sign_file", None)
 
         # 프로필 변경
         email = validated_data.get("email")
@@ -86,6 +108,17 @@ class UserSerializer(serializers.ModelSerializer):
         new_pw = validated_data.get("password")
         if new_pw:
             instance.set_password(new_pw)
+
+        if profile_picture_file is not None:
+            instance.profile_picture = profile_picture_file
+
+        if sign_file is not None:
+            instance.sign_file = sign_file
+
+        if clear_sign:
+            if instance.sign_file:
+                instance.sign_file.delete(save=False)
+            instance.sign_file = None
 
         instance.save()
         return instance
@@ -195,9 +228,25 @@ class DepartmentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Department
-        fields = ["id", "company", "company_name", "name", "type", "parent",
+        fields = ["id", "company", "company_name", "name", "order", "type", "parent",
                   "created_at", "updated_at"]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class OrganizationSerializer(serializers.ModelSerializer):
+    company_name = serializers.CharField(source="company.name", read_only=True)
+
+    class Meta:
+        model = Organization
+        fields = [
+            "id",
+            "company",
+            "company_name",
+            "tree",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at", "company_name"]
 
 # 직급
 class PositionSerializer(serializers.ModelSerializer):

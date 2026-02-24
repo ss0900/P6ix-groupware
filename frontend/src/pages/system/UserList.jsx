@@ -1,16 +1,32 @@
 // src/pages/system/UserList.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Edit, Trash2 } from "lucide-react";
 import api from "../../api/axios";
 import { fetchUsers } from "../../api/users/user";
 import BoardTable from "../../components/common/board/BoardTable"; //Changed
+import { useAuth } from "../../context/AuthContext";
+
+const formatPhoneNumber = (phoneNumber) => {
+  const digits = String(phoneNumber ?? "")
+    .replace(/\D/g, "")
+    .slice(0, 11);
+
+  if (!digits) return "";
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+};
 
 export default function UserList() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isSuperuser = Boolean(user?.is_superuser);
 
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState({});
+  const [deleting, setDeleting] = useState({});
 
   // 필터
   const [q, setQ] = useState("");
@@ -73,6 +89,34 @@ export default function UserList() {
     }
   };
 
+  const handleDeleteUser = async (targetUser) => {
+    if (!isSuperuser) return;
+    if (!targetUser?.id) return;
+
+    if (Number(targetUser.id) === Number(user?.id)) {
+      alert("현재 로그인한 본인 계정은 삭제할 수 없습니다.");
+      return;
+    }
+
+    const displayName =
+      `${targetUser.last_name ?? ""}${targetUser.first_name ?? ""}`.trim() ||
+      targetUser.username ||
+      "해당 사용자";
+
+    if (!window.confirm(`"${displayName}" 사용자를 삭제하시겠습니까?`)) return;
+
+    setDeleting((prev) => ({ ...prev, [targetUser.id]: true }));
+    try {
+      await api.delete(`core/users/${targetUser.id}/`);
+      setRows((prev) => prev.filter((row) => row.id !== targetUser.id));
+    } catch (e) {
+      console.error(e);
+      alert("사용자 삭제 중 오류가 발생했습니다.");
+    } finally {
+      setDeleting((prev) => ({ ...prev, [targetUser.id]: false }));
+    }
+  };
+
   // 필터 옵션 로드
   useEffect(() => {
     (async () => {
@@ -96,6 +140,14 @@ export default function UserList() {
     loadUsers();
   }, [q, company, department, position]);
 
+  const positionLevelMap = useMemo(() => {
+    const map = new Map();
+    positions.forEach((p) => {
+      map.set(String(p.id), Number(p.level ?? 999));
+    });
+    return map;
+  }, [positions]);
+
   // ======================= Columns ===========================
   const columns = [
     {
@@ -113,25 +165,32 @@ export default function UserList() {
       key: "company",
       header: "회사",
       // width: 140,
-      render: (row) => row.company?.name ?? row.company ?? "-",
+      render: (row) => row.company?.name ?? row.company ?? "",
     },
     {
       key: "department",
       header: "부서",
       // width: 140,
-      render: (row) => row.department?.name ?? row.department ?? "-",
+      render: (row) => row.department?.name ?? row.department ?? "",
     },
     {
       key: "position",
       header: "직책",
       // width: 120,
-      render: (row) => row.position?.name ?? row.position ?? "-",
+      sortValue: (row) => {
+        const positionId = row.position_id ?? row.position?.id ?? row.position;
+        if (positionId != null && positionLevelMap.has(String(positionId))) {
+          return positionLevelMap.get(String(positionId));
+        }
+        return Number.MAX_SAFE_INTEGER;
+      },
+      render: (row) => row.position?.name ?? row.position ?? "",
     },
     {
       key: "phone_number",
       header: "연락처",
       // width: 140,
-      render: (row) => row.phone_number || "-",
+      render: (row) => formatPhoneNumber(row.phone_number) || "-",
     },
     {
       key: "email",
@@ -139,6 +198,7 @@ export default function UserList() {
     },
     {
       key: "is_active",
+      sortable: false,
       header: "활성화",
       render: (row) => (
         <label
@@ -161,6 +221,7 @@ export default function UserList() {
     },
     {
       key: "is_staff",
+      sortable: false,
       header: "관리자 권한",
       render: (row) => (
         <label
@@ -181,6 +242,42 @@ export default function UserList() {
         </label>
       ),
     },
+    ...(isSuperuser
+      ? [
+          {
+            key: "actions",
+            sortable: false,
+            header: "관리",
+            render: (row) => (
+              <div className="inline-flex items-center gap-1">
+                <button
+                  type="button"
+                  className="inline-flex items-center justify-center rounded p-1.5 text-gray-600 hover:bg-gray-100"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/admin/users/${row.id}/edit`);
+                  }}
+                  title="수정"
+                >
+                  <Edit size={16} />
+                </button>
+                <button
+                  type="button"
+                  className="inline-flex items-center justify-center rounded p-1.5 text-red-600 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteUser(row);
+                  }}
+                  disabled={Boolean(deleting[row.id])}
+                  title="삭제"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ),
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -254,7 +351,7 @@ export default function UserList() {
         keyField="id"
         emptyText="등록된 사용자가 없습니다."
         onRowClick={(row) => navigate(`/admin/users/${row.id}`)}
-        sortable={false}
+        sortable
       />
     </div>
   );
