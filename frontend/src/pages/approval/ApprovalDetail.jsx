@@ -45,6 +45,34 @@ const formatApprovalDateTime = (dateStr) => {
   return `${formattedDate} ${formattedTime}`;
 };
 
+const StatusBadge = ({ status }) => {
+  const styles = {
+    draft: "bg-gray-100 text-gray-600",
+    pending: "bg-blue-100 text-blue-600",
+    approved: "bg-green-100 text-green-600",
+    rejected: "bg-red-100 text-red-600",
+    canceled: "bg-gray-100 text-gray-500",
+  };
+
+  const labels = {
+    draft: "임시저장",
+    pending: "진행중",
+    approved: "승인",
+    rejected: "반려",
+    canceled: "취소",
+  };
+
+  return (
+    <span
+      className={`px-2 py-0.5 text-xs rounded-full ${
+        styles[status] || styles.draft
+      }`}
+    >
+      {labels[status] || status}
+    </span>
+  );
+};
+
 export default function ApprovalDetail() {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -214,13 +242,13 @@ export default function ApprovalDetail() {
     );
   }
 
-  const referenceApprovers = (document.approval_lines || [])
+  const referenceUsers = (document.approval_lines || [])
     .filter((line) => line.approval_type === "reference")
-    .map(
-      (line) =>
-        `${line.approver_name}${line.approver_position ? ` ${line.approver_position}` : ""}`,
-    )
-    .join(", ");
+    .map((line) => ({
+      id: line.id,
+      name: line.approver_name || "미지정",
+      position: line.approver_position || "",
+    }));
   const sortedApprovalLines = (document.approval_lines || [])
     .filter((line) => normalizeApprovalType(line.approval_type) !== "reference")
     .sort((a, b) => Number(a?.order ?? 0) - Number(b?.order ?? 0));
@@ -284,7 +312,9 @@ export default function ApprovalDetail() {
       </div>
 
       {/* 결재선 + 결재 처리 */}
-      <div className={`grid grid-cols-1 gap-6 ${isMyTurn() ? "xl:grid-cols-3" : ""}`}>
+      <div
+        className={`grid grid-cols-1 gap-6 ${isMyTurn() ? "xl:grid-cols-3" : ""}`}
+      >
         <div className={isMyTurn() ? "xl:col-span-2" : ""}>
           <div className="bg-white rounded-xl border border-gray-200 p-5">
             <h3 className="text-sm font-semibold text-gray-700 mb-4">결재선</h3>
@@ -334,7 +364,8 @@ export default function ApprovalDetail() {
                                 : ""}
                             </p>
                             <div className="flex h-14 w-40 items-center justify-center overflow-hidden">
-                              {line.status === "approved" && line.approver_sign ? (
+                              {line.status === "approved" &&
+                              line.approver_sign ? (
                                 <img
                                   src={line.approver_sign}
                                   alt={`${line.approver_name || "사용자"} 서명`}
@@ -349,7 +380,10 @@ export default function ApprovalDetail() {
                                     />
                                   )}
                                   {line.status === "rejected" && (
-                                    <XCircle size={38} className="text-red-500" />
+                                    <XCircle
+                                      size={38}
+                                      className="text-red-500"
+                                    />
                                   )}
                                 </>
                               )}
@@ -406,12 +440,7 @@ export default function ApprovalDetail() {
       <div className="bg-white rounded-xl border border-gray-200 p-5">
         <h3 className="text-sm font-semibold text-gray-700 mb-4">문서 정보</h3>
         <div className="overflow-x-auto">
-          <table className="doc-table w-full table-fixed">
-            <colgroup>
-              <col style={{ width: "33.33%" }} />
-              <col style={{ width: "33.33%" }} />
-              <col style={{ width: "33.33%" }} />
-            </colgroup>
+          <table className="doc-table table-auto w-max">
             <thead className="doc-thead">
               <tr>
                 <th className="doc-th">상신자</th>
@@ -421,7 +450,7 @@ export default function ApprovalDetail() {
             </thead>
             <tbody>
               <tr>
-                <td className="doc-td h-20">
+                <td className="doc-td h-16 px-5">
                   <div className="flex flex-col items-center text-center">
                     <p className="font-medium text-gray-900">
                       {document.author_name} {document.author_position}
@@ -431,15 +460,31 @@ export default function ApprovalDetail() {
                     </p>
                   </div>
                 </td>
-                <td className="doc-td h-20 text-center">
-                  <p className="font-medium text-gray-900">
-                    {document.status_display || document.status || "-"}
-                  </p>
+                <td className="doc-td h-16 px-5 text-center">
+                  <StatusBadge status={document.status} />
                 </td>
-                <td className="doc-td h-20 text-center">
-                  <p className="font-medium text-gray-900">
-                    {referenceApprovers || "-"}
-                  </p>
+                <td className="doc-td h-16 px-5 text-center">
+                  {referenceUsers.length === 0 ? (
+                    <p className="font-medium text-gray-900">-</p>
+                  ) : (
+                    <div className="flex justify-center gap-2 py-0.5">
+                      {referenceUsers.map((refUser, idx) => (
+                        <div
+                          key={`${refUser.id || "reference"}-${idx}`}
+                          className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs text-gray-700"
+                        >
+                          <span className="font-medium text-gray-800">
+                            {refUser.name}
+                          </span>
+                          {refUser.position && (
+                            <span className="text-gray-500">
+                              {refUser.position}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </td>
               </tr>
             </tbody>
