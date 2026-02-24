@@ -177,7 +177,7 @@ export default function ApprovalTemplateList() {
   const loadTemplates = useCallback(async () => {
     setLoading(true);
     try {
-      const params = {};
+      const params = { include_inactive: true };
       if (selectedCategory) params.category = selectedCategory;
       const res = await api.get("/approval/templates/", { params });
       setTemplates(res.data?.results ?? res.data ?? []);

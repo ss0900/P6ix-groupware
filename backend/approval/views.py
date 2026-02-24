@@ -33,13 +33,29 @@ from .serializers import (
 
 class DocumentTemplateViewSet(viewsets.ModelViewSet):
     """결재 양식 ViewSet"""
-    queryset = DocumentTemplate.objects.filter(is_active=True)
+    queryset = DocumentTemplate.objects.all()
     serializer_class = DocumentTemplateSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         qs = super().get_queryset()
         category = self.request.query_params.get("category")
+        is_active = self.request.query_params.get("is_active")
+        include_inactive = self.request.query_params.get("include_inactive")
+
+        def _parse_bool(value):
+            if value is None:
+                return None
+            return str(value).strip().lower() in ("1", "true", "yes", "y", "on")
+
+        include_inactive_bool = _parse_bool(include_inactive)
+        is_active_bool = _parse_bool(is_active)
+
+        if is_active is not None:
+            qs = qs.filter(is_active=is_active_bool)
+        elif self.action == "list" and not include_inactive_bool:
+            qs = qs.filter(is_active=True)
+
         if category:
             qs = qs.filter(category=category)
         return qs
