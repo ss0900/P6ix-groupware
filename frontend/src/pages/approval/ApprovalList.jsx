@@ -10,6 +10,8 @@ import {
   Paperclip,
   Eye,
   EyeOff,
+  CheckSquare,
+  Square,
   FileText,
 } from "lucide-react";
 
@@ -68,6 +70,7 @@ export default function ApprovalList() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusTab, setStatusTab] = useState("all"); // all, approved, rejected
   const [readFilter, setReadFilter] = useState("all"); // all, read, unread
+  const [selectedIds, setSelectedIds] = useState([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const getDocumentNavigatePath = useCallback(
@@ -120,7 +123,22 @@ export default function ApprovalList() {
 
   useEffect(() => {
     loadDocuments();
+    setSelectedIds([]);
   }, [loadDocuments]);
+
+  const toggleSelect = (id) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === documents.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(documents.map((d) => d.id));
+    }
+  };
 
   // 날짜 포맷
   const formatDate = (dateStr) => {
@@ -249,6 +267,19 @@ export default function ApprovalList() {
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         {/* 테이블 헤더 */}
         <div className="flex items-center px-4 py-3 bg-gray-50 border-b border-gray-200 text-sm text-gray-600 font-medium">
+          <div className="w-10 flex justify-center">
+            <button
+              onClick={toggleSelectAll}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              {selectedIds.length === documents.length &&
+              documents.length > 0 ? (
+                <CheckSquare size={18} />
+              ) : (
+                <Square size={18} />
+              )}
+            </button>
+          </div>
           <div className="w-24 text-center">번호</div>
           <div className="flex-1">제목</div>
           <div className="w-10 text-center">
@@ -284,9 +315,28 @@ export default function ApprovalList() {
                 key={doc.id}
                 onClick={() => navigate(getDocumentNavigatePath(doc.id))}
                 className={`flex items-center px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors ${
+                  selectedIds.includes(doc.id) ? "bg-sky-50" : ""
+                } ${
                   !doc.is_read ? "font-medium" : ""
                 }`}
               >
+                {/* 체크박스 */}
+                <div className="w-10 flex justify-center">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleSelect(doc.id);
+                    }}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    {selectedIds.includes(doc.id) ? (
+                      <CheckSquare size={18} className="text-sky-500" />
+                    ) : (
+                      <Square size={18} />
+                    )}
+                  </button>
+                </div>
+
                 {/* 번호 */}
                 <div className="w-24 text-center text-sm text-gray-500">
                   {doc.id}
