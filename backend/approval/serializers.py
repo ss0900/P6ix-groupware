@@ -16,55 +16,6 @@ from .models import (
 )
 
 
-def advance_document_to_next_pending(document, acted_at=None):
-    """다음 결재자를 활성화한다. 합의 라인은 자동 승인 처리한다."""
-    acted_time = acted_at or timezone.now()
-    waiting_lines = document.approval_lines.filter(status="waiting").order_by("order")
-
-    for line in waiting_lines:
-        if line.approval_type == "agreement":
-            line.status = "approved"
-            line.acted_at = acted_time
-            line.save(update_fields=["status", "acted_at"])
-            continue
-
-        line.status = "pending"
-        line.save(update_fields=["status"])
-        return True
-
-    document.status = "approved"
-    document.completed_at = acted_time
-    document.save(update_fields=["status", "completed_at"])
-    return False
-
-
-def auto_approve_pending_agreements(document, acted_at=None):
-    """이미 pending 상태인 합의 라인을 자동 승인하고 다음 단계로 진행시킨다."""
-    changed = False
-    while True:
-        pending_agreement = (
-            document.approval_lines.filter(
-                status="pending", approval_type="agreement"
-            )
-            .order_by("order")
-            .first()
-        )
-        if not pending_agreement:
-            break
-
-        acted_time = acted_at or timezone.now()
-        pending_agreement.status = "approved"
-        pending_agreement.acted_at = acted_time
-        pending_agreement.save(update_fields=["status", "acted_at"])
-        changed = True
-
-        # 다음 결재자 활성화(또는 문서 완료)
-        if not advance_document_to_next_pending(document, acted_at=acted_time):
-            break
-
-    return changed
-
-
 class DocumentTemplateSerializer(serializers.ModelSerializer):
     category_display = serializers.CharField(source="get_category_display", read_only=True)
     
@@ -523,13 +474,10 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
                 approver_id=line_data.get("approver"),
                 order=idx,
                 approval_type=line_data.get("approval_type", "approval"),
-                status="waiting",
+                status="pending" if should_submit and idx == 0 else "waiting"
             )
 
         if should_submit:
-            advance_document_to_next_pending(
-                document, acted_at=document.submitted_at
-            )
             user = self.context.get("request").user if self.context.get("request") else None
             if user and approval_lines_data:
                 ApprovalAction.objects.create(
@@ -576,7 +524,7 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
                     approver_id=line_data.get("approver"),
                     order=idx,
                     approval_type=line_data.get("approval_type", "approval"),
-                    status="waiting",
+                    status="pending" if should_submit and idx == 0 else "waiting",
                 )
         elif should_submit:
             lines = list(instance.approval_lines.order_by("order"))
@@ -585,6 +533,10 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
                 line.acted_at = None
                 line.comment = ""
                 line.save(update_fields=["status", "acted_at", "comment"])
+            if lines:
+                first_line = lines[0]
+                first_line.status = "pending"
+                first_line.save(update_fields=["status"])
 
         if should_submit:
             instance.status = "pending"
@@ -599,11 +551,6 @@ class DocumentCreateSerializer(serializers.ModelSerializer):
                 )
 
         instance.save()
-
-        if should_submit:
-            advance_document_to_next_pending(
-                instance, acted_at=instance.submitted_at
-            )
 
         for file in attachments_data:
             Attachment.objects.create(
@@ -644,7 +591,12 @@ class DocumentSubmitSerializer(serializers.Serializer):
         instance.submitted_at = timezone.now()
         instance.completed_at = None
         instance.save(update_fields=["status", "submitted_at", "completed_at"])
-        advance_document_to_next_pending(instance, acted_at=instance.submitted_at)
+
+        # 첫 번째 결재자를 pending으로 변경
+        first_line = instance.approval_lines.order_by("order").first()
+        if first_line:
+            first_line.status = "pending"
+            first_line.save()
 
         # 제출 이력 추가
         ApprovalAction.objects.create(
@@ -665,9 +617,6 @@ class ApprovalDecisionSerializer(serializers.Serializer):
         action = validated_data["action"]
         comment = validated_data.get("comment", "")
         user = self.context["request"].user
-
-        # 과거 데이터 등으로 pending에 걸린 합의 라인은 자동 승인 처리한다.
-        auto_approve_pending_agreements(instance)
 
         # 현재 사용자의 결재선 찾기
         approval_line = instance.approval_lines.filter(
@@ -692,9 +641,18 @@ class ApprovalDecisionSerializer(serializers.Serializer):
 
         # 다음 결재자 활성화 또는 문서 완료 처리
         if action == "approve":
-            advance_document_to_next_pending(
-                instance, acted_at=approval_line.acted_at
-            )
+            next_line = instance.approval_lines.filter(
+                status="waiting"
+            ).order_by("order").first()
+
+            if next_line:
+                next_line.status = "pending"
+                next_line.save()
+            else:
+                # 모든 결재 완료
+                instance.status = "approved"
+                instance.completed_at = timezone.now()
+                instance.save()
         else:
             # 반려
             instance.status = "rejected"

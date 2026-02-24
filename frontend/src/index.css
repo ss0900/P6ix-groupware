@@ -658,3 +658,8 @@ code {
   padding-top: 4px;
   padding-bottom: 4px;
 }
+
+/* 상세 문서(본문) 근태계 메인 표 데이터 가운데 정렬 */
+.prose .attendance-template .doc-table:not(.attendance-guide-table) .doc-td {
+  text-align: center !important;
+}

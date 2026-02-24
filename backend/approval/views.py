@@ -4,7 +4,7 @@ from rest_framework.mixins import ListModelMixin, CreateModelMixin, DestroyModel
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.db.models import Q, Count
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
@@ -24,7 +24,6 @@ from .serializers import (
     ApprovalDecisionSerializer, ApprovalActionSerializer,
     AttachmentSerializer, BulkDecisionSerializer,
     ApprovalLinePresetSerializer,
-    auto_approve_pending_agreements,
 )
 
 
@@ -45,7 +44,7 @@ class DocumentTemplateViewSet(viewsets.ModelViewSet):
 class DocumentViewSet(viewsets.ModelViewSet):
     """결재 문서 ViewSet"""
     permission_classes = [IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser]
+    parser_classes = [JSONParser, MultiPartParser, FormParser]
 
     def get_queryset(self):
         user = self.request.user
@@ -171,7 +170,6 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
-        auto_approve_pending_agreements(instance)
         
         # 열람 시 읽음 처리
         user = request.user
@@ -266,6 +264,19 @@ class DocumentViewSet(viewsets.ModelViewSet):
                 {"error": "임시저장 또는 결재 중 상태의 문서만 취소할 수 있습니다."},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+        if document.status == "pending":
+            has_any_decision = document.approval_lines.filter(
+                approval_type__in=["approval", "agreement"],
+                status__in=["approved", "rejected", "skipped"],
+                acted_at__isnull=False,
+            ).exists()
+
+            if has_any_decision:
+                return Response(
+                    {"error": "결재가 시작된 문서는 상신 취소할 수 없습니다."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         document.status = "canceled"
         document.save()

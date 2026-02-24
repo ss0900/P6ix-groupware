@@ -115,6 +115,19 @@ export default function ApprovalDetail() {
     );
   };
 
+  const canCancelSubmission = () => {
+    if (!document || !isAuthor() || document.status !== "pending") return false;
+
+    const hasAnyDecision = (document.approval_lines || []).some(
+      (line) =>
+        line?.approval_type !== "reference" &&
+        line?.acted_at &&
+        ["approved", "rejected", "skipped"].includes(line?.status),
+    );
+
+    return !hasAnyDecision;
+  };
+
   // 결재 처리
   const handleDecision = async (action) => {
     if (
@@ -254,7 +267,7 @@ export default function ApprovalDetail() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {isAuthor() && document.status === "pending" && (
+          {canCancelSubmission() && (
             <button
               onClick={handleCancel}
               disabled={processing}
@@ -392,28 +405,45 @@ export default function ApprovalDetail() {
       {/* 문서 정보 */}
       <div className="bg-white rounded-xl border border-gray-200 p-5">
         <h3 className="text-sm font-semibold text-gray-700 mb-4">문서 정보</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-          <div>
-            <span className="text-gray-500">상신자</span>
-            <p className="font-medium text-gray-900">
-              {document.author_name} {document.author_position}
-            </p>
-            <p className="text-xs text-gray-400">
-              {document.author_department}
-            </p>
-          </div>
-          <div>
-            <span className="text-gray-500">상태</span>
-            <p className="font-medium text-gray-900">
-              {document.status_display || document.status || "-"}
-            </p>
-          </div>
-          <div>
-            <span className="text-gray-500">참조</span>
-            <p className="font-medium text-gray-900">
-              {referenceApprovers || "-"}
-            </p>
-          </div>
+        <div className="overflow-x-auto">
+          <table className="doc-table w-full table-fixed">
+            <colgroup>
+              <col style={{ width: "33.33%" }} />
+              <col style={{ width: "33.33%" }} />
+              <col style={{ width: "33.33%" }} />
+            </colgroup>
+            <thead className="doc-thead">
+              <tr>
+                <th className="doc-th">상신자</th>
+                <th className="doc-th">상태</th>
+                <th className="doc-th-end">참조</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="doc-td h-20">
+                  <div className="flex flex-col items-center text-center">
+                    <p className="font-medium text-gray-900">
+                      {document.author_name} {document.author_position}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {document.author_department || "-"}
+                    </p>
+                  </div>
+                </td>
+                <td className="doc-td h-20 text-center">
+                  <p className="font-medium text-gray-900">
+                    {document.status_display || document.status || "-"}
+                  </p>
+                </td>
+                <td className="doc-td h-20 text-center">
+                  <p className="font-medium text-gray-900">
+                    {referenceApprovers || "-"}
+                  </p>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
