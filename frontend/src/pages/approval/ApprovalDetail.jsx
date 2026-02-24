@@ -80,6 +80,28 @@ export default function ApprovalDetail() {
   const [decisionComment, setDecisionComment] = useState("");
   const [processing, setProcessing] = useState(false);
 
+  const getCurrentUserIdCandidates = () =>
+    [user?.id, user?.user_id]
+      .filter((value) => value != null)
+      .map((value) => String(value));
+
+  const getCurrentUserNameCandidates = () => {
+    const fullName = `${user?.last_name || ""}${user?.first_name || ""}`.trim();
+    return [user?.username, user?.name, fullName]
+      .filter((value) => Boolean(value))
+      .map((value) => String(value).trim());
+  };
+
+  const matchesCurrentUserId = (value) => {
+    if (value == null) return false;
+    return getCurrentUserIdCandidates().includes(String(value));
+  };
+
+  const matchesCurrentUserName = (value) => {
+    if (!value) return false;
+    return getCurrentUserNameCandidates().includes(String(value).trim());
+  };
+
   // 문서 로드
   const loadDocument = async () => {
     try {
@@ -102,14 +124,20 @@ export default function ApprovalDetail() {
   const isMyTurn = () => {
     if (!document || !user) return false;
     return document.approval_lines?.some(
-      (line) => line.approver === user.id && line.status === "pending"
+      (line) =>
+        line.status === "pending" &&
+        (matchesCurrentUserId(line.approver) ||
+          matchesCurrentUserName(line.approver_name))
     );
   };
 
   // 문서 작성자인지 확인
   const isAuthor = () => {
     if (!document || !user) return false;
-    return document.author === user.id;
+    return (
+      matchesCurrentUserId(document.author) ||
+      matchesCurrentUserName(document.author_name)
+    );
   };
 
   // 결재 처리
