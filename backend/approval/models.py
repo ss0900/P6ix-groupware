@@ -119,7 +119,12 @@ class Document(models.Model):
     @property
     def final_approver(self):
         """최종 결재자"""
-        last = self.approval_lines.filter(approval_type="approval").order_by("-order").first()
+        last = (
+            self.approval_lines.filter(approval_type__in=["approval", "agreement"])
+            .exclude(approver=self.author)
+            .order_by("-order")
+            .first()
+        )
         return last.approver if last else None
 
     @property
