@@ -198,12 +198,18 @@ class DocumentViewSet(viewsets.ModelViewSet):
         
         # 열람 시 읽음 처리
         user = request.user
+        from django.utils import timezone
+        now = timezone.now()
+
         approval_line = instance.approval_lines.filter(approver=user).first()
         if approval_line and not approval_line.is_read:
-            from django.utils import timezone
             approval_line.is_read = True
-            approval_line.read_at = timezone.now()
-            approval_line.save()
+            approval_line.read_at = now
+            approval_line.save(update_fields=["is_read", "read_at"])
+
+        if not instance.is_read:
+            instance.is_read = True
+            instance.save(update_fields=["is_read"])
         
         serializer = self.get_serializer(instance)
         return Response(serializer.data)

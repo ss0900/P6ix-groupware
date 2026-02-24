@@ -372,7 +372,11 @@ export default function ApprovalList() {
                 </div>
 
                 {/* 번호 */}
-                <div className="w-24 text-center text-sm text-gray-500">
+                <div
+                  className={`w-24 text-center text-sm ${
+                    !doc.is_read ? "text-[#0459cd]" : "text-gray-500"
+                  }`}
+                >
                   {doc.id}
                 </div>
 
@@ -383,7 +387,9 @@ export default function ApprovalList() {
                       [{doc.template_name}]
                     </span>
                   )}
-                  <span className="text-gray-900">{doc.title}</span>
+                  <span className={!doc.is_read ? "text-[#0459cd]" : "text-gray-900"}>
+                    {doc.title}
+                  </span>
                 </div>
 
                 {/* 첨부 */}
@@ -394,28 +400,48 @@ export default function ApprovalList() {
                 </div>
 
                 {isDraftPage ? (
-                  <div className="w-32 text-center text-xs text-gray-500">
+                  <div
+                    className={`w-32 text-center text-xs ${
+                      !doc.is_read ? "text-[#0459cd]" : "text-gray-500"
+                    }`}
+                  >
                     {formatDate(doc.drafted_at)}
                   </div>
                 ) : (
                   <>
                     {/* 문서번호 */}
-                    <div className="w-24 text-center text-xs text-gray-500">
+                    <div
+                      className={`w-24 text-center text-xs ${
+                        !doc.is_read ? "text-[#0459cd]" : "text-gray-500"
+                      }`}
+                    >
                       {doc.document_number || "-"}
                     </div>
 
                     {/* 상신자 */}
-                    <div className="w-20 text-center text-sm text-gray-600 truncate">
+                    <div
+                      className={`w-20 text-center text-sm truncate ${
+                        !doc.is_read ? "text-[#0459cd]" : "text-gray-600"
+                      }`}
+                    >
                       {doc.author_name}
                     </div>
 
                     {/* 상신일 */}
-                    <div className="w-32 text-center text-xs text-gray-500">
+                    <div
+                      className={`w-32 text-center text-xs ${
+                        !doc.is_read ? "text-[#0459cd]" : "text-gray-500"
+                      }`}
+                    >
                       {formatDate(doc.submitted_at || doc.drafted_at)}
                     </div>
 
                     {/* 최종결재자 */}
-                    <div className="w-24 text-center text-sm text-gray-600 truncate">
+                    <div
+                      className={`w-24 text-center text-sm truncate ${
+                        !doc.is_read ? "text-[#0459cd]" : "text-gray-600"
+                      }`}
+                    >
                       {doc.final_approver_name || "-"}
                     </div>
 
