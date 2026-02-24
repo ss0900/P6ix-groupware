@@ -1,12 +1,9 @@
 // src/api/axios.js
 import axios from "axios";
 
-const baseURL =
-  import.meta.env.VITE_API_BASE || import.meta.env.REACT_APP_API_BASE || "/api";
+const baseURL = import.meta.env.VITE_API_BASE || "/api";
 const PERSIST_LOGIN =
-  String(
-    import.meta.env.VITE_PERSIST_LOGIN ?? import.meta.env.REACT_APP_PERSIST_LOGIN,
-  ).toLowerCase() === "true";
+  String(import.meta.env.VITE_PERSIST_LOGIN).toLowerCase() === "true";
 
 /** Django 기본 csrftoken 쿠키를 읽어오는 유틸 */
 function getCookie(name) {
