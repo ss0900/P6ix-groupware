@@ -49,6 +49,7 @@ class ApprovalLineSerializer(serializers.ModelSerializer):
     approver_name = serializers.SerializerMethodField()
     approver_position = serializers.SerializerMethodField()
     approver_department = serializers.SerializerMethodField()
+    approver_sign = serializers.SerializerMethodField()
     status_display = serializers.CharField(source="get_status_display", read_only=True)
     type_display = serializers.CharField(source="get_approval_type_display", read_only=True)
 
@@ -56,6 +57,7 @@ class ApprovalLineSerializer(serializers.ModelSerializer):
         model = ApprovalLine
         fields = [
             "id", "approver", "approver_name", "approver_position", "approver_department",
+            "approver_sign",
             "order", "approval_type", "type_display", "status", "status_display",
             "comment", "acted_at", "is_read", "read_at"
         ]
@@ -77,6 +79,13 @@ class ApprovalLineSerializer(serializers.ModelSerializer):
         if membership and membership.department:
             return membership.department.name
         return ""
+
+    def get_approver_sign(self, obj):
+        if not obj.approver or not obj.approver.sign_file:
+            return None
+        request = self.context.get("request")
+        sign_url = obj.approver.sign_file.url
+        return request.build_absolute_uri(sign_url) if request else sign_url
 
 
 class ApprovalLinePresetItemSerializer(serializers.ModelSerializer):
@@ -327,6 +336,7 @@ class DocumentDetailSerializer(serializers.ModelSerializer):
     author_name = serializers.SerializerMethodField()
     author_position = serializers.SerializerMethodField()
     author_department = serializers.SerializerMethodField()
+    author_sign = serializers.SerializerMethodField()
     template_name = serializers.CharField(source="template.name", read_only=True)
     template_category = serializers.CharField(source="template.category", read_only=True)
     status_display = serializers.CharField(source="get_status_display", read_only=True)
@@ -344,7 +354,7 @@ class DocumentDetailSerializer(serializers.ModelSerializer):
             "status", "status_display",
             "preservation_period", "preservation_display",
             "template", "template_name", "template_category",
-            "author", "author_name", "author_position", "author_department",
+            "author", "author_name", "author_position", "author_department", "author_sign",
             "current_approver_name", "final_approver_name",
             "is_read",
             "drafted_at", "submitted_at", "completed_at",
@@ -366,6 +376,13 @@ class DocumentDetailSerializer(serializers.ModelSerializer):
         if membership and membership.department:
             return membership.department.name
         return ""
+
+    def get_author_sign(self, obj):
+        if not obj.author or not obj.author.sign_file:
+            return None
+        request = self.context.get("request")
+        sign_url = obj.author.sign_file.url
+        return request.build_absolute_uri(sign_url) if request else sign_url
 
     def get_current_approver_name(self, obj):
         approver = obj.current_approver

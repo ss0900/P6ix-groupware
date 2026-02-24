@@ -8,15 +8,12 @@ import {
   FileEdit,
   CheckCircle,
   XCircle,
-  Clock,
-  User,
   MessageSquare,
   Printer,
   Download,
   Paperclip,
   Trash2,
 } from "lucide-react";
-import ApprovalStamp from "./components/ApprovalStamp";
 import ApprovalTimeline from "./components/ApprovalTimeline";
 
 // 상태 뱃지
@@ -42,6 +39,35 @@ const StatusBadge = ({ status }) => {
       {labels[status] || status}
     </span>
   );
+};
+
+const APPROVAL_LINE_TYPE_SET = new Set(["approval", "agreement", "reference"]);
+
+const normalizeApprovalType = (value) =>
+  APPROVAL_LINE_TYPE_SET.has(value) ? value : "approval";
+
+const getApprovalStageLabel = (line = {}) => {
+  if (normalizeApprovalType(line.approval_type) === "agreement") return "합의";
+  return "결재";
+};
+
+const formatApprovalDateTime = (dateStr) => {
+  if (!dateStr) return "-";
+  const date = new Date(dateStr);
+  const formattedDate = date
+    .toLocaleDateString("ko-KR", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    })
+    .replace(/\. /g, "-")
+    .replace(".", "");
+  const formattedTime = date.toLocaleTimeString("ko-KR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  return `${formattedDate} ${formattedTime}`;
 };
 
 export default function ApprovalDetail() {
@@ -169,6 +195,27 @@ export default function ApprovalDetail() {
     .filter((line) => line.approval_type === "reference")
     .map((line) => `${line.approver_name}${line.approver_position ? ` ${line.approver_position}` : ""}`)
     .join(", ");
+  const sortedApprovalLines = (document.approval_lines || [])
+    .filter((line) => normalizeApprovalType(line.approval_type) !== "reference")
+    .sort((a, b) => Number(a?.order ?? 0) - Number(b?.order ?? 0));
+  const filteredApprovalLines =
+    document.author == null
+      ? sortedApprovalLines
+      : sortedApprovalLines.filter(
+          (line) => String(line?.approver) !== String(document.author),
+        );
+  const approvalColumns = [
+    {
+      id: `draft-${document.id}`,
+      stage_label: "기안",
+      approver_name: document.author_name || "미지정",
+      approver_position: document.author_position || "",
+      status: "approved",
+      approver_sign: document.author_sign || null,
+      acted_at: document.submitted_at || document.drafted_at || null,
+    },
+    ...filteredApprovalLines,
+  ];
 
   return (
     <div className="space-y-6">
@@ -200,25 +247,74 @@ export default function ApprovalDetail() {
       {/* 결재선 */}
       <div className="bg-white rounded-xl border border-gray-200 p-5">
         <h3 className="text-sm font-semibold text-gray-700 mb-4">결재선</h3>
-        <div className="flex items-center gap-3 overflow-x-auto pb-2">
-          {document.approval_lines?.map((line, idx) => (
-            <React.Fragment key={line.id}>
-              <ApprovalStamp
-                status={line.status}
-                approver={{
-                  name: line.approver_name,
-                  position: line.approver_position,
-                }}
-                actedAt={line.acted_at}
-                order={idx + 1}
-                size="lg"
-              />
-              {idx < document.approval_lines.length - 1 && (
-                <div className="text-gray-300 text-2xl">→</div>
-              )}
-            </React.Fragment>
-          ))}
-        </div>
+        {approvalColumns.length === 0 ? (
+          <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg">
+            <p>결재선 정보가 없습니다.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="doc-table table-fixed">
+              <colgroup>
+                {approvalColumns.map((line, idx) => (
+                  <col
+                    key={`${line.id || "line-col"}-${idx}`}
+                    style={{ width: "170px" }}
+                  />
+                ))}
+              </colgroup>
+              <thead className="doc-thead">
+                <tr>
+                  {approvalColumns.map((line, idx) => (
+                    <th
+                      key={`${line.id || "line-head"}-${idx}`}
+                      className={idx === approvalColumns.length - 1 ? "doc-th-end" : "doc-th"}
+                    >
+                      {line.stage_label || getApprovalStageLabel(line)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  {approvalColumns.map((line, idx) => (
+                    <td
+                      key={`${line.id || "line-body"}-${idx}`}
+                      className="doc-td h-28 text-center"
+                    >
+                      <div className="flex h-full flex-col items-center justify-center gap-1.5 py-1">
+                        <p className="whitespace-nowrap text-lg text-gray-900">
+                          {line.approver_name || "미지정"}
+                          {line.approver_position ? ` ${line.approver_position}` : ""}
+                        </p>
+                        <div className="flex h-14 w-40 items-center justify-center overflow-hidden">
+                          {line.status === "approved" && line.approver_sign ? (
+                            <img
+                              src={line.approver_sign}
+                              alt={`${line.approver_name || "사용자"} 서명`}
+                              className="h-full w-full object-contain"
+                            />
+                          ) : (
+                            <>
+                              {line.status === "approved" && (
+                                <CheckCircle size={38} className="text-gray-500" />
+                              )}
+                              {line.status === "rejected" && (
+                                <XCircle size={38} className="text-red-500" />
+                              )}
+                            </>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          {formatApprovalDateTime(line.acted_at)}
+                        </p>
+                      </div>
+                    </td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* 문서 정보 */}
