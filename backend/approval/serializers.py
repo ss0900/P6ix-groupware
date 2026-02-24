@@ -328,6 +328,15 @@ class ApprovalLinePresetSerializer(serializers.ModelSerializer):
         return instance
 
 
+class BulkReadStatusSerializer(serializers.Serializer):
+    """Validate bulk read/unread update payload."""
+    document_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        allow_empty=False,
+    )
+    is_read = serializers.BooleanField()
+
+
 class ApprovalActionSerializer(serializers.ModelSerializer):
     actor_name = serializers.SerializerMethodField()
     actor_position = serializers.SerializerMethodField()

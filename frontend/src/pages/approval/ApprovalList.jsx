@@ -140,6 +140,21 @@ export default function ApprovalList() {
     }
   };
 
+  const handleBulkReadUpdate = async (isRead) => {
+    if (selectedIds.length === 0) return;
+    try {
+      await api.post("/approval/documents/bulk_read/", {
+        document_ids: selectedIds,
+        is_read: isRead,
+      });
+      setSelectedIds([]);
+      await loadDocuments();
+    } catch (err) {
+      console.error("Bulk read status update failed:", err);
+      alert("읽음 상태 변경 중 오류가 발생했습니다.");
+    }
+  };
+
   // 날짜 포맷
   const formatDate = (dateStr) => {
     if (!dateStr) return "-";
@@ -174,41 +189,60 @@ export default function ApprovalList() {
       {/* 검색 및 필터 바 */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
         <div className="flex items-center gap-4 flex-wrap">
-          {/* 읽음/안읽음 필터 */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setReadFilter("all")}
-              className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-1 transition-colors ${
-                readFilter === "all"
-                  ? "bg-sky-100 text-sky-700 border border-sky-300"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-            >
-              전체
-            </button>
-            <button
-              onClick={() => setReadFilter("read")}
-              className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-1 transition-colors ${
-                readFilter === "read"
-                  ? "bg-sky-100 text-sky-700 border border-sky-300"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-            >
-              <Eye size={14} />
-              읽음
-            </button>
-            <button
-              onClick={() => setReadFilter("unread")}
-              className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-1 transition-colors ${
-                readFilter === "unread"
-                  ? "bg-sky-100 text-sky-700 border border-sky-300"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-            >
-              <EyeOff size={14} />
-              안읽음
-            </button>
-          </div>
+          {selectedIds.length > 0 ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600">
+                선택 {selectedIds.length}건
+              </span>
+              <button
+                onClick={() => handleBulkReadUpdate(true)}
+                className="px-3 py-1.5 rounded-lg text-sm text-sky-700 bg-sky-100 border border-sky-300 hover:bg-sky-200 transition-colors"
+              >
+                읽음처리
+              </button>
+              <button
+                onClick={() => handleBulkReadUpdate(false)}
+                className="px-3 py-1.5 rounded-lg text-sm text-gray-700 bg-gray-100 border border-gray-300 hover:bg-gray-200 transition-colors"
+              >
+                안읽음처리
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setReadFilter("all")}
+                className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-1 transition-colors ${
+                  readFilter === "all"
+                    ? "bg-sky-100 text-sky-700 border border-sky-300"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                전체
+              </button>
+              <button
+                onClick={() => setReadFilter("read")}
+                className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-1 transition-colors ${
+                  readFilter === "read"
+                    ? "bg-sky-100 text-sky-700 border border-sky-300"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                <Eye size={14} />
+                읽음
+              </button>
+              <button
+                onClick={() => setReadFilter("unread")}
+                className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-1 transition-colors ${
+                  readFilter === "unread"
+                    ? "bg-sky-100 text-sky-700 border border-sky-300"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                <EyeOff size={14} />
+                안읽음
+              </button>
+            </div>
+          )}
 
           {/* 검색 */}
           <div className="relative flex-1 max-w-md">

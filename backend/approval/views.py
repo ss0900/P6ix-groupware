@@ -23,6 +23,7 @@ from .serializers import (
     DocumentCreateSerializer, DocumentSubmitSerializer,
     ApprovalDecisionSerializer, ApprovalActionSerializer,
     AttachmentSerializer,
+    BulkReadStatusSerializer,
     ApprovalLinePresetSerializer,
     ACTIONABLE_APPROVAL_TYPES,
     _activate_next_approval_line,
@@ -236,6 +237,47 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
         action_text = "승인" if request.data.get("action") == "approve" else "반려"
         return Response({"message": f"문서가 {action_text}되었습니다."})
+    @action(detail=False, methods=["post"])
+    def bulk_read(self, request):
+        """Update read/unread status for selected documents."""
+        serializer = BulkReadStatusSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        document_ids = serializer.validated_data["document_ids"]
+        is_read = serializer.validated_data["is_read"]
+        user = request.user
+
+        editable_doc_ids = list(
+            Document.objects.filter(id__in=document_ids)
+            .filter(Q(author=user) | Q(approval_lines__approver=user))
+            .distinct()
+            .values_list("id", flat=True)
+        )
+
+        if not editable_doc_ids:
+            return Response({"updated_count": 0, "message": "처리 대상이 없습니다."})
+
+        Document.objects.filter(id__in=editable_doc_ids).update(is_read=is_read)
+
+        if is_read:
+            from django.utils import timezone
+
+            ApprovalLine.objects.filter(
+                document_id__in=editable_doc_ids,
+                approver=user,
+            ).update(is_read=True, read_at=timezone.now())
+        else:
+            ApprovalLine.objects.filter(
+                document_id__in=editable_doc_ids,
+                approver=user,
+            ).update(is_read=False, read_at=None)
+
+        return Response(
+            {
+                "updated_count": len(editable_doc_ids),
+                "message": f"{len(editable_doc_ids)}건의 열람 상태가 업데이트되었습니다.",
+            }
+        )
 
     @action(detail=True, methods=["post"])
     def cancel(self, request, pk=None):
