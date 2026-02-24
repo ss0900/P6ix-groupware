@@ -270,84 +270,121 @@ export default function ApprovalDetail() {
         </div>
       </div>
 
-      {/* 결재선 */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <h3 className="text-sm font-semibold text-gray-700 mb-4">결재선</h3>
-        {approvalColumns.length === 0 ? (
-          <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg">
-            <p>결재선 정보가 없습니다.</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="doc-table table-fixed">
-              <colgroup>
-                {approvalColumns.map((line, idx) => (
-                  <col
-                    key={`${line.id || "line-col"}-${idx}`}
-                    style={{ width: "170px" }}
-                  />
-                ))}
-              </colgroup>
-              <thead className="doc-thead">
-                <tr>
-                  {approvalColumns.map((line, idx) => (
-                    <th
-                      key={`${line.id || "line-head"}-${idx}`}
-                      className={
-                        idx === approvalColumns.length - 1
-                          ? "doc-th-end"
-                          : "doc-th"
-                      }
-                    >
-                      {line.stage_label || getApprovalStageLabel(line)}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  {approvalColumns.map((line, idx) => (
-                    <td
-                      key={`${line.id || "line-body"}-${idx}`}
-                      className="doc-td h-28 text-center"
-                    >
-                      <div className="flex h-full flex-col items-center justify-center gap-1.5 py-1">
-                        <p className="whitespace-nowrap text-lg text-gray-900">
-                          {line.approver_name || "미지정"}
-                          {line.approver_position
-                            ? ` ${line.approver_position}`
-                            : ""}
-                        </p>
-                        <div className="flex h-14 w-40 items-center justify-center overflow-hidden">
-                          {line.status === "approved" && line.approver_sign ? (
-                            <img
-                              src={line.approver_sign}
-                              alt={`${line.approver_name || "사용자"} 서명`}
-                              className="h-full w-full object-contain"
-                            />
-                          ) : (
-                            <>
-                              {line.status === "approved" && (
-                                <CheckCircle
-                                  size={38}
-                                  className="text-gray-500"
+      {/* 결재선 + 결재 처리 */}
+      <div className={`grid grid-cols-1 gap-6 ${isMyTurn() ? "xl:grid-cols-3" : ""}`}>
+        <div className={isMyTurn() ? "xl:col-span-2" : ""}>
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <h3 className="text-sm font-semibold text-gray-700 mb-4">결재선</h3>
+            {approvalColumns.length === 0 ? (
+              <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-200 rounded-lg">
+                <p>결재선 정보가 없습니다.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="doc-table table-fixed">
+                  <colgroup>
+                    {approvalColumns.map((line, idx) => (
+                      <col
+                        key={`${line.id || "line-col"}-${idx}`}
+                        style={{ width: "170px" }}
+                      />
+                    ))}
+                  </colgroup>
+                  <thead className="doc-thead">
+                    <tr>
+                      {approvalColumns.map((line, idx) => (
+                        <th
+                          key={`${line.id || "line-head"}-${idx}`}
+                          className={
+                            idx === approvalColumns.length - 1
+                              ? "doc-th-end"
+                              : "doc-th"
+                          }
+                        >
+                          {line.stage_label || getApprovalStageLabel(line)}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      {approvalColumns.map((line, idx) => (
+                        <td
+                          key={`${line.id || "line-body"}-${idx}`}
+                          className="doc-td h-28 text-center"
+                        >
+                          <div className="flex h-full flex-col items-center justify-center gap-1.5 py-1">
+                            <p className="whitespace-nowrap text-lg text-gray-900">
+                              {line.approver_name || "미지정"}
+                              {line.approver_position
+                                ? ` ${line.approver_position}`
+                                : ""}
+                            </p>
+                            <div className="flex h-14 w-40 items-center justify-center overflow-hidden">
+                              {line.status === "approved" && line.approver_sign ? (
+                                <img
+                                  src={line.approver_sign}
+                                  alt={`${line.approver_name || "사용자"} 서명`}
+                                  className="h-full w-full object-contain"
                                 />
+                              ) : (
+                                <>
+                                  {line.status === "approved" && (
+                                    <CheckCircle
+                                      size={38}
+                                      className="text-gray-500"
+                                    />
+                                  )}
+                                  {line.status === "rejected" && (
+                                    <XCircle size={38} className="text-red-500" />
+                                  )}
+                                </>
                               )}
-                              {line.status === "rejected" && (
-                                <XCircle size={38} className="text-red-500" />
-                              )}
-                            </>
-                          )}
-                        </div>
-                        <p className="text-xs text-gray-500">
-                          {formatApprovalDateTime(line.acted_at)}
-                        </p>
-                      </div>
-                    </td>
-                  ))}
-                </tr>
-              </tbody>
-            </table>
+                            </div>
+                            <p className="text-xs text-gray-500">
+                              {formatApprovalDateTime(line.acted_at)}
+                            </p>
+                          </div>
+                        </td>
+                      ))}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {isMyTurn() && (
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+              <MessageSquare size={16} />
+              결재 처리
+            </h3>
+            <textarea
+              value={decisionComment}
+              onChange={(e) => setDecisionComment(e.target.value)}
+              placeholder="의견을 입력하세요 (선택사항)"
+              className="w-full p-3 border border-gray-300 rounded-lg resize-none h-24 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none"
+            />
+            <div className="flex items-center gap-3 mt-4">
+              <button
+                onClick={() => handleDecision("approve")}
+                disabled={processing}
+                className="flex items-center gap-2 px-5 py-2.5 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50"
+              >
+                <CheckCircle size={18} />
+                승인
+              </button>
+              <button
+                onClick={() => handleDecision("reject")}
+                disabled={processing}
+                className="flex items-center gap-2 px-5 py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50"
+              >
+                <XCircle size={18} />
+                반려
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -430,40 +467,6 @@ export default function ApprovalDetail() {
 
       {/* 결재 이력 타임라인 */}
       <ApprovalTimeline actions={document.actions || []} />
-
-      {/* 결재 처리 영역 */}
-      {isMyTurn() && (
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
-            <MessageSquare size={16} />
-            결재 처리
-          </h3>
-          <textarea
-            value={decisionComment}
-            onChange={(e) => setDecisionComment(e.target.value)}
-            placeholder="의견을 입력하세요 (선택사항)"
-            className="w-full p-3 border border-gray-300 rounded-lg resize-none h-24 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none"
-          />
-          <div className="flex items-center gap-3 mt-4">
-            <button
-              onClick={() => handleDecision("approve")}
-              disabled={processing}
-              className="flex items-center gap-2 px-5 py-2.5 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50"
-            >
-              <CheckCircle size={18} />
-              승인
-            </button>
-            <button
-              onClick={() => handleDecision("reject")}
-              disabled={processing}
-              className="flex items-center gap-2 px-5 py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50"
-            >
-              <XCircle size={18} />
-              반려
-            </button>
-          </div>
-        </div>
-      )}
 
       {isAuthor() && document.status === "draft" && (
         <div className="bg-white rounded-xl border border-gray-200 p-5">
