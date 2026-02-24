@@ -100,16 +100,24 @@ class DocumentViewSet(viewsets.ModelViewSet):
             )
         
         elif filter_type == "in_progress":
-            # 진행 중인 문서 (내가 관련된)
+            # 진행 중인 문서 (내가 관련한, 참조 전용 제외)
             qs = qs.filter(
-                Q(author=user) | Q(approval_lines__approver=user),
+                Q(author=user)
+                | Q(
+                    approval_lines__approver=user,
+                    approval_lines__approval_type__in=ACTIONABLE_APPROVAL_TYPES,
+                ),
                 status="pending"
             )
         
         elif filter_type == "completed":
-            # 완료된 문서 (내가 관련된)
+            # 완료된 문서 (내가 관련한, 참조 전용 제외)
             qs = qs.filter(
-                Q(author=user) | Q(approval_lines__approver=user),
+                Q(author=user)
+                | Q(
+                    approval_lines__approver=user,
+                    approval_lines__approval_type__in=ACTIONABLE_APPROVAL_TYPES,
+                ),
                 status__in=["approved", "rejected"]
             )
         
