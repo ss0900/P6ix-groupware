@@ -168,7 +168,7 @@ export default function ApprovalHome() {
               <ApprovalStamp
                 status={line.status}
                 approver={{
-                  name: `${idx + 1}. ${line.approver_name || "미지정"}`,
+                  name: `${line.approver_name || "미지정"}`,
                   position: line.approver_position,
                 }}
                 actedAt={line.acted_at}
