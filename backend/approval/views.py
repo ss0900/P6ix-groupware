@@ -22,7 +22,7 @@ from .serializers import (
     DocumentListSerializer, DocumentDetailSerializer, 
     DocumentCreateSerializer, DocumentSubmitSerializer,
     ApprovalDecisionSerializer, ApprovalActionSerializer,
-    AttachmentSerializer, BulkDecisionSerializer,
+    AttachmentSerializer,
     ApprovalLinePresetSerializer,
     ACTIONABLE_APPROVAL_TYPES,
     _activate_next_approval_line,
@@ -236,41 +236,6 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
         action_text = "승인" if request.data.get("action") == "approve" else "반려"
         return Response({"message": f"문서가 {action_text}되었습니다."})
-
-    @action(detail=False, methods=["post"])
-    def bulk_decide(self, request):
-        """일괄 결재 결정 (승인/반려)"""
-        serializer = BulkDecisionSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        
-        document_ids = serializer.validated_data["document_ids"]
-        action = serializer.validated_data["action"]
-        comment = serializer.validated_data.get("comment", "")
-        
-        success_count = 0
-        errors = []
-        
-        for doc_id in document_ids:
-            try:
-                document = Document.objects.get(id=doc_id)
-                decision_serializer = ApprovalDecisionSerializer(
-                    document, 
-                    data={"action": action, "comment": comment},
-                    context={"request": request}
-                )
-                decision_serializer.is_valid(raise_exception=True)
-                decision_serializer.save()
-                success_count += 1
-            except Document.DoesNotExist:
-                errors.append(f"문서 ID {doc_id}를 찾을 수 없습니다.")
-            except Exception as e:
-                errors.append(f"문서 ID {doc_id}: {str(e)}")
-        
-        return Response({
-            "message": f"{success_count}건이 처리되었습니다.",
-            "success_count": success_count,
-            "errors": errors
-        })
 
     @action(detail=True, methods=["post"])
     def cancel(self, request, pk=None):

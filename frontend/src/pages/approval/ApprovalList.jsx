@@ -5,15 +5,11 @@ import api from "../../api/axios";
 import {
   FileEdit,
   Search,
-  CheckCircle,
-  XCircle,
   ChevronLeft,
   ChevronRight,
   Paperclip,
   Eye,
   EyeOff,
-  CheckSquare,
-  Square,
   FileText,
 } from "lucide-react";
 
@@ -72,7 +68,6 @@ export default function ApprovalList() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusTab, setStatusTab] = useState("all"); // all, approved, rejected
   const [readFilter, setReadFilter] = useState("all"); // all, read, unread
-  const [selectedIds, setSelectedIds] = useState([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const getDocumentNavigatePath = useCallback(
@@ -125,62 +120,7 @@ export default function ApprovalList() {
 
   useEffect(() => {
     loadDocuments();
-    setSelectedIds([]);
   }, [loadDocuments]);
-
-  // 선택 토글
-  const toggleSelect = (id) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    );
-  };
-
-  // 전체 선택/해제
-  const toggleSelectAll = () => {
-    if (selectedIds.length === documents.length) {
-      setSelectedIds([]);
-    } else {
-      setSelectedIds(documents.map((d) => d.id));
-    }
-  };
-
-  // 일괄 승인
-  const handleBulkApprove = async () => {
-    if (selectedIds.length === 0) return;
-    if (!window.confirm(`${selectedIds.length}건을 승인하시겠습니까?`)) return;
-
-    try {
-      await api.post("/approval/documents/bulk_decide/", {
-        document_ids: selectedIds,
-        action: "approve",
-      });
-      setSelectedIds([]);
-      loadDocuments();
-    } catch (err) {
-      console.error("Bulk approve failed:", err);
-      alert("일괄 승인 중 오류가 발생했습니다.");
-    }
-  };
-
-  // 일괄 반려
-  const handleBulkReject = async () => {
-    if (selectedIds.length === 0) return;
-    const comment = window.prompt("반려 사유를 입력해주세요.");
-    if (comment === null) return;
-
-    try {
-      await api.post("/approval/documents/bulk_decide/", {
-        document_ids: selectedIds,
-        action: "reject",
-        comment,
-      });
-      setSelectedIds([]);
-      loadDocuments();
-    } catch (err) {
-      console.error("Bulk reject failed:", err);
-      alert("일괄 반려 중 오류가 발생했습니다.");
-    }
-  };
 
   // 날짜 포맷
   const formatDate = (dateStr) => {
@@ -215,42 +155,6 @@ export default function ApprovalList() {
 
       {/* 검색 및 필터 바 */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
-        {/* 상태 탭 (완료 페이지에서만) */}
-        {currentPath === "completed" && (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setStatusTab("all")}
-              className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                statusTab === "all"
-                  ? "bg-sky-500 text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-            >
-              전체
-            </button>
-            <button
-              onClick={() => setStatusTab("approved")}
-              className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                statusTab === "approved"
-                  ? "bg-green-500 text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-            >
-              승인
-            </button>
-            <button
-              onClick={() => setStatusTab("rejected")}
-              className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                statusTab === "rejected"
-                  ? "bg-red-500 text-white"
-                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-            >
-              반려
-            </button>
-          </div>
-        )}
-
         <div className="flex items-center gap-4 flex-wrap">
           {/* 읽음/안읽음 필터 */}
           <div className="flex items-center gap-2">
@@ -303,23 +207,37 @@ export default function ApprovalList() {
             />
           </div>
 
-          {/* 일괄 처리 버튼 (진행중 페이지에서만) */}
-          {(currentPath === "in-progress" || currentPath === "all") && (
+          {/* 상태 탭 (완료 페이지에서만, 검색창과 같은 줄 우측 정렬) */}
+          {currentPath === "completed" && (
             <div className="flex items-center gap-2 ml-auto">
               <button
-                onClick={handleBulkApprove}
-                disabled={selectedIds.length === 0}
-                className="flex items-center gap-1 px-3 py-2 text-sm text-green-600 bg-green-50 rounded-lg hover:bg-green-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={() => setStatusTab("all")}
+                className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                  statusTab === "all"
+                    ? "bg-sky-500 text-white"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
               >
-                <CheckCircle size={16} />
+                전체
+              </button>
+              <button
+                onClick={() => setStatusTab("approved")}
+                className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                  statusTab === "approved"
+                    ? "bg-green-500 text-white"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
                 승인
               </button>
               <button
-                onClick={handleBulkReject}
-                disabled={selectedIds.length === 0}
-                className="flex items-center gap-1 px-3 py-2 text-sm text-red-600 bg-red-50 rounded-lg hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={() => setStatusTab("rejected")}
+                className={`px-3 py-1.5 rounded-lg text-sm transition-colors ${
+                  statusTab === "rejected"
+                    ? "bg-red-500 text-white"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
               >
-                <XCircle size={16} />
                 반려
               </button>
             </div>
@@ -331,19 +249,6 @@ export default function ApprovalList() {
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         {/* 테이블 헤더 */}
         <div className="flex items-center px-4 py-3 bg-gray-50 border-b border-gray-200 text-sm text-gray-600 font-medium">
-          <div className="w-10 flex justify-center">
-            <button
-              onClick={toggleSelectAll}
-              className="text-gray-400 hover:text-gray-600"
-            >
-              {selectedIds.length === documents.length &&
-              documents.length > 0 ? (
-                <CheckSquare size={18} />
-              ) : (
-                <Square size={18} />
-              )}
-            </button>
-          </div>
           <div className="w-24 text-center">번호</div>
           <div className="flex-1">제목</div>
           <div className="w-10 text-center">
@@ -379,26 +284,9 @@ export default function ApprovalList() {
                 key={doc.id}
                 onClick={() => navigate(getDocumentNavigatePath(doc.id))}
                 className={`flex items-center px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors ${
-                  selectedIds.includes(doc.id) ? "bg-sky-50" : ""
-                } ${!doc.is_read ? "font-medium" : ""}`}
+                  !doc.is_read ? "font-medium" : ""
+                }`}
               >
-                {/* 체크박스 */}
-                <div className="w-10 flex justify-center">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleSelect(doc.id);
-                    }}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    {selectedIds.includes(doc.id) ? (
-                      <CheckSquare size={18} className="text-sky-500" />
-                    ) : (
-                      <Square size={18} />
-                    )}
-                  </button>
-                </div>
-
                 {/* 번호 */}
                 <div className="w-24 text-center text-sm text-gray-500">
                   {doc.id}

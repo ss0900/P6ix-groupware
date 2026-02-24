@@ -724,11 +724,3 @@ class ApprovalDecisionSerializer(serializers.Serializer):
             instance.save(update_fields=["status", "completed_at"])
 
         return instance
-
-
-class BulkDecisionSerializer(serializers.Serializer):
-    """일괄 결재 결정용 시리얼라이저"""
-    document_ids = serializers.ListField(child=serializers.IntegerField())
-    action = serializers.ChoiceField(choices=["approve", "reject"])
-    comment = serializers.CharField(required=False, allow_blank=True, default="")
-
