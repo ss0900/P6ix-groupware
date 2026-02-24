@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useRef } from "react";
 
 const HOST_CHANNEL = "p6ix-groupware-host";
 const EDITOR_CHANNEL = "p6ix-groupware-editor";
-const EDITOR_SRC = `${process.env.PUBLIC_URL || ""}/editor.html`;
+const baseUrl = import.meta.env.BASE_URL?.replace(/\/$/, "") || "";
+const EDITOR_SRC = `${baseUrl}/editor.html`;
 
 export default function HtmlEditorFrame({
   value = "",
