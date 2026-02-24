@@ -167,6 +167,7 @@ export default function ApprovalTemplateList() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null);
   const [savingTemplate, setSavingTemplate] = useState(false);
+  const [updatingTemplateStatus, setUpdatingTemplateStatus] = useState({});
   const [formData, setFormData] = useState({
     name: "",
     content: "",
@@ -275,6 +276,24 @@ export default function ApprovalTemplateList() {
     }
   };
 
+  const handleToggleTemplateActive = async (template, isActive) => {
+    setUpdatingTemplateStatus((prev) => ({ ...prev, [template.id]: true }));
+    try {
+      const res = await api.patch(`/approval/templates/${template.id}/`, {
+        is_active: isActive,
+      });
+      const updatedTemplate = res.data;
+      setTemplates((prev) =>
+        prev.map((row) => (row.id === template.id ? updatedTemplate : row)),
+      );
+    } catch (error) {
+      console.error("Failed to update template status:", error);
+      alert("양식 상태 변경 중 오류가 발생했습니다.");
+    } finally {
+      setUpdatingTemplateStatus((prev) => ({ ...prev, [template.id]: false }));
+    }
+  };
+
   const handleSelect = (template) => {
     navigate(`/approval/new?template=${template.id}`);
   };
@@ -343,7 +362,7 @@ export default function ApprovalTemplateList() {
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
         <div className="flex items-center border-b border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-600">
           <div className="flex-1">양식명</div>
-          <div className="w-24 text-center">상태</div>
+          <div className="w-24 text-center">활성화</div>
           <div className="w-32 text-center">생성일</div>
           <div className="w-28 text-center">관리</div>
           <div className="w-10" />
@@ -385,15 +404,22 @@ export default function ApprovalTemplateList() {
                 </div>
 
                 <div className="w-24 text-center">
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-xs ${
-                      template.is_active
-                        ? "bg-green-100 text-green-700"
-                        : "bg-gray-200 text-gray-600"
-                    }`}
+                  <label
+                    className="relative inline-flex items-center cursor-pointer"
+                    onClick={(event) => event.stopPropagation()}
                   >
-                    {template.is_active ? "활성" : "비활성"}
-                  </span>
+                    <input
+                      type="checkbox"
+                      className="peer sr-only"
+                      checked={!!template.is_active}
+                      disabled={!!updatingTemplateStatus[template.id]}
+                      onChange={(event) =>
+                        handleToggleTemplateActive(template, event.target.checked)
+                      }
+                    />
+                    <div className="w-10 h-5 bg-gray-200 peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:bg-blue-600 transition-colors" />
+                    <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5" />
+                  </label>
                 </div>
 
                 <div className="w-32 text-center text-sm text-gray-500">
