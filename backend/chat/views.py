@@ -98,11 +98,15 @@ class NotificationViewSet(viewsets.ModelViewSet):
         notification.save(update_fields=['is_read'])
         return Response({"status": "ok"})
 
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=['get'], url_path='unread-count')
     def unread_count(self, request):
         """읽지 않은 알림 수"""
         count = self.get_queryset().filter(is_read=False).count()
         return Response({"count": count})
+
+    @action(detail=False, methods=['get'], url_path='unread_count')
+    def unread_count_legacy(self, request):
+        return self.unread_count(request)
 
 
 class HelpQuestionViewSet(viewsets.ModelViewSet):

@@ -31,7 +31,7 @@ function Header({ onMenuClick }) {
   useEffect(() => {
     const loadUnreadCount = async () => {
       try {
-        const res = await api.get("chat/notifications/unread_count/");
+        const res = await api.get("chat/notifications/unread-count/");
         setUnreadNotifications(res.data.count || 0);
       } catch (err) {
         console.error(err);

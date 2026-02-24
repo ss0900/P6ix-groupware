@@ -144,7 +144,7 @@ function Dashboard() {
         ] = await Promise.allSettled([
           api.get("core/users/"),
           api.get("approval/documents/stats/"),
-          api.get("chat/notifications/unread_count/"),
+          api.get("chat/notifications/unread-count/"),
           api.get("meeting/schedules/today/"),
           api.get("operation/leads/stats/"),
           api.get("approval/documents/?filter=pending"),
