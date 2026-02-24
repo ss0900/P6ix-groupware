@@ -7,6 +7,11 @@ import sys
 def main():
     """Run administrative tasks."""
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+    # Default development server port to 8001 unless addr:port is explicitly passed.
+    if len(sys.argv) >= 2 and sys.argv[1] == "runserver":
+        has_addrport = any(not arg.startswith("-") for arg in sys.argv[2:])
+        if not has_addrport:
+            sys.argv.append("8001")
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:

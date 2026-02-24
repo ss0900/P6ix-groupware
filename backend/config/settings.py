@@ -205,7 +205,12 @@ SIMPLE_JWT = {
 # CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 CORS_ALLOWED_ORIGINS = env.list(
     "CORS_ALLOWED_ORIGINS",
-    default=["http://localhost:3000", "http://127.0.0.1:3000"],
+    default=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+    ],
 )
 
 # (선택) 프론트에서 Authorization 헤더를 확실히 쓰기 위해
