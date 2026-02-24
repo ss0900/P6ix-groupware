@@ -16,31 +16,6 @@ import {
 } from "lucide-react";
 import ApprovalTimeline from "./components/ApprovalTimeline";
 
-// 상태 뱃지
-const StatusBadge = ({ status }) => {
-  const styles = {
-    draft: "bg-gray-100 text-gray-600 border-gray-300",
-    pending: "bg-blue-100 text-blue-600 border-blue-300",
-    approved: "bg-green-100 text-green-600 border-green-300",
-    rejected: "bg-red-100 text-red-600 border-red-300",
-    canceled: "bg-gray-100 text-gray-500 border-gray-300",
-  };
-
-  const labels = {
-    draft: "임시저장",
-    pending: "결재 중",
-    approved: "승인 완료",
-    rejected: "반려",
-    canceled: "취소",
-  };
-
-  return (
-    <span className={`px-3 py-1 text-sm rounded-full border ${styles[status] || styles.draft}`}>
-      {labels[status] || status}
-    </span>
-  );
-};
-
 const APPROVAL_LINE_TYPE_SET = new Set(["approval", "agreement", "reference"]);
 
 const normalizeApprovalType = (value) =>
@@ -127,7 +102,7 @@ export default function ApprovalDetail() {
       (line) =>
         line.status === "pending" &&
         (matchesCurrentUserId(line.approver) ||
-          matchesCurrentUserName(line.approver_name))
+          matchesCurrentUserName(line.approver_name)),
     );
   };
 
@@ -142,7 +117,11 @@ export default function ApprovalDetail() {
 
   // 결재 처리
   const handleDecision = async (action) => {
-    if (!window.confirm(action === "approve" ? "승인하시겠습니까?" : "반려하시겠습니까?")) {
+    if (
+      !window.confirm(
+        action === "approve" ? "승인하시겠습니까?" : "반려하시겠습니까?",
+      )
+    ) {
       return;
     }
 
@@ -163,7 +142,7 @@ export default function ApprovalDetail() {
     }
   };
 
-  // 문서 취소
+  // 상신 취소
   const handleCancel = async () => {
     if (!window.confirm("문서를 취소(회수)하시겠습니까?")) {
       return;
@@ -187,9 +166,12 @@ export default function ApprovalDetail() {
   // 첨부파일 다운로드
   const handleDownload = async (attachment) => {
     try {
-      const res = await api.get(`/approval/attachments/${attachment.id}/download/`, {
-        responseType: "blob",
-      });
+      const res = await api.get(
+        `/approval/attachments/${attachment.id}/download/`,
+        {
+          responseType: "blob",
+        },
+      );
       const url = window.URL.createObjectURL(new Blob([res.data]));
       const link = document.createElement("a");
       link.href = url;
@@ -221,7 +203,10 @@ export default function ApprovalDetail() {
 
   const referenceApprovers = (document.approval_lines || [])
     .filter((line) => line.approval_type === "reference")
-    .map((line) => `${line.approver_name}${line.approver_position ? ` ${line.approver_position}` : ""}`)
+    .map(
+      (line) =>
+        `${line.approver_name}${line.approver_position ? ` ${line.approver_position}` : ""}`,
+    )
     .join(", ");
   const sortedApprovalLines = (document.approval_lines || [])
     .filter((line) => normalizeApprovalType(line.approval_type) !== "reference")
@@ -257,15 +242,28 @@ export default function ApprovalDetail() {
             <ArrowLeft size={20} />
           </button>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">{document.title}</h1>
+            <h1 className="text-xl font-bold text-gray-900">
+              {document.title}
+            </h1>
             <p className="text-sm text-gray-500">
-              {document.template_name && <span className="text-sky-600">[{document.template_name}]</span>}
-              {" "}문서번호: {document.document_number || "-"}
+              {document.template_name && (
+                <span className="text-sky-600">[{document.template_name}]</span>
+              )}{" "}
+              문서번호: {document.document_number || "-"}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <StatusBadge status={document.status} />
+          {isAuthor() && document.status === "pending" && (
+            <button
+              onClick={handleCancel}
+              disabled={processing}
+              className="flex items-center gap-2 px-3 py-1.5 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
+            >
+              <Trash2 size={16} />
+              상신 취소
+            </button>
+          )}
           <button className="p-2 rounded-lg hover:bg-gray-100" title="인쇄">
             <Printer size={20} className="text-gray-500" />
           </button>
@@ -295,7 +293,11 @@ export default function ApprovalDetail() {
                   {approvalColumns.map((line, idx) => (
                     <th
                       key={`${line.id || "line-head"}-${idx}`}
-                      className={idx === approvalColumns.length - 1 ? "doc-th-end" : "doc-th"}
+                      className={
+                        idx === approvalColumns.length - 1
+                          ? "doc-th-end"
+                          : "doc-th"
+                      }
                     >
                       {line.stage_label || getApprovalStageLabel(line)}
                     </th>
@@ -312,7 +314,9 @@ export default function ApprovalDetail() {
                       <div className="flex h-full flex-col items-center justify-center gap-1.5 py-1">
                         <p className="whitespace-nowrap text-lg text-gray-900">
                           {line.approver_name || "미지정"}
-                          {line.approver_position ? ` ${line.approver_position}` : ""}
+                          {line.approver_position
+                            ? ` ${line.approver_position}`
+                            : ""}
                         </p>
                         <div className="flex h-14 w-40 items-center justify-center overflow-hidden">
                           {line.status === "approved" && line.approver_sign ? (
@@ -324,7 +328,10 @@ export default function ApprovalDetail() {
                           ) : (
                             <>
                               {line.status === "approved" && (
-                                <CheckCircle size={38} className="text-gray-500" />
+                                <CheckCircle
+                                  size={38}
+                                  className="text-gray-500"
+                                />
                               )}
                               {line.status === "rejected" && (
                                 <XCircle size={38} className="text-red-500" />
@@ -354,15 +361,21 @@ export default function ApprovalDetail() {
             <p className="font-medium text-gray-900">
               {document.author_name} {document.author_position}
             </p>
-            <p className="text-xs text-gray-400">{document.author_department}</p>
+            <p className="text-xs text-gray-400">
+              {document.author_department}
+            </p>
           </div>
           <div>
             <span className="text-gray-500">상태</span>
-            <p className="font-medium text-gray-900">{document.status_display || document.status || "-"}</p>
+            <p className="font-medium text-gray-900">
+              {document.status_display || document.status || "-"}
+            </p>
           </div>
           <div>
             <span className="text-gray-500">참조</span>
-            <p className="font-medium text-gray-900">{referenceApprovers || "-"}</p>
+            <p className="font-medium text-gray-900">
+              {referenceApprovers || "-"}
+            </p>
           </div>
         </div>
       </div>
@@ -372,7 +385,9 @@ export default function ApprovalDetail() {
         <h3 className="text-sm font-semibold text-gray-700 mb-4">문서 내용</h3>
         <div
           className="prose prose-sm max-w-none text-gray-800"
-          dangerouslySetInnerHTML={{ __html: document.content || "<p>내용 없음</p>" }}
+          dangerouslySetInnerHTML={{
+            __html: document.content || "<p>내용 없음</p>",
+          }}
         />
       </div>
 
@@ -392,7 +407,9 @@ export default function ApprovalDetail() {
                 <div className="flex items-center gap-3">
                   <FileEdit size={18} className="text-gray-400" />
                   <div>
-                    <p className="text-sm font-medium text-gray-900">{att.filename}</p>
+                    <p className="text-sm font-medium text-gray-900">
+                      {att.filename}
+                    </p>
                     <p className="text-xs text-gray-500">
                       {(att.file_size / 1024).toFixed(1)} KB
                     </p>
@@ -443,22 +460,6 @@ export default function ApprovalDetail() {
             >
               <XCircle size={18} />
               반려
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* 작성자 액션 (취소/수정) */}
-      {isAuthor() && document.status === "pending" && (
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={handleCancel}
-              disabled={processing}
-              className="flex items-center gap-2 px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
-            >
-              <Trash2 size={16} />
-              문서 취소
             </button>
           </div>
         </div>

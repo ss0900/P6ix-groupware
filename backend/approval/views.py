@@ -24,6 +24,7 @@ from .serializers import (
     ApprovalDecisionSerializer, ApprovalActionSerializer,
     AttachmentSerializer, BulkDecisionSerializer,
     ApprovalLinePresetSerializer,
+    auto_approve_pending_agreements,
 )
 
 
@@ -170,6 +171,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
+        auto_approve_pending_agreements(instance)
         
         # 열람 시 읽음 처리
         user = request.user
@@ -250,7 +252,7 @@ class DocumentViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def cancel(self, request, pk=None):
-        """문서 취소 (회수)"""
+        """상신 취소 (회수)"""
         document = self.get_object()
 
         if document.author != request.user:
