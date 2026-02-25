@@ -93,7 +93,7 @@ const ChatRoom = ({
                         );
                         const msgId = msg.id || msg.tempId;
                         const translated = messageTranslations[msgId];
-                        const unreadByCount = isOwn ? getUnreadByCount(msg) : 0;
+                        const unreadByCount = getUnreadByCount(msg);
 
                         return (
                             <React.Fragment key={msg.id || msg.tempId || `${msg.created_at}-${idx}`}>
@@ -230,8 +230,10 @@ const ChatRoom = ({
                                             )}
 
                                             <div className={`text-[9px] mt-2 flex items-center justify-end gap-1.5 font-bold ${isOwn ? 'text-blue-100' : 'text-gray-400'}`}>
-                                                {isOwn && unreadByCount > 0 && (
-                                                    <span className="text-yellow-300 animate-pulse">{unreadByCount}</span>
+                                                {unreadByCount > 0 && (
+                                                    <span className={isOwn ? 'text-yellow-300 animate-pulse' : 'text-blue-500'}>
+                                                        {unreadByCount}
+                                                    </span>
                                                 )}
                                                 <span className="opacity-70 font-medium">
                                                     {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
