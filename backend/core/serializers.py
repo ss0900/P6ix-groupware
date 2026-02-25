@@ -269,21 +269,41 @@ class PositionSerializer(serializers.ModelSerializer):
 # 유저 멤버십 조회
 class UserMembershipReadSerializer(serializers.ModelSerializer):
     company_name    = serializers.CharField(source="company.name", read_only=True)
+    company_logo    = serializers.SerializerMethodField()
     department_name = serializers.CharField(source="department.name", read_only=True)
     position_name   = serializers.CharField(source="position.name", read_only=True)
+
+    def get_company_logo(self, obj):
+        company = getattr(obj, "company", None)
+        if not company or not company.logo:
+            return None
+        request = self.context.get("request")
+        try:
+            ts = int(os.path.getmtime(company.logo.path))
+        except Exception:
+            ts = int(timezone.now().timestamp())
+        url = f"{company.logo.url}?t={ts}"
+        return request.build_absolute_uri(url) if request else url
 
     class Meta:
         model = UserMembership
         fields = [
             "id",
-            "company", "company_name",
+            "company", "company_name", "company_logo",
             "department", "department_name",
             "position", "position_name",
             "is_primary",
             "started_on", "ended_on",
             "created_at",
         ]
-        read_only_fields = ["id", "created_at", "company_name", "department_name", "position_name"]
+        read_only_fields = [
+            "id",
+            "created_at",
+            "company_name",
+            "company_logo",
+            "department_name",
+            "position_name",
+        ]
 
 # --- 멤버십 쓰기용 (회사/부서/직위 변경·생성) ---
 class UserMembershipWriteSerializer(serializers.ModelSerializer):

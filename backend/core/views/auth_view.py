@@ -77,14 +77,19 @@ class UserMembershipMeView(APIView):
             .select_related("company", "department", "position")
             .order_by("-is_primary", "-created_at")
         )
-        return Response(UserMembershipReadSerializer(qs, many=True).data, status=status.HTTP_200_OK)
+        return Response(
+            UserMembershipReadSerializer(
+                qs, many=True, context={"request": request}
+            ).data,
+            status=status.HTTP_200_OK,
+        )
 
     def post(self, request):
         # 새 멤버십 생성(겸직 추가 가능)
         serializer = UserMembershipWriteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         instance = serializer.save(user=request.user)
-        out = UserMembershipReadSerializer(instance).data
+        out = UserMembershipReadSerializer(instance, context={"request": request}).data
         return Response(out, status=status.HTTP_201_CREATED)
 
     def put(self, request):
@@ -101,5 +106,5 @@ class UserMembershipMeView(APIView):
         serializer = UserMembershipWriteSerializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         instance = serializer.save(user=request.user)
-        out = UserMembershipReadSerializer(instance).data
+        out = UserMembershipReadSerializer(instance, context={"request": request}).data
         return Response(out, status=status.HTTP_200_OK)

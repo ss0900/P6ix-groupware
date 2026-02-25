@@ -5,7 +5,6 @@ import { Menu as MenuIcon, Bell, MessageSquare, HelpCircle } from "lucide-react"
 import { useAuth } from "../../context/AuthContext";
 import api from "../../api/axios";
 
-// 컴포넌트
 import ChatPanel from "../chat/ChatPanel";
 import NotificationPanel from "../notification/NotificationPanel";
 import Menu from "./Menu";
@@ -27,7 +26,6 @@ function Header({ onMenuClick }) {
   const [companyLogoUrl, setCompanyLogoUrl] = useState(null);
   const [companyLogoLoading, setCompanyLogoLoading] = useState(true);
 
-  // 알림 개수 로드
   useEffect(() => {
     const loadUnreadCount = async () => {
       try {
@@ -37,8 +35,8 @@ function Header({ onMenuClick }) {
         console.error(err);
       }
     };
+
     loadUnreadCount();
-    // 30초마다 갱신
     const interval = setInterval(loadUnreadCount, 30000);
     return () => clearInterval(interval);
   }, []);
@@ -73,12 +71,16 @@ function Header({ onMenuClick }) {
       }
     };
 
-    const fetchPrimaryCompanyId = async () => {
+    const fetchPrimaryMembership = async () => {
       const membershipRes = await api.get("core/membership/me/");
       const memberships = membershipRes.data?.results ?? membershipRes.data ?? [];
       const primaryMembership =
         memberships.find((membership) => membership.is_primary) || memberships[0];
-      return primaryMembership?.company || null;
+
+      return {
+        companyId: primaryMembership?.company || null,
+        companyLogoUrl: primaryMembership?.company_logo || null,
+      };
     };
 
     const loadCompanyLogo = async () => {
@@ -91,18 +93,7 @@ function Header({ onMenuClick }) {
       }
 
       const username = user?.username || "";
-      const canReadCompanyDetail = Boolean(user?.is_staff || user?.is_superuser);
-
-      if (!canReadCompanyDetail) {
-        clearLogoCache(username);
-        if (mounted) {
-          setCompanyLogoUrl(null);
-          setCompanyLogoLoading(false);
-        }
-        return;
-      }
-
-      const { cachedCompanyId, cachedLogoUrl } = readLogoCache(username);
+      const { cachedLogoUrl } = readLogoCache(username);
 
       if (mounted && cachedLogoUrl) {
         setCompanyLogoUrl(cachedLogoUrl);
@@ -112,58 +103,26 @@ function Header({ onMenuClick }) {
       }
 
       try {
-        let companyId = cachedCompanyId;
+        const { companyId, companyLogoUrl } = await fetchPrimaryMembership();
 
         if (!companyId) {
-          companyId = await fetchPrimaryCompanyId();
-        }
-
-        if (!companyId) {
+          clearLogoCache(username);
           if (mounted) {
             setCompanyLogoUrl(null);
             setCompanyLogoLoading(false);
           }
-          clearLogoCache(username);
           return;
         }
 
-        const companyRes = await api.get(`core/companies/${companyId}/`);
-        const nextLogoUrl = companyRes.data?.logo || null;
-        writeLogoCache(username, companyId, nextLogoUrl);
+        writeLogoCache(username, companyId, companyLogoUrl);
 
         if (mounted) {
-          setCompanyLogoUrl(nextLogoUrl);
+          setCompanyLogoUrl(companyLogoUrl);
           setCompanyLogoLoading(false);
         }
       } catch (err) {
-        if (err?.response?.status === 403) {
-          const username = user?.username || "";
-          clearLogoCache(username);
-          if (mounted) {
-            if (!cachedLogoUrl) {
-              setCompanyLogoUrl(null);
-            }
-            setCompanyLogoLoading(false);
-          }
-          return;
-        }
-        // cachedCompanyId가 오래되어 실패할 경우 membership에서 다시 확인 후 재시도
-        try {
-          const username = user?.username || "";
-          const fallbackCompanyId = await fetchPrimaryCompanyId();
-          if (!fallbackCompanyId) {
-            throw new Error("No company id");
-          }
-          const fallbackCompanyRes = await api.get(`core/companies/${fallbackCompanyId}/`);
-          const fallbackLogoUrl = fallbackCompanyRes.data?.logo || null;
-          writeLogoCache(username, fallbackCompanyId, fallbackLogoUrl);
-          if (mounted) {
-            setCompanyLogoUrl(fallbackLogoUrl);
-            setCompanyLogoLoading(false);
-          }
-          return;
-        } catch (fallbackErr) {
-          const username = user?.username || "";
+        console.error("Failed to load company logo:", err);
+        if (err?.response?.status === 401) {
           clearLogoCache(username);
         }
 
@@ -195,7 +154,6 @@ function Header({ onMenuClick }) {
     <>
       <header className="sticky top-0 z-50 bg-[#1e1e2f] shadow-md h-[60px]">
         <div className="w-full h-full px-6 flex items-center">
-          {/* Left Section - Logo */}
           <div className="flex items-center gap-4 shrink-0">
             <button
               onClick={onMenuClick}
@@ -230,14 +188,11 @@ function Header({ onMenuClick }) {
             </button>
           </div>
 
-          {/* Center Section - Top Menu */}
           <div className="flex-1 flex justify-center px-8 hidden lg:flex">
             <Menu />
           </div>
 
-          {/* Right Section */}
           <div className="flex items-center gap-2">
-            {/* 알림 */}
             <div className="relative">
               <button
                 onClick={() => {
@@ -255,11 +210,12 @@ function Header({ onMenuClick }) {
                 )}
               </button>
 
-              {/* 알림 패널 */}
-              <NotificationPanel isOpen={showNotifications} onClose={() => setShowNotifications(false)} />
+              <NotificationPanel
+                isOpen={showNotifications}
+                onClose={() => setShowNotifications(false)}
+              />
             </div>
 
-            {/* 메신저 */}
             <button
               onClick={() => {
                 setShowChat(!showChat);
@@ -271,7 +227,6 @@ function Header({ onMenuClick }) {
               <MessageSquare size={20} />
             </button>
 
-            {/* 도움말 */}
             <button
               onClick={goHelp}
               className="p-2 rounded-lg hover:bg-slate-700 text-white transition-colors"
@@ -279,12 +234,10 @@ function Header({ onMenuClick }) {
             >
               <HelpCircle size={20} />
             </button>
-
           </div>
         </div>
       </header>
 
-      {/* 채팅 패널 */}
       <ChatPanel isOpen={showChat} onClose={() => setShowChat(false)} />
     </>
   );
