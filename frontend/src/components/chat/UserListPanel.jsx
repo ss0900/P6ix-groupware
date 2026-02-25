@@ -22,21 +22,15 @@ const UserListPanel = ({ users, currentUser, onStart1on1, onCreateGroup }) => {
     const groupedUsers = useMemo(() => {
         const groups = {};
         filteredUsers.forEach((u) => {
-            const companyName = u.company || '기타(소속없음)';
             const deptName = u.department || '부서없음';
-            if (!groups[companyName]) groups[companyName] = {};
-            if (!groups[companyName][deptName]) groups[companyName][deptName] = [];
-            groups[companyName][deptName].push(u);
+            if (!groups[deptName]) groups[deptName] = [];
+            groups[deptName].push(u);
         });
 
-        return Object.keys(groups)
-            .sort()
-            .map((companyName) => ({
-                companyName,
-                departments: Object.keys(groups[companyName])
-                    .sort()
-                    .map((deptName) => ({ deptName, users: groups[companyName][deptName] })),
-            }));
+        return Object.keys(groups).sort().map((deptName) => ({
+            deptName,
+            users: groups[deptName],
+        }));
     }, [filteredUsers]);
 
     const toggleGroup = (key) => {
@@ -89,19 +83,19 @@ const UserListPanel = ({ users, currentUser, onStart1on1, onCreateGroup }) => {
                     <div className="p-4 text-center text-gray-500 text-sm">검색 결과가 없습니다.</div>
                 ) : (
                     groupedUsers.map((group) => {
-                        const isCompanyExpanded = expandedGroups[group.companyName] ?? true;
+                        const isGroupExpanded = expandedGroups[group.deptName] ?? false;
                         return (
-                            <div key={group.companyName} className="mb-2">
+                            <div key={group.deptName} className="mb-2">
                                 <div
-                                    onClick={() => toggleGroup(group.companyName)}
+                                    onClick={() => toggleGroup(group.deptName)}
                                     className="px-4 py-2 bg-gray-100 text-blue-600 font-bold text-sm sticky top-0 z-10 border-y border-gray-200 flex items-center justify-between cursor-pointer hover:bg-gray-200 transition-colors"
                                 >
-                                    <span>{group.companyName}</span>
-                                    {isCompanyExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                    <span>{group.deptName}</span>
+                                    {isGroupExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                                 </div>
 
                                 <AnimatePresence initial={false}>
-                                    {isCompanyExpanded && (
+                                    {isGroupExpanded && (
                                         <motion.div
                                             initial={{ height: 0, opacity: 0 }}
                                             animate={{ height: 'auto', opacity: 1 }}
@@ -109,74 +103,45 @@ const UserListPanel = ({ users, currentUser, onStart1on1, onCreateGroup }) => {
                                             transition={{ duration: 0.2, ease: 'easeInOut' }}
                                             className="overflow-hidden"
                                         >
-                                            {group.departments.map((dept) => {
-                                                const deptKey = `${group.companyName}-${dept.deptName}`;
-                                                const isDeptExpanded = expandedGroups[deptKey] ?? true;
-
-                                                return (
-                                                    <div key={dept.deptName}>
-                                                        <div
-                                                            onClick={() => toggleGroup(deptKey)}
-                                                            className="px-4 py-1 bg-gray-50 text-gray-600 text-xs font-semibold pl-6 border-b border-gray-200 flex items-center justify-between cursor-pointer hover:bg-gray-100 transition-colors"
-                                                        >
-                                                            <span>- {dept.deptName}</span>
-                                                            {isDeptExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                                                        </div>
-
-                                                        <AnimatePresence initial={false}>
-                                                            {isDeptExpanded && (
-                                                                <motion.div
-                                                                    initial={{ height: 0, opacity: 0 }}
-                                                                    animate={{ height: 'auto', opacity: 1 }}
-                                                                    exit={{ height: 0, opacity: 0 }}
-                                                                    transition={{ duration: 0.2, ease: 'easeInOut' }}
-                                                                    className="overflow-hidden"
-                                                                >
-                                                                    {dept.users.map((u) => (
-                                                                        <div key={u.id} className="p-3 pl-8 flex items-center justify-between hover:bg-gray-100 border-b border-gray-200 transition-colors">
-                                                                            <div className="flex items-center gap-3">
-                                                                                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold overflow-hidden shrink-0">
-                                                                                    {u.profile_picture ? (
-                                                                                        <img src={u.profile_picture} alt={u.username} className="w-full h-full object-cover" />
-                                                                                    ) : (
-                                                                                        (u.username || '?').slice(0, 1).toUpperCase()
-                                                                                    )}
-                                                                                </div>
-                                                                                <div>
-                                                                                    <div className="text-sm font-semibold text-gray-900">
-                                                                                        {u.last_name}{u.first_name}
-                                                                                        <span className="ml-2 text-[10px] text-gray-500 font-normal">{u.position || ''}</span>
-                                                                                    </div>
-                                                                                </div>
-                                                                            </div>
-                                                                            <div className="flex items-center gap-2">
-                                                                                <button
-                                                                                    onClick={(e) => {
-                                                                                        e.stopPropagation();
-                                                                                        onStart1on1(u.id);
-                                                                                    }}
-                                                                                    className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-900 text-[11px] rounded transition-colors"
-                                                                                >
-                                                                                    1:1
-                                                                                </button>
-                                                                                <input
-                                                                                    type="checkbox"
-                                                                                    checked={selectedUserIds.includes(u.id)}
-                                                                                    onChange={(e) => {
-                                                                                        e.stopPropagation();
-                                                                                        toggleUserSelection(u.id);
-                                                                                    }}
-                                                                                    className="w-4 h-4 rounded border-white/20 bg-transparent text-blue-600 focus:ring-blue-500 cursor-pointer"
-                                                                                />
-                                                                            </div>
-                                                                        </div>
-                                                                    ))}
-                                                                </motion.div>
+                                            {group.users.map((u) => (
+                                                <div key={u.id} className="p-3 flex items-center justify-between hover:bg-gray-100 border-b border-gray-200 transition-colors">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold overflow-hidden shrink-0">
+                                                            {u.profile_picture ? (
+                                                                <img src={u.profile_picture} alt={u.username} className="w-full h-full object-cover" />
+                                                            ) : (
+                                                                (u.username || '?').slice(0, 1).toUpperCase()
                                                             )}
-                                                        </AnimatePresence>
+                                                        </div>
+                                                        <div>
+                                                            <div className="text-sm font-semibold text-gray-900">
+                                                                {u.last_name}{u.first_name}
+                                                                <span className="ml-2 text-[10px] text-gray-500 font-normal">{u.position || ''}</span>
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                );
-                                            })}
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                onStart1on1(u.id);
+                                                            }}
+                                                            className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-900 text-[11px] rounded transition-colors"
+                                                        >
+                                                            1:1
+                                                        </button>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedUserIds.includes(u.id)}
+                                                            onChange={(e) => {
+                                                                e.stopPropagation();
+                                                                toggleUserSelection(u.id);
+                                                            }}
+                                                            className="w-4 h-4 rounded border-white/20 bg-transparent text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            ))}
                                         </motion.div>
                                     )}
                                 </AnimatePresence>
