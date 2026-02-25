@@ -330,7 +330,13 @@ const ChatPanel = ({ isOpen, onClose, onOpenExternally, onUnreadCountChange }) =
                 await chatApi.markAsRead(selectedChat.id);
                 setMessages((prev) => prev.map((m) =>
                     Number(m.conversation) === Number(selectedChat.id) && Number(m.sender) !== Number(currentUser?.id)
-                        ? { ...m, is_read: true }
+                        ? {
+                            ...m,
+                            is_read: true,
+                            read_by_ids: Array.isArray(m.read_by_ids) && m.read_by_ids.some((id) => Number(id) === Number(currentUser?.id))
+                                ? m.read_by_ids
+                                : [...(Array.isArray(m.read_by_ids) ? m.read_by_ids : []), currentUser?.id],
+                        }
                         : m
                 ));
 

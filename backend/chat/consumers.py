@@ -4,7 +4,7 @@ from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.contrib.auth import get_user_model
 
-from .models import Conversation, Message
+from .models import Conversation, Message, MessageReadReceipt
 
 User = get_user_model()
 
@@ -60,6 +60,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     "sender_name": sender_display_name,
                     "sender_profile_picture": profile_picture,
                     "conversation": conversation_id,
+                    "read_by_ids": [self.user.id],
                     "created_at": saved_msg.created_at.isoformat(),
                 },
             )
@@ -74,6 +75,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     "sender_name": event["sender_name"],
                     "sender_profile_picture": event.get("sender_profile_picture"),
                     "conversation": event["conversation"],
+                    "read_by_ids": event.get("read_by_ids", []),
                     "created_at": event["created_at"],
                 }
             )
@@ -94,7 +96,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
     def save_message(self, conversation_id, text):
         try:
             conversation = Conversation.objects.get(id=conversation_id)
-            return Message.objects.create(conversation=conversation, sender=self.user, text=text)
+            message = Message.objects.create(conversation=conversation, sender=self.user, text=text)
+            MessageReadReceipt.objects.get_or_create(message=message, user=self.user)
+            return message
         except Conversation.DoesNotExist:
             return None
 

@@ -54,6 +54,25 @@ const ChatRoom = ({
     };
 
     const inConversation = messages.filter((m) => String(m.conversation) === String(selectedChat.id));
+    const participantCount = Array.isArray(selectedChat?.participants) ? selectedChat.participants.length : 0;
+
+    const getUnreadByCount = (msg) => {
+        if (!msg) return 0;
+        if (!participantCount) return msg.is_read ? 0 : 1;
+
+        const senderId = Number(msg.sender);
+        const readBySet = new Set(
+            (Array.isArray(msg.read_by_ids) ? msg.read_by_ids : [])
+                .map((id) => Number(id))
+                .filter((id) => !Number.isNaN(id))
+        );
+
+        if (!Number.isNaN(senderId)) {
+            readBySet.add(senderId);
+        }
+
+        return Math.max(participantCount - readBySet.size, 0);
+    };
 
     return (
         <>
@@ -74,6 +93,7 @@ const ChatRoom = ({
                         );
                         const msgId = msg.id || msg.tempId;
                         const translated = messageTranslations[msgId];
+                        const unreadByCount = isOwn ? getUnreadByCount(msg) : 0;
 
                         return (
                             <React.Fragment key={msg.id || msg.tempId || `${msg.created_at}-${idx}`}>
@@ -210,8 +230,8 @@ const ChatRoom = ({
                                             )}
 
                                             <div className={`text-[9px] mt-2 flex items-center justify-end gap-1.5 font-bold ${isOwn ? 'text-blue-100' : 'text-gray-400'}`}>
-                                                {isOwn && !msg.is_read && (
-                                                    <span className="text-yellow-300 animate-pulse">1</span>
+                                                {isOwn && unreadByCount > 0 && (
+                                                    <span className="text-yellow-300 animate-pulse">{unreadByCount}</span>
                                                 )}
                                                 <span className="opacity-70 font-medium">
                                                     {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

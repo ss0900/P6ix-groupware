@@ -58,6 +58,33 @@ class Message(models.Model):
         return f"{self.sender}: {self.text[:30]}"
 
 
+class MessageReadReceipt(models.Model):
+    message = models.ForeignKey(
+        Message,
+        on_delete=models.CASCADE,
+        related_name="read_receipts",
+        verbose_name="Message",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="chat_message_read_receipts",
+        verbose_name="User",
+    )
+    read_at = models.DateTimeField(auto_now_add=True, verbose_name="Read At")
+
+    class Meta:
+        verbose_name = "Message Read Receipt"
+        verbose_name_plural = "Message Read Receipts"
+        constraints = [
+            models.UniqueConstraint(fields=["message", "user"], name="uniq_chat_message_read_receipt")
+        ]
+        ordering = ["-read_at"]
+
+    def __str__(self):
+        return f"{self.user_id} read {self.message_id}"
+
+
 class Notification(models.Model):
     """알림"""
     NOTIFICATION_TYPES = [

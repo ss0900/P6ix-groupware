@@ -90,13 +90,25 @@ const useChat = () => {
 
             if (data.type === 'messages_read') {
                 setLastReadEvent(data);
-                setMessages(prev => prev.map(msg =>
-                    Number(msg.conversation) === Number(data.conversation_id) &&
-                    Number(msg.sender) !== Number(data.reader_id) &&
-                    !msg.is_read
-                        ? { ...msg, is_read: true }
-                        : msg
-                ));
+                const readerId = Number(data.reader_id);
+                setMessages((prev) => prev.map((msg) => {
+                    if (
+                        Number(msg.conversation) !== Number(data.conversation_id) ||
+                        Number(msg.sender) === readerId
+                    ) {
+                        return msg;
+                    }
+
+                    const readByIds = Array.isArray(msg.read_by_ids) ? msg.read_by_ids : [];
+                    const alreadyRead = readByIds.some((id) => Number(id) === readerId);
+                    if (alreadyRead && msg.is_read) return msg;
+
+                    return {
+                        ...msg,
+                        is_read: true,
+                        read_by_ids: alreadyRead ? readByIds : [...readByIds, readerId],
+                    };
+                }));
                 return;
             }
 

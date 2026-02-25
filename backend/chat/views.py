@@ -11,7 +11,7 @@ from rest_framework.response import Response
 from core.models import CustomUser, UserMembership
 from resources.models import Resource
 
-from .models import Conversation, HelpQuestion, Message, Notification
+from .models import Conversation, HelpQuestion, Message, MessageReadReceipt, Notification
 from .serializers import (
     ConversationSerializer,
     HelpQuestionSerializer,
@@ -148,10 +148,16 @@ class MessageViewSet(viewsets.ModelViewSet):
         if not Conversation.objects.filter(id=conversation_id, participants=self.request.user).exists():
             return Message.objects.none()
 
-        return Message.objects.filter(conversation_id=conversation_id).order_by("created_at")
+        return (
+            Message.objects.filter(conversation_id=conversation_id)
+            .select_related("sender")
+            .prefetch_related("read_receipts")
+            .order_by("created_at")
+        )
 
     def perform_create(self, serializer):
-        serializer.save(sender=self.request.user)
+        message = serializer.save(sender=self.request.user)
+        MessageReadReceipt.objects.get_or_create(message=message, user=self.request.user)
 
     @action(detail=False, methods=["post"], url_path="mark-read")
     def mark_read(self, request):
@@ -159,26 +165,37 @@ class MessageViewSet(viewsets.ModelViewSet):
         if not conversation_id:
             return Response({"error": "conversation_id is required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        Message.objects.filter(conversation_id=conversation_id, is_read=False).exclude(
-            sender=request.user
-        ).update(is_read=True)
+        conversation = Conversation.objects.filter(id=conversation_id, participants=request.user).first()
+        if not conversation:
+            return Response({"error": "conversation not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        try:
-            conversation = Conversation.objects.get(id=conversation_id)
-            participants = conversation.participants.values_list("id", flat=True)
-            channel_layer = get_channel_layer()
+        target_messages = Message.objects.filter(conversation_id=conversation_id).exclude(sender=request.user)
+        unread_message_ids = list(
+            target_messages.exclude(read_receipts__user=request.user).values_list("id", flat=True).distinct()
+        )
 
-            for user_id in participants:
-                async_to_sync(channel_layer.group_send)(
-                    f"user_{user_id}",
-                    {
-                        "type": "messages_read",
-                        "conversation_id": conversation_id,
-                        "reader_id": request.user.id,
-                    },
-                )
-        except Conversation.DoesNotExist:
-            pass
+        if unread_message_ids:
+            MessageReadReceipt.objects.bulk_create(
+                [
+                    MessageReadReceipt(message_id=message_id, user=request.user)
+                    for message_id in unread_message_ids
+                ],
+                ignore_conflicts=True,
+            )
+            Message.objects.filter(id__in=unread_message_ids, is_read=False).update(is_read=True)
+
+        participants = conversation.participants.values_list("id", flat=True)
+        channel_layer = get_channel_layer()
+
+        for user_id in participants:
+            async_to_sync(channel_layer.group_send)(
+                f"user_{user_id}",
+                {
+                    "type": "messages_read",
+                    "conversation_id": conversation_id,
+                    "reader_id": request.user.id,
+                },
+            )
 
         return Response({"status": "ok"})
 

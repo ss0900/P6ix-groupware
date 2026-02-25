@@ -55,10 +55,11 @@ class UserSimpleSerializer(serializers.ModelSerializer):
 class MessageSerializer(serializers.ModelSerializer):
     sender_name = serializers.SerializerMethodField()
     sender_profile_picture = serializers.SerializerMethodField()
+    read_by_ids = serializers.SerializerMethodField()
 
     class Meta:
         model = Message
-        fields = ['id', 'conversation', 'sender', 'sender_name', 'sender_profile_picture', 'text', 'is_read', 'created_at']
+        fields = ['id', 'conversation', 'sender', 'sender_name', 'sender_profile_picture', 'text', 'is_read', 'read_by_ids', 'created_at']
         read_only_fields = ['id', 'created_at']
 
     def get_sender_name(self, obj):
@@ -71,6 +72,17 @@ class MessageSerializer(serializers.ModelSerializer):
             except Exception:
                 return str(obj.sender.profile_picture)
         return None
+
+    def get_read_by_ids(self, obj):
+        prefetched = getattr(obj, "_prefetched_objects_cache", {}).get("read_receipts")
+        if prefetched is not None:
+            read_by_ids = [receipt.user_id for receipt in prefetched]
+        else:
+            read_by_ids = list(obj.read_receipts.values_list("user_id", flat=True))
+        sender_id = obj.sender_id
+        if sender_id and sender_id not in read_by_ids:
+            read_by_ids.append(sender_id)
+        return sorted(set(read_by_ids))
 
 
 class ConversationSerializer(serializers.ModelSerializer):
@@ -91,7 +103,12 @@ class ConversationSerializer(serializers.ModelSerializer):
     def get_unread_count(self, obj):
         user = self.context.get('request').user
         if user and user.is_authenticated:
-            return obj.messages.filter(is_read=False).exclude(sender=user).count()
+            return (
+                obj.messages.exclude(sender=user)
+                .exclude(read_receipts__user=user)
+                .distinct()
+                .count()
+            )
         return 0
 
     def to_representation(self, instance):
