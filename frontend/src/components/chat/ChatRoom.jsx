@@ -107,6 +107,35 @@ const ChatRoom = ({
         }
     };
 
+    const getFileExtension = (fileName) => {
+        const name = String(fileName || '').trim();
+        const idx = name.lastIndexOf('.');
+        if (idx < 0) return '';
+        return name.slice(idx + 1).toLowerCase();
+    };
+
+    const isPreviewableFile = (fileInfo) => {
+        if (!fileInfo?.isFile) return false;
+        if (fileInfo.type === 'photo') return true;
+
+        const extension = getFileExtension(fileInfo?.metadata?.name);
+        const previewableExtensions = new Set(['pdf', 'txt', 'md', 'csv', 'json', 'xml', 'html', 'htm']);
+        return previewableExtensions.has(extension);
+    };
+
+    const handleFileCardOpen = (fileInfo) => {
+        const url = fileInfo?.metadata?.url;
+        const fileName = fileInfo?.metadata?.name;
+        if (!url) return;
+
+        if (isPreviewableFile(fileInfo)) {
+            window.open(url, '_blank', 'noopener,noreferrer');
+            return;
+        }
+
+        handleDownloadWithRename(url, fileName);
+    };
+
     const inConversation = messages.filter((m) => String(m.conversation) === String(selectedChat.id));
     const participantCount = Array.isArray(selectedChat?.participants) ? selectedChat.participants.length : 0;
 
@@ -217,7 +246,7 @@ const ChatRoom = ({
                                                                 src={fileInfo.metadata.url}
                                                                 alt={fileInfo.metadata.name}
                                                                 className="w-full max-h-64 object-cover cursor-pointer"
-                                                                onClick={() => window.open(fileInfo.metadata.url, '_blank')}
+                                                                onClick={() => handleFileCardOpen(fileInfo)}
                                                             />
                                                         </div>
                                                         <div className="px-1">
@@ -248,17 +277,11 @@ const ChatRoom = ({
                                                     <div
                                                         role="button"
                                                         tabIndex={0}
-                                                        onClick={() => {
-                                                            if (fileInfo.metadata.url) {
-                                                                window.open(fileInfo.metadata.url, '_blank', 'noopener,noreferrer');
-                                                            }
-                                                        }}
+                                                        onClick={() => handleFileCardOpen(fileInfo)}
                                                         onKeyDown={(e) => {
                                                             if (e.key === 'Enter' || e.key === ' ') {
                                                                 e.preventDefault();
-                                                                if (fileInfo.metadata.url) {
-                                                                    window.open(fileInfo.metadata.url, '_blank', 'noopener,noreferrer');
-                                                                }
+                                                                handleFileCardOpen(fileInfo);
                                                             }
                                                         }}
                                                         className={`block p-3 pb-8 rounded-xl border transition-all cursor-pointer group/doc relative overflow-hidden ${isOwn ? 'bg-white/10 border-white/20 hover:bg-white/20' : 'bg-gray-50 border-gray-100 hover:bg-blue-50 hover:border-blue-200 shadow-sm'}`}
