@@ -52,7 +52,7 @@ const formatDate = (dateStr) => {
 
 export default function ArchiveList() {
   const [searchParams, setSearchParams] = useSearchParams();
-  
+
   const [folders, setFolders] = useState([]);
   const [resources, setResources] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -65,14 +65,14 @@ export default function ArchiveList() {
   const [isDragging, setIsDragging] = useState(false);
   const [sortBy, setSortBy] = useState("name");
   const [sortOrder, setSortOrder] = useState("asc");
-  
+
   // 컨텍스트 메뉴
   const [contextMenu, setContextMenu] = useState(null);
-  
+
   // 이름변경 모달
   const [renameModal, setRenameModal] = useState(null);
   const [newName, setNewName] = useState("");
-  
+
   // 이동 모달
   const [moveModal, setMoveModal] = useState(null);
   const [folderTree, setFolderTree] = useState([]);
@@ -153,7 +153,7 @@ export default function ArchiveList() {
 
     setUploading(true);
     setUploadProgress(0);
-    
+
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
@@ -201,7 +201,7 @@ export default function ArchiveList() {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
-    
+
     const files = Array.from(e.dataTransfer.files);
     if (files.length > 0) {
       handleFileUpload(files);
@@ -230,11 +230,11 @@ export default function ArchiveList() {
     const menuHeight = menuItemCount * MENU_ITEM_HEIGHT + 12;
     const x = Math.max(
       MENU_PADDING,
-      Math.min(e.clientX, window.innerWidth - MENU_WIDTH - MENU_PADDING)
+      Math.min(e.clientX, window.innerWidth - MENU_WIDTH - MENU_PADDING),
     );
     const y = Math.max(
       MENU_PADDING,
-      Math.min(e.clientY, window.innerHeight - menuHeight - MENU_PADDING)
+      Math.min(e.clientY, window.innerHeight - menuHeight - MENU_PADDING),
     );
 
     setContextMenu({
@@ -290,7 +290,12 @@ export default function ArchiveList() {
 
   // 삭제
   const handleDelete = async (item, type) => {
-    if (!window.confirm(`${item.name}을(를) 삭제하시겠습니까?`)) return;
+    if (
+      !window.confirm(
+        `${item.name}을(를) 삭제하시겠습니까?\n삭제하면 자동으로 휴지통으로 이동됩니다.`,
+      )
+    )
+      return;
 
     try {
       if (type === "folder") {
@@ -328,12 +333,12 @@ export default function ArchiveList() {
 
   // 검색 필터
   const filteredFolders = folders.filter((f) =>
-    f.name.toLowerCase().includes(searchQuery.toLowerCase())
+    f.name.toLowerCase().includes(searchQuery.toLowerCase()),
   );
   const filteredResources = sortItems(
     resources.filter((r) =>
-      r.name.toLowerCase().includes(searchQuery.toLowerCase())
-    )
+      r.name.toLowerCase().includes(searchQuery.toLowerCase()),
+    ),
   );
 
   // 폴더 트리 렌더링
@@ -356,10 +361,7 @@ export default function ArchiveList() {
   };
 
   return (
-    <div 
-      className="space-y-6"
-      onClick={closeContextMenu}
-    >
+    <div className="space-y-6" onClick={closeContextMenu}>
       {/* 헤더 */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">자료실</h1>
@@ -368,8 +370,7 @@ export default function ArchiveList() {
             onClick={() => setShowNewFolder(true)}
             className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
           >
-            <FolderPlus size={18} />
-            새 폴더
+            <FolderPlus size={18} />새 폴더
           </button>
           <label className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer">
             <Upload size={18} />
@@ -409,15 +410,15 @@ export default function ArchiveList() {
         onDragOver={handleDragOver}
         onDrop={handleDrop}
         className={`bg-white rounded-xl border-2 border-dashed transition-colors ${
-          isDragging 
-            ? "border-blue-500 bg-blue-50" 
-            : "border-gray-200"
+          isDragging ? "border-blue-500 bg-blue-50" : "border-gray-200"
         }`}
       >
         {isDragging && (
           <div className="p-12 text-center">
             <Upload size={48} className="mx-auto mb-4 text-blue-500" />
-            <p className="text-lg font-medium text-blue-600">파일을 여기에 놓으세요</p>
+            <p className="text-lg font-medium text-blue-600">
+              파일을 여기에 놓으세요
+            </p>
           </div>
         )}
 
@@ -426,7 +427,10 @@ export default function ArchiveList() {
             {/* 검색 및 정렬 */}
             <div className="p-4 border-b border-gray-100 flex items-center justify-between gap-4">
               <div className="relative flex-1 max-w-md">
-                <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <Search
+                  size={18}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                />
                 <input
                   type="text"
                   value={searchQuery}
@@ -447,7 +451,9 @@ export default function ArchiveList() {
                   <option value="size">크기</option>
                 </select>
                 <button
-                  onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+                  onClick={() =>
+                    setSortOrder(sortOrder === "asc" ? "desc" : "asc")
+                  }
                   className="p-2 border border-gray-300 rounded-lg hover:bg-gray-50"
                 >
                   <ChevronDown
@@ -464,11 +470,14 @@ export default function ArchiveList() {
                 <div className="flex items-center justify-center py-12">
                   <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-500 border-t-transparent"></div>
                 </div>
-              ) : filteredFolders.length === 0 && filteredResources.length === 0 ? (
+              ) : filteredFolders.length === 0 &&
+                filteredResources.length === 0 ? (
                 <div className="text-center py-12 text-gray-500">
                   <Folder size={48} className="mx-auto mb-4 text-gray-300" />
                   <p>폴더나 파일이 없습니다.</p>
-                  <p className="text-sm mt-2">파일을 드래그하여 업로드하거나 위 버튼을 클릭하세요.</p>
+                  <p className="text-sm mt-2">
+                    파일을 드래그하여 업로드하거나 위 버튼을 클릭하세요.
+                  </p>
                 </div>
               ) : (
                 <>
@@ -477,7 +486,9 @@ export default function ArchiveList() {
                     <div
                       onClick={() =>
                         navigateToFolder(
-                          currentFolder.parent ? { id: currentFolder.parent } : null
+                          currentFolder.parent
+                            ? { id: currentFolder.parent }
+                            : null,
                         )
                       }
                       className="p-4 hover:bg-gray-50 cursor-pointer flex items-center gap-4"
@@ -494,14 +505,18 @@ export default function ArchiveList() {
                     <div
                       key={`folder-${folder.id}`}
                       onClick={() => navigateToFolder(folder)}
-                      onContextMenu={(e) => openContextMenu(e, folder, "folder")}
+                      onContextMenu={(e) =>
+                        openContextMenu(e, folder, "folder")
+                      }
                       className="p-4 hover:bg-gray-50 cursor-pointer flex items-center gap-4 group"
                     >
                       <div className="p-2 bg-yellow-100 rounded-lg">
                         <Folder size={20} className="text-yellow-600" />
                       </div>
                       <div className="flex-1">
-                        <p className="font-medium text-gray-900">{folder.name}</p>
+                        <p className="font-medium text-gray-900">
+                          {folder.name}
+                        </p>
                         <p className="text-sm text-gray-500">
                           폴더 {folder.subfolder_count || 0}개, 파일{" "}
                           {folder.resource_count || 0}개
@@ -523,7 +538,9 @@ export default function ArchiveList() {
                     return (
                       <div
                         key={`file-${resource.id}`}
-                        onContextMenu={(e) => openContextMenu(e, resource, "file")}
+                        onContextMenu={(e) =>
+                          openContextMenu(e, resource, "file")
+                        }
                         className="p-4 hover:bg-gray-50 flex items-center gap-4 group"
                       >
                         <div className="p-2 bg-blue-100 rounded-lg">
@@ -551,7 +568,9 @@ export default function ArchiveList() {
                             <Download size={18} />
                           </button>
                           <button
-                            onClick={(e) => openContextMenu(e, resource, "file")}
+                            onClick={(e) =>
+                              openContextMenu(e, resource, "file")
+                            }
                             className="p-2 opacity-0 group-hover:opacity-100 hover:bg-gray-200 rounded-lg"
                           >
                             <MoreVertical size={18} className="text-gray-500" />
