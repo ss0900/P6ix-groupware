@@ -250,11 +250,11 @@ function FAQListView({ loading, questions, page, total, onPageChange, onSelect }
               <span className="font-medium">{question.title}</span>
               {Array.isArray(question.answers) && question.answers.length > 0 ? (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-green-50 text-green-700">
-                  답변완료
+                  답변 완료
                 </span>
               ) : (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-orange-50 text-orange-700">
-                  답변대기
+                  답변 대기
                 </span>
               )}
             </div>
@@ -270,6 +270,7 @@ function FAQListView({ loading, questions, page, total, onPageChange, onSelect }
         pageSize={PAGE_SIZE}
         total={total}
         onPageChange={onPageChange}
+        showSinglePage
       />
     </>
   );
@@ -283,7 +284,7 @@ function FAQCreateView({ onCancel, onSaved }) {
 
   const submit = async () => {
     if (!title.trim() || !content.trim()) {
-      alert("제목과 내용을 입력해주세요.");
+      alert("제목과 내용을 입력해 주세요.");
       return;
     }
 
@@ -421,9 +422,7 @@ function FAQDetailView({ user, question, canDelete, onBack, onRefresh }) {
       {Array.isArray(question.answers) && question.answers.length > 0 ? (
         question.answers.map((answer) => (
           <div key={answer.id} className="bg-gray-50 p-3 rounded">
-            <div className="text-xs text-gray-400 mb-1">
-              관리자 · {toDate(answer.created_at)}
-            </div>
+            <div className="text-xs text-gray-400 mb-1">관리자 · {toDate(answer.created_at)}</div>
             {answer.content}
           </div>
         ))

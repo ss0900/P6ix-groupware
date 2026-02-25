@@ -6,9 +6,10 @@ export default function BoardPagination({
   total = 0,
   onPageChange,
   className = "",
+  showSinglePage = false,
 }) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  if (totalPages <= 1) return null;
+  if (!showSinglePage && totalPages <= 1) return null;
 
   const changePage = (nextPage) => {
     if (!onPageChange) return;

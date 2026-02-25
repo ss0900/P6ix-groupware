@@ -1,38 +1,55 @@
-// src/components/common/ui/PageHeader.jsx
-// PMIS 디자인 시스템에서 이식 - 페이지 상단 헤더 컴포넌트
 import React from "react";
+
+const isPrimitive = (value) =>
+  typeof value === "string" || typeof value === "number";
 
 export default function PageHeader({
   title,
   subtitle,
-  children, // 우측 액션 버튼 영역
+  children,
   breadcrumb = null,
+  className = "",
 }) {
+  const childArray = React.Children.toArray(children);
+  const hasTitleProp = title !== undefined && title !== null;
+  const hasLegacyTitleChild =
+    !hasTitleProp && childArray.length === 1 && isPrimitive(childArray[0]);
+
+  const resolvedTitle = hasTitleProp
+    ? title
+    : hasLegacyTitleChild
+      ? childArray[0]
+      : null;
+  const resolvedActions = hasTitleProp
+    ? children
+    : hasLegacyTitleChild
+      ? null
+      : children;
+
   return (
-    <div className="mb-6">
-      {/* Breadcrumb */}
-      {breadcrumb && (
-        <div className="text-sm text-gray-500 mb-2">
-          {breadcrumb}
-        </div>
-      )}
-      
-      {/* Header Row */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-title">{title}</h1>
-          {subtitle && (
-            <p className="text-muted-sm mt-1">{subtitle}</p>
+    <div
+      className={[
+        "mb-6",
+        hasLegacyTitleChild ? "-mt-4" : "",
+        className,
+      ].join(" ")}
+    >
+      {breadcrumb && <div className="text-sm text-gray-500 mb-2">{breadcrumb}</div>}
+
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          {resolvedTitle && (
+            <h1 className="text-title min-w-0 break-words">{resolvedTitle}</h1>
           )}
+          {subtitle && <p className="text-muted-sm mt-1">{subtitle}</p>}
         </div>
-        
-        {/* Actions */}
-        {children && (
-          <div className="flex items-center gap-2">
-            {children}
-          </div>
+
+        {resolvedActions && (
+          <div className="flex items-center gap-2">{resolvedActions}</div>
         )}
       </div>
+
+      {hasLegacyTitleChild && <div className="h-px bg-gray-300 mt-2" />}
     </div>
   );
 }
