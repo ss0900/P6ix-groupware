@@ -81,11 +81,12 @@ def _normalize_reference_pending_lines(document, acted_at=None):
 
 class DocumentTemplateSerializer(serializers.ModelSerializer):
     category_display = serializers.CharField(source="get_category_display", read_only=True)
+    template_type_display = serializers.CharField(source="get_template_type_display", read_only=True)
     
     class Meta:
         model = DocumentTemplate
         fields = [
-            "id", "name", "category", "category_display",
+            "id", "name", "template_type", "template_type_display", "category", "category_display",
             "content", "is_active", "created_at", "updated_at"
         ]
         read_only_fields = ["id", "created_at", "updated_at"]

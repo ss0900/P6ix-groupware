@@ -13,8 +13,8 @@ from .models import (
 
 @admin.register(DocumentTemplate)
 class DocumentTemplateAdmin(admin.ModelAdmin):
-    list_display = ["name", "category", "is_active", "created_at"]
-    list_filter = ["category", "is_active"]
+    list_display = ["name", "template_type", "category", "is_active", "created_at"]
+    list_filter = ["template_type", "category", "is_active"]
     search_fields = ["name", "content"]
 
 

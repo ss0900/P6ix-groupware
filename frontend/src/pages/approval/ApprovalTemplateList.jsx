@@ -157,7 +157,10 @@ const TemplateModal = ({
   );
 };
 
-export default function ApprovalTemplateList() {
+export default function ApprovalTemplateList({
+  pageTitle = "공문 양식",
+  templateType = "official",
+}) {
   const navigate = useNavigate();
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -178,7 +181,7 @@ export default function ApprovalTemplateList() {
   const loadTemplates = useCallback(async () => {
     setLoading(true);
     try {
-      const params = { include_inactive: true };
+      const params = { include_inactive: true, template_type: templateType };
       if (selectedCategory) params.category = selectedCategory;
       const res = await api.get("/approval/templates/", { params });
       setTemplates(res.data?.results ?? res.data ?? []);
@@ -187,7 +190,7 @@ export default function ApprovalTemplateList() {
     } finally {
       setLoading(false);
     }
-  }, [selectedCategory]);
+  }, [selectedCategory, templateType]);
 
   useEffect(() => {
     loadTemplates();
@@ -240,6 +243,7 @@ export default function ApprovalTemplateList() {
 
     const payload = {
       name: formData.name.trim(),
+      template_type: templateType,
       content: formData.content,
       category: formData.category,
       is_active: formData.is_active,
@@ -313,7 +317,7 @@ export default function ApprovalTemplateList() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">공문 양식</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{pageTitle}</h1>
         <button
           type="button"
           onClick={openCreateModal}

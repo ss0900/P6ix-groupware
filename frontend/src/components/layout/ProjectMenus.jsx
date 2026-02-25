@@ -48,12 +48,16 @@ export const projectMenus = {
         title: "전체보기",
         items: [{ to: "all", label: "전체보기" }],
       },
+      // {
+      //   title: "공문문서함",
+      //   items: [
+      //     { to: "templates", label: "공문 양식" },
+      //     { to: "public", label: "내 공문" },
+      //   ],
+      // },
       {
-        title: "공문문서함",
-        items: [
-          { to: "templates", label: "공문 양식" },
-          { to: "public", label: "내 공문" },
-        ],
+        title: "양식문서함",
+        items: [{ to: "template-management", label: "결재 양식" }],
       },
     ],
   },
@@ -207,7 +211,11 @@ export const projectMenus = {
         title: "사용자 관리",
         items: [
           { to: "users", label: "사용자 목록", permission: "superuser" },
-          { to: "companies", label: "회사(워크스페이스) 관리", permission: "superuser" },
+          {
+            to: "companies",
+            label: "회사(워크스페이스) 관리",
+            permission: "superuser",
+          },
         ],
       },
       {

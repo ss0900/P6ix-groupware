@@ -7,6 +7,10 @@ import datetime
 
 class DocumentTemplate(models.Model):
     """결재 문서 양식"""
+    TEMPLATE_TYPE_CHOICES = [
+        ("official", "공문 양식"),
+        ("approval", "결재 양식"),
+    ]
     CATEGORY_CHOICES = [
         ("general", "일반"),
         ("leave", "휴가"),
@@ -17,6 +21,12 @@ class DocumentTemplate(models.Model):
     ]
     
     name = models.CharField("양식명", max_length=100)
+    template_type = models.CharField(
+        "양식 유형",
+        max_length=20,
+        choices=TEMPLATE_TYPE_CHOICES,
+        default="official",
+    )
     category = models.CharField("분류", max_length=50, choices=CATEGORY_CHOICES, default="general")
     content = models.TextField("내용", blank=True)
     is_active = models.BooleanField("활성화", default=True)

@@ -207,7 +207,15 @@ function AppRouter() {
           <Route path="reference" element={<ApprovalList />} />
           <Route path="sent" element={<ApprovalList />} />
           <Route path="all" element={<ApprovalList />} />
-          <Route path="templates" element={<ApprovalTemplateList />} />
+          <Route
+            path="templates"
+            element={<ApprovalTemplateList pageTitle="공문 양식" templateType="official" />}
+          />
+          <Route
+            path="template-management"
+            element={<ApprovalTemplateList pageTitle="결재 양식" templateType="approval" />}
+          />
+          <Route path="template-management/templates" element={<Navigate to="../template-management" replace />} />
           <Route path="public" element={<ApprovalList />} />
           <Route path="new" element={<ApprovalForm />} />
           <Route path=":id" element={<ApprovalDetail />} />

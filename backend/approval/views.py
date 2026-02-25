@@ -39,6 +39,7 @@ class DocumentTemplateViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset()
+        template_type = self.request.query_params.get("template_type")
         category = self.request.query_params.get("category")
         is_active = self.request.query_params.get("is_active")
         include_inactive = self.request.query_params.get("include_inactive")
@@ -58,6 +59,8 @@ class DocumentTemplateViewSet(viewsets.ModelViewSet):
 
         if category:
             qs = qs.filter(category=category)
+        if template_type:
+            qs = qs.filter(template_type=template_type)
         return qs
 
 
