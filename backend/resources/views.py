@@ -3,7 +3,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.http import FileResponse
 from django.db.models import Q
 from django.utils import timezone
@@ -174,7 +174,7 @@ class FolderViewSet(viewsets.ModelViewSet):
 class ResourceViewSet(viewsets.ModelViewSet):
     """자료 ViewSet"""
     permission_classes = [IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get_queryset(self):
         qs = Resource.objects.filter(is_deleted=False).select_related('folder', 'uploader')
@@ -222,14 +222,6 @@ class ResourceViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         resource = serializer.save(uploader=self.request.user)
         log_activity(self.request.user, 'upload', self.request, resource=resource)
-
-    def retrieve(self, request, *args, **kwargs):
-        instance = self.get_object()
-        # 조회수 증가
-        instance.view_count += 1
-        instance.save(update_fields=['view_count'])
-        serializer = self.get_serializer(instance)
-        return Response(serializer.data)
 
     @action(detail=True, methods=['get'])
     def download(self, request, pk=None):

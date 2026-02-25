@@ -14,7 +14,6 @@ import {
   FileText,
   Film,
   Archive as ArchiveIcon,
-  Eye,
   MoreVertical,
   ArrowLeft,
   Edit3,
@@ -223,9 +222,24 @@ export default function ArchiveList() {
   const openContextMenu = (e, item, type) => {
     e.preventDefault();
     e.stopPropagation();
+
+    const MENU_WIDTH = 192; // w-48
+    const MENU_ITEM_HEIGHT = 40;
+    const MENU_PADDING = 8;
+    const menuItemCount = 3;
+    const menuHeight = menuItemCount * MENU_ITEM_HEIGHT + 12;
+    const x = Math.max(
+      MENU_PADDING,
+      Math.min(e.clientX, window.innerWidth - MENU_WIDTH - MENU_PADDING)
+    );
+    const y = Math.max(
+      MENU_PADDING,
+      Math.min(e.clientY, window.innerHeight - menuHeight - MENU_PADDING)
+    );
+
     setContextMenu({
-      x: e.clientX,
-      y: e.clientY,
+      x,
+      y,
       item,
       type,
     });
@@ -523,10 +537,6 @@ export default function ArchiveList() {
                             <span>{formatFileSize(resource.file_size)}</span>
                             <span>{formatDate(resource.created_at)}</span>
                             <span className="flex items-center gap-1">
-                              <Eye size={12} />
-                              {resource.view_count}
-                            </span>
-                            <span className="flex items-center gap-1">
                               <Download size={12} />
                               {resource.download_count}
                             </span>
@@ -560,7 +570,7 @@ export default function ArchiveList() {
       {/* 컨텍스트 메뉴 */}
       {contextMenu && (
         <div
-          className="fixed bg-white border border-gray-200 rounded-lg shadow-lg py-2 z-50"
+          className="fixed w-48 bg-white border border-gray-200 rounded-lg shadow-lg py-2 z-50"
           style={{ top: contextMenu.y, left: contextMenu.x }}
         >
           <button
@@ -569,7 +579,7 @@ export default function ArchiveList() {
               setNewName(contextMenu.item.name);
               closeContextMenu();
             }}
-            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2 whitespace-nowrap"
           >
             <Edit3 size={16} />
             이름 변경
@@ -580,30 +590,18 @@ export default function ArchiveList() {
               loadFolderTree();
               closeContextMenu();
             }}
-            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
+            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2 whitespace-nowrap"
           >
             <Move size={16} />
             이동
           </button>
-          {contextMenu.type === "file" && (
-            <button
-              onClick={() => {
-                handleDownload(contextMenu.item);
-                closeContextMenu();
-              }}
-              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2"
-            >
-              <Download size={16} />
-              다운로드
-            </button>
-          )}
           <hr className="my-1" />
           <button
             onClick={() => {
               handleDelete(contextMenu.item, contextMenu.type);
               closeContextMenu();
             }}
-            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2 text-red-600"
+            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-2 text-red-600 whitespace-nowrap"
           >
             <Trash2 size={16} />
             삭제

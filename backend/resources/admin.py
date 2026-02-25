@@ -32,7 +32,7 @@ class ResourceAdmin(admin.ModelAdmin):
     list_filter = ['resource_type', 'is_deleted', 'is_temporary', 'created_at']
     search_fields = ['name', 'description', 'tags']
     raw_id_fields = ['folder', 'uploader', 'deleted_by', 'previous_version']
-    readonly_fields = ['created_at', 'updated_at', 'checksum', 'download_count', 'view_count']
+    readonly_fields = ['created_at', 'updated_at', 'checksum', 'download_count']
 
 
 @admin.register(AttachmentLink)

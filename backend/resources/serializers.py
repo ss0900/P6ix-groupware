@@ -73,7 +73,7 @@ class ResourceListSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'original_name', 'folder', 'folder_name',
             'resource_type', 'file_size', 'extension', 'file_url',
-            'download_count', 'view_count',
+            'download_count',
             'uploader', 'uploader_name',
             'version', 'is_deleted', 'is_temporary',
             'created_at'
@@ -106,7 +106,7 @@ class ResourceDetailSerializer(serializers.ModelSerializer):
             'id', 'name', 'original_name', 'folder', 'folder_name',
             'file', 'file_url', 'resource_type', 'file_size', 'mime_type', 'checksum', 'extension',
             'description', 'tags',
-            'download_count', 'view_count',
+            'download_count',
             'uploader', 'uploader_name',
             'version', 'previous_version', 'previous_versions',
             'is_deleted', 'deleted_at', 'is_temporary', 'expires_at',
