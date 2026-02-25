@@ -551,9 +551,13 @@ export default function ArchiveList() {
                             {resource.name}
                           </p>
                           <div className="flex items-center gap-3 text-sm text-gray-500 flex-wrap">
-                            <span>{formatFileSize(resource.file_size)}</span>
-                            <span>{formatDate(resource.created_at)}</span>
+                            <span>
+                              크기: {formatFileSize(resource.file_size)}
+                            </span>
                             <span>등록자: {resource.uploader_name || "-"}</span>
+                            <span>
+                              등록일: {formatDate(resource.created_at)}
+                            </span>
                             <span className="flex items-center gap-1">
                               <Download size={12} />
                               {resource.download_count}

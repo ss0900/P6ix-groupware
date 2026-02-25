@@ -247,5 +247,7 @@ class TrashItemSerializer(serializers.Serializer):
     type = serializers.CharField()  # 'folder' or 'file'
     deleted_at = serializers.DateTimeField()
     deleted_by_name = serializers.CharField()
+    uploader_name = serializers.CharField(required=False, allow_blank=True)
+    created_at = serializers.DateTimeField(required=False, allow_null=True)
     size = serializers.IntegerField(required=False)
     resource_type = serializers.CharField(required=False)

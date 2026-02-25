@@ -83,7 +83,7 @@ export default function ArchiveTrash() {
   // 영구 삭제
   const handlePurge = async () => {
     if (!itemToPurge) return;
-    
+
     try {
       await ResourceService.purgeItem(itemToPurge.id, itemToPurge.type);
       setShowPurgeConfirm(false);
@@ -115,12 +115,14 @@ export default function ArchiveTrash() {
 
       <div className="bg-white rounded-xl border border-gray-200">
         {/* 테이블 헤더 */}
-        <div className="p-4 border-b border-gray-100 grid grid-cols-12 gap-4 text-sm font-medium text-gray-500">
-          <div className="col-span-5">이름</div>
-          <div className="col-span-2">유형</div>
-          <div className="col-span-2">삭제일</div>
-          <div className="col-span-1">크기</div>
-          <div className="col-span-2 text-center">작업</div>
+        <div className="p-4 border-b border-gray-100 grid grid-cols-[minmax(0,3fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1.8fr)_minmax(0,1.8fr)_minmax(0,2fr)] gap-4 text-sm font-medium text-gray-500">
+          <div className="min-w-0">이름</div>
+          <div>유형</div>
+          <div>크기</div>
+          <div>등록자</div>
+          <div>등록일</div>
+          <div>삭제일</div>
+          <div className="text-center">관리</div>
         </div>
 
         {/* 내용 */}
@@ -136,40 +138,57 @@ export default function ArchiveTrash() {
             </div>
           ) : (
             items.map((item) => {
-              const Icon = item.type === "folder" ? Folder : getFileIcon(item.resource_type);
-              const iconBg = item.type === "folder" ? "bg-yellow-100" : "bg-blue-100";
-              const iconColor = item.type === "folder" ? "text-yellow-600" : "text-blue-600";
+              const Icon =
+                item.type === "folder"
+                  ? Folder
+                  : getFileIcon(item.resource_type);
+              const iconBg =
+                item.type === "folder" ? "bg-yellow-100" : "bg-blue-100";
+              const iconColor =
+                item.type === "folder" ? "text-yellow-600" : "text-blue-600";
 
               return (
                 <div
                   key={`${item.type}-${item.id}`}
-                  className="p-4 hover:bg-gray-50 grid grid-cols-12 gap-4 items-center"
+                  className="p-4 hover:bg-gray-50 grid grid-cols-[minmax(0,3fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1.8fr)_minmax(0,1.8fr)_minmax(0,2fr)] gap-4 items-center"
                 >
                   {/* 이름 */}
-                  <div className="col-span-5 flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
                     <div className={`p-2 ${iconBg} rounded-lg`}>
                       <Icon size={20} className={iconColor} />
                     </div>
-                    <span className="font-medium text-gray-900 truncate">{item.name}</span>
+                    <span className="font-medium text-gray-900 truncate">
+                      {item.name}
+                    </span>
                   </div>
 
                   {/* 유형 */}
-                  <div className="col-span-2 text-sm text-gray-500">
+                  <div className="text-sm text-gray-500">
                     {item.type === "folder" ? "폴더" : "파일"}
                   </div>
 
-                  {/* 삭제일 */}
-                  <div className="col-span-2 text-sm text-gray-500">
-                    {formatDate(item.deleted_at)}
-                  </div>
-
                   {/* 크기 */}
-                  <div className="col-span-1 text-sm text-gray-500">
+                  <div className="text-sm text-gray-500">
                     {item.type === "file" ? formatFileSize(item.size) : "-"}
                   </div>
 
+                  {/* 등록자 */}
+                  <div className="text-sm text-gray-500 truncate">
+                    {item.uploader_name || "-"}
+                  </div>
+
+                  {/* 등록일 */}
+                  <div className="text-sm text-gray-500 whitespace-nowrap">
+                    {formatDate(item.created_at)}
+                  </div>
+
+                  {/* 삭제일 */}
+                  <div className="text-sm text-gray-500 whitespace-nowrap">
+                    {formatDate(item.deleted_at)}
+                  </div>
+
                   {/* 작업 */}
-                  <div className="col-span-2 flex items-center justify-center gap-2">
+                  <div className="flex items-center justify-center gap-2">
                     <button
                       onClick={() => handleRestore(item)}
                       className="flex items-center gap-1 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-lg"
@@ -184,7 +203,7 @@ export default function ArchiveTrash() {
                       title="영구삭제"
                     >
                       <Trash2 size={16} />
-                      삭제
+                      영구삭제
                     </button>
                   </div>
                 </div>
@@ -205,7 +224,9 @@ export default function ArchiveTrash() {
             <p className="text-gray-600 mb-6">
               <strong>{itemToPurge?.name}</strong>을(를) 영구 삭제하시겠습니까?
               <br />
-              <span className="text-sm text-red-500">이 작업은 되돌릴 수 없습니다.</span>
+              <span className="text-sm text-red-500">
+                이 작업은 되돌릴 수 없습니다.
+              </span>
             </p>
             <div className="flex gap-3">
               <button

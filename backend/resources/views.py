@@ -320,12 +320,12 @@ class TrashViewSet(viewsets.ViewSet):
         # 삭제된 폴더
         folders = Folder.objects.filter(
             is_deleted=True
-        ).filter(Q(owner=user) | Q(deleted_by=user)).select_related('deleted_by')
+        ).filter(Q(owner=user) | Q(deleted_by=user)).select_related('deleted_by', 'owner')
         
         # 삭제된 파일
         resources = Resource.objects.filter(
             is_deleted=True
-        ).filter(Q(uploader=user) | Q(deleted_by=user)).select_related('deleted_by')
+        ).filter(Q(uploader=user) | Q(deleted_by=user)).select_related('deleted_by', 'uploader')
         
         items = []
         for folder in folders:
@@ -335,6 +335,8 @@ class TrashViewSet(viewsets.ViewSet):
                 'type': 'folder',
                 'deleted_at': folder.deleted_at,
                 'deleted_by_name': f"{folder.deleted_by.last_name}{folder.deleted_by.first_name}" if folder.deleted_by else "",
+                'uploader_name': f"{folder.owner.last_name}{folder.owner.first_name}" if folder.owner else "",
+                'created_at': folder.created_at,
             })
         
         for resource in resources:
@@ -344,6 +346,8 @@ class TrashViewSet(viewsets.ViewSet):
                 'type': 'file',
                 'deleted_at': resource.deleted_at,
                 'deleted_by_name': f"{resource.deleted_by.last_name}{resource.deleted_by.first_name}" if resource.deleted_by else "",
+                'uploader_name': f"{resource.uploader.last_name}{resource.uploader.first_name}" if resource.uploader else "",
+                'created_at': resource.created_at,
                 'size': resource.file_size,
                 'resource_type': resource.resource_type,
             })
