@@ -1,6 +1,8 @@
 ﻿import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
+
+const PRIORITY_DEPARTMENT_NAME = '대표이사';
 
 const UserListPanel = ({ users, currentUser, onStart1on1, onCreateGroup }) => {
     const [searchQuery, setSearchQuery] = useState('');
@@ -27,10 +29,19 @@ const UserListPanel = ({ users, currentUser, onStart1on1, onCreateGroup }) => {
             groups[deptName].push(u);
         });
 
-        return Object.keys(groups).sort().map((deptName) => ({
-            deptName,
-            users: groups[deptName],
-        }));
+        return Object.keys(groups)
+            .sort((a, b) => {
+                const isAPriority = String(a || '').trim() === PRIORITY_DEPARTMENT_NAME;
+                const isBPriority = String(b || '').trim() === PRIORITY_DEPARTMENT_NAME;
+
+                if (isAPriority && !isBPriority) return -1;
+                if (!isAPriority && isBPriority) return 1;
+                return a.localeCompare(b);
+            })
+            .map((deptName) => ({
+                deptName,
+                users: groups[deptName],
+            }));
     }, [filteredUsers]);
 
     const toggleGroup = (key) => {
@@ -83,7 +94,8 @@ const UserListPanel = ({ users, currentUser, onStart1on1, onCreateGroup }) => {
                     <div className="p-4 text-center text-gray-500 text-sm">검색 결과가 없습니다.</div>
                 ) : (
                     groupedUsers.map((group) => {
-                        const isGroupExpanded = expandedGroups[group.deptName] ?? false;
+                        const hasSearchQuery = searchQuery.trim().length > 0;
+                        const isGroupExpanded = hasSearchQuery || (expandedGroups[group.deptName] ?? false);
                         return (
                             <div key={group.deptName} className="mb-2">
                                 <div
@@ -91,7 +103,7 @@ const UserListPanel = ({ users, currentUser, onStart1on1, onCreateGroup }) => {
                                     className="px-4 py-2 bg-gray-100 text-blue-600 font-bold text-sm sticky top-0 z-10 border-y border-gray-200 flex items-center justify-between cursor-pointer hover:bg-gray-200 transition-colors"
                                 >
                                     <span>{group.deptName}</span>
-                                    {isGroupExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                    {isGroupExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                                 </div>
 
                                 <AnimatePresence initial={false}>
