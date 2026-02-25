@@ -93,7 +93,8 @@ const ChatPanel = ({ isOpen, onClose, onOpenExternally, onUnreadCountChange }) =
         let mounted = true;
 
         const resolveCompanyScope = async () => {
-            if (!currentUser?.id) {
+            const accessToken = localStorage.getItem('access');
+            if (!accessToken) {
                 if (mounted) {
                     setCompanyId(null);
                     setScopeLoading(false);
