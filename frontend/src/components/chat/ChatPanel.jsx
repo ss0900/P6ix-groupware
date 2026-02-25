@@ -10,6 +10,8 @@ import ChatListPanel from './ChatListPanel';
 import UserListPanel from './UserListPanel';
 import ChatRoom from './ChatRoom';
 
+const getSelectedCompanyScopeKey = (username) => `chat:selected-company:${username || 'anonymous'}`;
+
 const ChatPanel = ({ isOpen, onClose, onOpenExternally, onUnreadCountChange }) => {
     const { user } = useAuth();
     const currentUser = user || {};
@@ -100,6 +102,17 @@ const ChatPanel = ({ isOpen, onClose, onOpenExternally, onUnreadCountChange }) =
             }
 
             setScopeLoading(true);
+            const selectedScopeKey = getSelectedCompanyScopeKey(currentUser?.username);
+            const selectedCompany = localStorage.getItem(selectedScopeKey);
+            if (selectedCompany && mounted) {
+                const selectedCompanyId = Number(selectedCompany) || null;
+                if (selectedCompanyId) {
+                    setCompanyId(selectedCompanyId);
+                    setScopeLoading(false);
+                    return;
+                }
+            }
+
             const cacheKey = currentUser?.username ? `header:company:${currentUser.username}:id` : null;
             const cachedCompany = cacheKey ? localStorage.getItem(cacheKey) : null;
             if (cachedCompany && mounted) {

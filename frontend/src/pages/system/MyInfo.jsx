@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Eye, EyeOff } from "lucide-react";
 import api from "../../api/axios";
 import { useAuth } from "../../context/AuthContext";
@@ -95,7 +101,8 @@ export default function MyInfo() {
       setSignFile(null);
       setClearSign(false);
 
-      const memberships = membershipRes.data?.results ?? membershipRes.data ?? [];
+      const memberships =
+        membershipRes.data?.results ?? membershipRes.data ?? [];
       const primaryMembership =
         memberships.find((item) => item.is_primary) || memberships[0] || null;
 
@@ -241,7 +248,9 @@ export default function MyInfo() {
     }
 
     const hasPasswordInput =
-      passwordForm.current_password || passwordForm.password || passwordForm.password_confirm;
+      passwordForm.current_password ||
+      passwordForm.password ||
+      passwordForm.password_confirm;
     if (hasPasswordInput) {
       if (
         !passwordForm.current_password ||
@@ -309,7 +318,7 @@ export default function MyInfo() {
 
   if (loading) {
     return (
-        <div className="flex items-center justify-center py-20">
+      <div className="flex items-center justify-center py-20">
         <div className="animate-spin rounded-full h-10 w-10 border-2 border-[#1e1e2f] border-t-transparent"></div>
       </div>
     );
@@ -328,7 +337,9 @@ export default function MyInfo() {
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <span className="text-3xl font-bold text-[#1e1e2f]">{initialLetter}</span>
+                <span className="text-3xl font-bold text-[#1e1e2f]">
+                  {initialLetter}
+                </span>
               )}
             </div>
             <button
@@ -348,7 +359,9 @@ export default function MyInfo() {
           </div>
 
           <div className="pt-1">
-            <h1 className="text-3xl font-bold text-gray-900 mb-1">{displayName}</h1>
+            <h1 className="text-3xl font-bold text-gray-900 mb-1">
+              {displayName}
+            </h1>
             <p className="text-gray-600">{form.email || "-"}</p>
           </div>
         </div>
@@ -360,42 +373,65 @@ export default function MyInfo() {
         </div>
         <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm text-gray-600 mb-1">성(Last Name)*</label>
+            <label className="block text-sm text-gray-600 mb-1">
+              성(Last Name) <span className="text-red-500">*</span>
+            </label>
             <input
               type="text"
               value={form.last_name}
-              onChange={(e) => setForm((prev) => ({ ...prev, last_name: e.target.value }))}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, last_name: e.target.value }))
+              }
               className={inputClassName}
             />
           </div>
           <div>
-            <label className="block text-sm text-gray-600 mb-1">이름(First Name)*</label>
+            <label className="block text-sm text-gray-600 mb-1">
+              이름(First Name) <span className="text-red-500">*</span>
+            </label>
             <input
               type="text"
               value={form.first_name}
-              onChange={(e) => setForm((prev) => ({ ...prev, first_name: e.target.value }))}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, first_name: e.target.value }))
+              }
               className={inputClassName}
             />
           </div>
           <div>
-            <label className="block text-sm text-gray-600 mb-1">아이디(변경 불가)</label>
-            <input type="text" value={form.username} readOnly className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-600" />
+            <label className="block text-sm text-gray-600 mb-1">
+              아이디(변경 불가)
+            </label>
+            <input
+              type="text"
+              value={form.username}
+              readOnly
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-600"
+            />
           </div>
           <div>
-            <label className="block text-sm text-gray-600 mb-1">이메일*</label>
+            <label className="block text-sm text-gray-600 mb-1">
+              이메일 <span className="text-red-500">*</span>
+            </label>
             <input
               type="email"
               value={form.email}
-              onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, email: e.target.value }))
+              }
               className={inputClassName}
             />
           </div>
           <div>
-            <label className="block text-sm text-gray-600 mb-1">전화번호*</label>
+            <label className="block text-sm text-gray-600 mb-1">
+              전화번호 <span className="text-red-500">*</span>
+            </label>
             <input
               type="text"
               value={form.phone_number}
-              onChange={(e) => setForm((prev) => ({ ...prev, phone_number: e.target.value }))}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, phone_number: e.target.value }))
+              }
               className={inputClassName}
             />
           </div>
@@ -424,7 +460,9 @@ export default function MyInfo() {
         {showPasswordForm && (
           <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-4 border-b border-gray-100">
             <div>
-              <label className="block text-sm text-gray-600 mb-1">현재 비밀번호</label>
+              <label className="block text-sm text-gray-600 mb-1">
+                현재 비밀번호
+              </label>
               <div className="relative">
                 <input
                   type={showPassword.current_password ? "text" : "password"}
@@ -441,14 +479,24 @@ export default function MyInfo() {
                   type="button"
                   onClick={() => togglePasswordVisibility("current_password")}
                   className="absolute inset-y-0 right-0 px-3 text-gray-500 hover:text-[#1e1e2f]"
-                  aria-label={showPassword.current_password ? "현재 비밀번호 숨기기" : "현재 비밀번호 표시"}
+                  aria-label={
+                    showPassword.current_password
+                      ? "현재 비밀번호 숨기기"
+                      : "현재 비밀번호 표시"
+                  }
                 >
-                  {showPassword.current_password ? <EyeOff size={18} /> : <Eye size={18} />}
+                  {showPassword.current_password ? (
+                    <EyeOff size={18} />
+                  ) : (
+                    <Eye size={18} />
+                  )}
                 </button>
               </div>
             </div>
             <div>
-              <label className="block text-sm text-gray-600 mb-1">새 비밀번호</label>
+              <label className="block text-sm text-gray-600 mb-1">
+                새 비밀번호
+              </label>
               <div className="relative">
                 <input
                   type={showPassword.password ? "text" : "password"}
@@ -465,14 +513,24 @@ export default function MyInfo() {
                   type="button"
                   onClick={() => togglePasswordVisibility("password")}
                   className="absolute inset-y-0 right-0 px-3 text-gray-500 hover:text-[#1e1e2f]"
-                  aria-label={showPassword.password ? "새 비밀번호 숨기기" : "새 비밀번호 표시"}
+                  aria-label={
+                    showPassword.password
+                      ? "새 비밀번호 숨기기"
+                      : "새 비밀번호 표시"
+                  }
                 >
-                  {showPassword.password ? <EyeOff size={18} /> : <Eye size={18} />}
+                  {showPassword.password ? (
+                    <EyeOff size={18} />
+                  ) : (
+                    <Eye size={18} />
+                  )}
                 </button>
               </div>
             </div>
             <div>
-              <label className="block text-sm text-gray-600 mb-1">새 비밀번호 확인</label>
+              <label className="block text-sm text-gray-600 mb-1">
+                새 비밀번호 확인
+              </label>
               <div className="relative">
                 <input
                   type={showPassword.password_confirm ? "text" : "password"}
@@ -489,9 +547,17 @@ export default function MyInfo() {
                   type="button"
                   onClick={() => togglePasswordVisibility("password_confirm")}
                   className="absolute inset-y-0 right-0 px-3 text-gray-500 hover:text-[#1e1e2f]"
-                  aria-label={showPassword.password_confirm ? "새 비밀번호 확인 숨기기" : "새 비밀번호 확인 표시"}
+                  aria-label={
+                    showPassword.password_confirm
+                      ? "새 비밀번호 확인 숨기기"
+                      : "새 비밀번호 확인 표시"
+                  }
                 >
-                  {showPassword.password_confirm ? <EyeOff size={18} /> : <Eye size={18} />}
+                  {showPassword.password_confirm ? (
+                    <EyeOff size={18} />
+                  ) : (
+                    <Eye size={18} />
+                  )}
                 </button>
               </div>
             </div>
@@ -505,7 +571,11 @@ export default function MyInfo() {
           {signPreview ? (
             <>
               <div className="w-[180px] h-[120px] border border-gray-200 rounded bg-white overflow-hidden mb-3 flex items-center justify-center">
-                <img src={signPreview} alt="서명" className="w-full h-full object-contain" />
+                <img
+                  src={signPreview}
+                  alt="서명"
+                  className="w-full h-full object-contain"
+                />
               </div>
               <div className="flex items-center gap-2">
                 <button

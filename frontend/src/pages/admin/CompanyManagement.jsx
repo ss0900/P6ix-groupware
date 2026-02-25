@@ -1,14 +1,20 @@
 // src/pages/admin/CompanyManagement.jsx
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import api from "../../api/axios";
 import Modal from "../../components/common/ui/Modal";
 import BoardTable from "../../components/common/board/BoardTable";
 import { RefreshCw, Plus, Edit, Trash2 } from "lucide-react";
+import { useAuth } from "../../context/AuthContext";
+
+const getSelectedCompanyScopeKey = (username) =>
+  `chat:selected-company:${username || "anonymous"}`;
 
 export default function CompanyManagement() {
+  const { user } = useAuth();
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [selectedCompanyId, setSelectedCompanyId] = useState("");
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState(null);
@@ -24,6 +30,12 @@ export default function CompanyManagement() {
     phone: "",
     email: "",
   });
+
+  useEffect(() => {
+    const key = getSelectedCompanyScopeKey(user?.username);
+    const storedCompanyId = localStorage.getItem(key) || "";
+    setSelectedCompanyId(storedCompanyId);
+  }, [user?.username]);
 
   const loadCompanies = useCallback(async () => {
     setLoading(true);
@@ -42,6 +54,16 @@ export default function CompanyManagement() {
   useEffect(() => {
     loadCompanies();
   }, [loadCompanies]);
+
+  useEffect(() => {
+    if (!user?.username || selectedCompanyId || companies.length === 0) return;
+    const defaultCompanyId = String(companies[0].id);
+    setSelectedCompanyId(defaultCompanyId);
+    localStorage.setItem(
+      getSelectedCompanyScopeKey(user.username),
+      defaultCompanyId
+    );
+  }, [companies, selectedCompanyId, user?.username]);
 
   const openModal = (company = null) => {
     setEditingCompany(company);
@@ -98,12 +120,35 @@ export default function CompanyManagement() {
     if (!window.confirm(`"${company.name}" 회사를 삭제하시겠습니까?`)) return;
     try {
       await api.delete(`core/companies/${company.id}/`);
+      if (String(selectedCompanyId) === String(company.id)) {
+        const key = getSelectedCompanyScopeKey(user?.username);
+        localStorage.removeItem(key);
+        setSelectedCompanyId("");
+      }
       loadCompanies();
     } catch (err) {
       console.error(err);
       alert("삭제 중 오류가 발생했습니다.");
     }
   };
+
+  const handleSelectCompanyScope = (company) => {
+    if (!company?.id) return;
+    const nextCompanyId = String(company.id);
+    setSelectedCompanyId(nextCompanyId);
+    localStorage.setItem(
+      getSelectedCompanyScopeKey(user?.username),
+      nextCompanyId
+    );
+  };
+
+  const selectedCompanyName = useMemo(() => {
+    if (!selectedCompanyId) return "";
+    return (
+      companies.find((company) => String(company.id) === String(selectedCompanyId))
+        ?.name || `ID ${selectedCompanyId}`
+    );
+  }, [companies, selectedCompanyId]);
 
   const columns = [
     {
@@ -196,11 +241,18 @@ export default function CompanyManagement() {
         />
       </div>
 
+      {selectedCompanyId && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+          메신저 기본 회사 스코프: <span className="font-semibold">{selectedCompanyName}</span>
+        </div>
+      )}
+
       <BoardTable
         columns={columns}
         rows={companies}
         loading={loading}
         keyField="id"
+        onRowClick={handleSelectCompanyScope}
         emptyText="등록된 회사가 없습니다."
         sortable={false}
       />

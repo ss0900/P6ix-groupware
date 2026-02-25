@@ -43,13 +43,25 @@ const useChat = () => {
             socketRef.current = null;
         }
 
-        const apiBase = import.meta.env.VITE_API_BASE || '';
+        const wsBase =
+            import.meta.env.REACT_APP_WS_BASE ||
+            import.meta.env.VITE_WS_BASE ||
+            '';
+        const apiBase =
+            import.meta.env.REACT_APP_API_BASE ||
+            import.meta.env.VITE_API_BASE ||
+            '';
+        const endpointBase = wsBase || apiBase;
         let wsScheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
         let wsHost = window.location.host;
 
-        if (apiBase.startsWith('http')) {
-            const url = new URL(apiBase);
+        if (endpointBase.startsWith('http://') || endpointBase.startsWith('https://')) {
+            const url = new URL(endpointBase);
             wsScheme = url.protocol === 'https:' ? 'wss' : 'ws';
+            wsHost = url.host;
+        } else if (endpointBase.startsWith('ws://') || endpointBase.startsWith('wss://')) {
+            const url = new URL(endpointBase);
+            wsScheme = url.protocol === 'wss:' ? 'wss' : 'ws';
             wsHost = url.host;
         }
 
