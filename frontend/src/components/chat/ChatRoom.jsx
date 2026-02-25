@@ -196,10 +196,6 @@ const ChatRoom = ({
                                                                 <ChevronRight size={18} />
                                                             </div>
                                                         </div>
-                                                        <div className={`flex items-center justify-between pt-2 border-t text-[10px] ${isOwn ? 'border-white/10 text-blue-100' : 'border-gray-100 text-gray-400'}`}>
-                                                            <span>{fileInfo.metadata.created_by}</span>
-                                                            <span>{fileInfo.metadata.date && new Date(fileInfo.metadata.date).toLocaleDateString()}</span>
-                                                        </div>
                                                     </a>
                                                 ) : null
                                             ) : (
