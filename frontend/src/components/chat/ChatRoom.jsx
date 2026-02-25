@@ -53,6 +53,60 @@ const ChatRoom = ({
         });
     };
 
+    const handleDownloadWithRename = async (url, fileName) => {
+        if (!url) return;
+        const suggestedName = fileName || 'download';
+
+        let blob = null;
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`Download failed: ${response.status}`);
+            blob = await response.blob();
+        } catch (err) {
+            blob = null;
+        }
+
+        if (blob && typeof window !== 'undefined' && typeof window.showSaveFilePicker === 'function') {
+            try {
+                const handle = await window.showSaveFilePicker({
+                    suggestedName,
+                });
+                const writable = await handle.createWritable();
+                await writable.write(blob);
+                await writable.close();
+                return;
+            } catch (err) {
+                if (err?.name === 'AbortError') return;
+            }
+        }
+
+        const nextName = window.prompt('저장할 파일 이름을 입력해 주세요.', suggestedName);
+        if (nextName === null) return;
+
+        if (blob) {
+            const blobUrl = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.download = nextName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(blobUrl);
+            return;
+        }
+
+        try {
+            const fallbackLink = document.createElement('a');
+            fallbackLink.href = url;
+            fallbackLink.download = nextName;
+            document.body.appendChild(fallbackLink);
+            fallbackLink.click();
+            document.body.removeChild(fallbackLink);
+        } catch (err) {
+            // no-op
+        }
+    };
+
     const inConversation = messages.filter((m) => String(m.conversation) === String(selectedChat.id));
     const participantCount = Array.isArray(selectedChat?.participants) ? selectedChat.participants.length : 0;
 
@@ -143,16 +197,18 @@ const ChatRoom = ({
                                                                 </p>
                                                             </div>
                                                         </div>
-                                                        <a
-                                                            href={fileInfo.metadata.url}
-                                                            download
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.preventDefault();
+                                                                e.stopPropagation();
+                                                                handleDownloadWithRename(fileInfo.metadata.url, fileInfo.metadata.name);
+                                                            }}
                                                             className={`flex items-center justify-center gap-2 w-full py-2 rounded-lg transition-colors text-xs font-bold ${isOwn ? 'bg-white/20 hover:bg-white/30 text-white' : 'bg-blue-50 hover:bg-blue-100 text-blue-700'}`}
                                                         >
                                                             <Download size={12} />
                                                             다운로드
-                                                        </a>
+                                                        </button>
                                                     </div>
                                                 ) : fileInfo.type === 'photo' ? (
                                                     <div className="space-y-2">
@@ -165,7 +221,22 @@ const ChatRoom = ({
                                                             />
                                                         </div>
                                                         <div className="px-1">
-                                                            <p className={`text-sm font-bold ${isOwn ? 'text-white' : 'text-gray-900'}`}>{fileInfo.metadata.name}</p>
+                                                            <div className="flex items-center justify-between gap-2">
+                                                                <p className={`text-sm font-bold truncate ${isOwn ? 'text-white' : 'text-gray-900'}`}>
+                                                                    {fileInfo.metadata.name}
+                                                                </p>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleDownloadWithRename(fileInfo.metadata.url, fileInfo.metadata.name);
+                                                                    }}
+                                                                    className={`${isOwn ? 'text-white/90 hover:text-white' : 'text-blue-600 hover:text-blue-700'} shrink-0`}
+                                                                    title="다운로드"
+                                                                >
+                                                                    <Download size={14} />
+                                                                </button>
+                                                            </div>
                                                             {fileInfo.metadata.description && (
                                                                 <p className={`text-[11px] opacity-70 mt-0.5 line-clamp-2 ${isOwn ? 'text-blue-50' : 'text-gray-500'}`}>
                                                                     {fileInfo.metadata.description}
@@ -174,11 +245,23 @@ const ChatRoom = ({
                                                         </div>
                                                     </div>
                                                 ) : fileInfo.type === 'doc' ? (
-                                                    <a
-                                                        href={fileInfo.metadata.url || '#'}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className={`block p-3 rounded-xl border transition-all cursor-pointer group/doc relative overflow-hidden ${isOwn ? 'bg-white/10 border-white/20 hover:bg-white/20' : 'bg-gray-50 border-gray-100 hover:bg-blue-50 hover:border-blue-200 shadow-sm'}`}
+                                                    <div
+                                                        role="button"
+                                                        tabIndex={0}
+                                                        onClick={() => {
+                                                            if (fileInfo.metadata.url) {
+                                                                window.open(fileInfo.metadata.url, '_blank', 'noopener,noreferrer');
+                                                            }
+                                                        }}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                                e.preventDefault();
+                                                                if (fileInfo.metadata.url) {
+                                                                    window.open(fileInfo.metadata.url, '_blank', 'noopener,noreferrer');
+                                                                }
+                                                            }
+                                                        }}
+                                                        className={`block p-3 pb-8 rounded-xl border transition-all cursor-pointer group/doc relative overflow-hidden ${isOwn ? 'bg-white/10 border-white/20 hover:bg-white/20' : 'bg-gray-50 border-gray-100 hover:bg-blue-50 hover:border-blue-200 shadow-sm'}`}
                                                     >
                                                         <div className="flex items-center gap-3 mb-3">
                                                             <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${isOwn ? 'bg-white/20' : 'bg-white'}`}>
@@ -196,7 +279,20 @@ const ChatRoom = ({
                                                                 <ChevronRight size={18} />
                                                             </div>
                                                         </div>
-                                                    </a>
+                                                        <div className={`absolute left-3 right-3 bottom-7 border-t ${isOwn ? 'border-white/20' : 'border-gray-200'}`} />
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.preventDefault();
+                                                                e.stopPropagation();
+                                                                handleDownloadWithRename(fileInfo.metadata.url, fileInfo.metadata.name);
+                                                            }}
+                                                            className={`absolute right-2 bottom-2 ${isOwn ? 'text-white/90 hover:text-white' : 'text-blue-600 hover:text-blue-700'}`}
+                                                            title="다운로드"
+                                                        >
+                                                            <Download size={14} />
+                                                        </button>
+                                                    </div>
                                                 ) : null
                                             ) : (
                                                 <>
