@@ -8,6 +8,8 @@ app_name = "chat"
 router = DefaultRouter()
 router.register("conversations", views.ConversationViewSet, basename="conversation")
 router.register("messages", views.MessageViewSet, basename="message")
+router.register("docs", views.DocListView, basename="docs")
+router.register("users", views.ProjectChatUserListView, basename="chat-users")
 router.register("notifications", views.NotificationViewSet, basename="notification")
 router.register("help", views.HelpQuestionViewSet, basename="help")
 

@@ -1,272 +1,679 @@
-// src/components/chat/ChatPanel.jsx
-import React, { useState, useEffect, useCallback, useRef } from "react";
-import api from "../../api/axios";
-import { useAuth } from "../../context/AuthContext";
-import { 
-  X, 
-  ChevronLeft, 
-  UserPlus, 
-  Send, 
-  MessageCircle,
-  Users
-} from "lucide-react";
+﻿import React, { useEffect, useRef, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { X, ChevronLeft, UserPlus, Globe, Languages, Pencil, Check } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { chatApi } from '../../api/chat';
+import useChat from '../../hooks/useChat';
+import FileShareModal from './FileShareModal';
+import ChatListPanel from './ChatListPanel';
+import UserListPanel from './UserListPanel';
+import ChatRoom from './ChatRoom';
 
-// 간단 시간 포맷
-const formatTime = (dateString) => {
-  const date = new Date(dateString);
-  return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+const ChatPanel = ({ isOpen, onClose, onOpenExternally, onUnreadCountChange }) => {
+    const { user } = useAuth();
+    const currentUser = user || {};
+    const projectId = localStorage.getItem('projectId');
+
+    const [view, setView] = useState('list');
+    const [conversations, setConversations] = useState([]);
+    const [selectedChat, setSelectedChat] = useState(null);
+    const [inputText, setInputText] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    const [users, setUsers] = useState([]);
+    const [translationEnabled, setTranslationEnabled] = useState(false);
+    const [targetLanguage, setTargetLanguage] = useState('English');
+    const [messageTranslations, setMessageTranslations] = useState({});
+    const [showScrollButton, setShowScrollButton] = useState(false);
+    const [unreadCount, setUnreadCount] = useState(0);
+
+    const [isRenamingChat, setIsRenamingChat] = useState(false);
+    const [renameChatName, setRenameChatName] = useState('');
+    const [renameLoading, setRenameLoading] = useState(false);
+
+    const [showFileModal, setShowFileModal] = useState(false);
+    const [fileTab, setFileTab] = useState('papers');
+    const [paperFiles, setPaperFiles] = useState([]);
+    const [photos, setPhotos] = useState([]);
+    const [docs, setDocs] = useState([]);
+    const [loadingFiles, setLoadingFiles] = useState(false);
+
+    const scrollRef = useRef(null);
+    const isUserScrolling = useRef(false);
+    const processedMessagesCount = useRef(0);
+
+    const { messages, setMessages, sendMessage, isConnected, isTranslating, lastReadEvent } = useChat();
+
+    const loadConversations = async () => {
+        try {
+            const res = await chatApi.getConversations(projectId);
+            let data = res.data.results || res.data || [];
+
+            if (selectedChat) {
+                data = data.map((chat) =>
+                    Number(chat.id) === Number(selectedChat.id)
+                        ? { ...chat, unread_count: 0 }
+                        : chat
+                );
+            }
+
+            setConversations(data);
+        } catch (e) {
+            console.error('Failed to load conversations', e);
+        }
+    };
+
+    const loadUsers = async () => {
+        try {
+            const res = await chatApi.getUsers(projectId);
+            setUsers(res.data.results || res.data || []);
+        } catch (e) {
+            console.error('Failed to load users', e);
+        }
+    };
+
+    useEffect(() => {
+        const total = conversations.reduce((acc, cur) => acc + (cur.unread_count || 0), 0);
+        onUnreadCountChange?.(total);
+    }, [conversations, onUnreadCountChange]);
+
+    useEffect(() => {
+        loadConversations();
+        loadUsers();
+    }, []);
+
+    useEffect(() => {
+        window.isChatPanelOpen = isOpen;
+        if (isOpen) loadConversations();
+        return () => {
+            if (isOpen) window.isChatPanelOpen = false;
+        };
+    }, [isOpen]);
+
+    useEffect(() => {
+        if (messages.length <= processedMessagesCount.current) return;
+
+        const newMsgs = messages.slice(processedMessagesCount.current);
+        processedMessagesCount.current = messages.length;
+
+        setConversations((prev) => {
+            let current = [...prev];
+            let changed = false;
+            let needReload = false;
+
+            newMsgs.forEach((msg) => {
+                const chatId = Number(msg.conversation);
+                const existing = current.find((c) => Number(c.id) === chatId);
+                if (!existing) {
+                    needReload = true;
+                    return;
+                }
+
+                const isOther = Number(msg.sender) !== Number(currentUser?.id);
+                const isCurrent = selectedChat && Number(selectedChat.id) === chatId && isOpen;
+
+                current = current.map((chat) => {
+                    if (Number(chat.id) !== chatId) return chat;
+                    changed = true;
+
+                    if (isOther && isCurrent) {
+                        chatApi.markAsRead(chat.id).catch((err) => console.error('markAsRead failed:', err));
+                    }
+
+                    return {
+                        ...chat,
+                        last_message: { ...msg, text: msg.text || msg.message },
+                        unread_count: isCurrent ? 0 : (isOther ? (chat.unread_count + 1) : chat.unread_count),
+                    };
+                });
+            });
+
+            if (needReload) loadConversations();
+            return changed ? current : prev;
+        });
+    }, [messages, selectedChat, isOpen, currentUser?.id]);
+
+    useEffect(() => {
+        if (!lastReadEvent) return;
+        const { conversation_id, reader_id } = lastReadEvent;
+        if (Number(reader_id) !== Number(currentUser?.id)) return;
+
+        setConversations((prev) => prev.map((chat) =>
+            Number(chat.id) === Number(conversation_id)
+                ? { ...chat, unread_count: 0 }
+                : chat
+        ));
+    }, [lastReadEvent, currentUser?.id]);
+
+    useEffect(() => {
+        if (selectedChat) {
+            setView('chat');
+        } else if (view === 'chat') {
+            setView('list');
+        }
+    }, [selectedChat]);
+
+    useEffect(() => {
+        if (!selectedChat) {
+            setIsRenamingChat(false);
+            setRenameChatName('');
+            return;
+        }
+        setIsRenamingChat(false);
+        setRenameChatName(selectedChat.name || '');
+    }, [selectedChat]);
+
+    useEffect(() => {
+        const handleOpenChat = async (e) => {
+            const { userId } = e.detail || {};
+            if (!userId) return;
+            try {
+                setLoading(true);
+                const res = await chatApi.getOrCreate1on1(userId, projectId);
+                setSelectedChat(res.data);
+                onOpenExternally?.();
+            } catch (err) {
+                console.error('Failed to open chat with user', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        const handleOpenSpecificChat = (e) => {
+            const { conversationId } = e.detail || {};
+            if (!conversationId) return;
+            const chat = conversations.find((c) => Number(c.id) === Number(conversationId));
+            if (chat) {
+                setSelectedChat(chat);
+                onOpenExternally?.();
+            }
+        };
+
+        window.addEventListener('openChatWithUser', handleOpenChat);
+        window.addEventListener('openSpecificChat', handleOpenSpecificChat);
+
+        return () => {
+            window.removeEventListener('openChatWithUser', handleOpenChat);
+            window.removeEventListener('openSpecificChat', handleOpenSpecificChat);
+        };
+    }, [onOpenExternally, conversations, projectId]);
+
+    const handleStart1on1 = async (userId) => {
+        try {
+            setLoading(true);
+            const res = await chatApi.getOrCreate1on1(userId, projectId);
+            setSelectedChat(res.data);
+        } catch (e) {
+            console.error('Failed to start 1:1 chat', e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleCreateGroup = async (groupName, selectedUserIds) => {
+        if (selectedUserIds.length < 1) return;
+        try {
+            setLoading(true);
+            const participants = [...selectedUserIds, currentUser?.id].filter(Boolean);
+            const res = await chatApi.createConversation({
+                project: projectId || null,
+                participants,
+                is_group: true,
+                name: groupName || `${currentUser?.username || currentUser?.name || 'Group'}'s Group`,
+            });
+            setSelectedChat(res.data);
+            loadConversations();
+        } catch (e) {
+            console.error('Failed to create group chat', e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (!selectedChat || !isOpen) return;
+
+        const loadMessages = async () => {
+            setLoading(true);
+            try {
+                const res = await chatApi.getMessages(selectedChat.id);
+                const msgs = res.data.results || res.data || [];
+                processedMessagesCount.current = msgs.length;
+                setMessages(msgs);
+
+                await chatApi.markAsRead(selectedChat.id);
+                setMessages((prev) => prev.map((m) =>
+                    Number(m.conversation) === Number(selectedChat.id) && Number(m.sender) !== Number(currentUser?.id)
+                        ? { ...m, is_read: true }
+                        : m
+                ));
+
+                setConversations((prev) => prev.map((chat) =>
+                    Number(chat.id) === Number(selectedChat.id)
+                        ? { ...chat, unread_count: 0 }
+                        : chat
+                ));
+
+                setTimeout(scrollToBottom, 100);
+            } catch (e) {
+                console.error('Failed to load messages', e);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadMessages();
+    }, [selectedChat, isOpen, setMessages, currentUser?.id]);
+
+    const handleScroll = () => {
+        if (!scrollRef.current) return;
+        const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
+        const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
+        setShowScrollButton(!isAtBottom);
+        isUserScrolling.current = !isAtBottom;
+    };
+
+    useEffect(() => {
+        if (!scrollRef.current) return;
+        if (isUserScrolling.current) {
+            setUnreadCount((prev) => prev + 1);
+        } else {
+            setTimeout(scrollToBottom, 50);
+        }
+    }, [messages]);
+
+    const scrollToBottom = () => {
+        if (!scrollRef.current) return;
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        setUnreadCount(0);
+        isUserScrolling.current = false;
+        setShowScrollButton(false);
+    };
+
+    const handleOpenFileModal = async () => {
+        setShowFileModal(true);
+        setLoadingFiles(true);
+
+        try {
+            const [filesRes, photosRes, docsRes] = await Promise.allSettled([
+                chatApi.getPaperFiles(projectId),
+                chatApi.getPhotos(projectId),
+                chatApi.getDocs(projectId),
+            ]);
+
+            if (filesRes.status === 'fulfilled') {
+                setPaperFiles(filesRes.value.data.results || filesRes.value.data || []);
+            }
+            if (photosRes.status === 'fulfilled') {
+                setPhotos(photosRes.value.data.results || photosRes.value.data || []);
+            }
+            if (docsRes.status === 'fulfilled') {
+                setDocs(docsRes.value.data.results || docsRes.value.data || []);
+            }
+        } finally {
+            setLoadingFiles(false);
+        }
+    };
+
+    const handleShareFile = async (file, type) => {
+        if (!selectedChat) return;
+
+        const metadata = { type, id: file.id };
+
+        if (type === 'paper') {
+            metadata.name = file.name;
+            metadata.url = file.file_url || file.url || file.file;
+            metadata.size = file.file_size || file.size || 0;
+            metadata.created_by = file.uploader_name || file.created_by_name || file.created_by || '';
+            metadata.date = file.created_at;
+        } else if (type === 'photo') {
+            metadata.name = file.title || file.name;
+            metadata.url = file.file_url || file.url;
+            metadata.description = file.description || '';
+            metadata.date = file.date || file.created_at;
+        } else if (type === 'doc') {
+            metadata.name = file.title || file.name;
+            metadata.url = file.file_url || file.url;
+            metadata.resource_type = file.resource_type || 'document';
+            metadata.status = file.status || '';
+            metadata.doc_type = file.doc_type || '';
+            metadata.created_by = file.created_by_name || file.uploader_name || '';
+            metadata.date = file.created_at;
+        }
+
+        const messageText = `[FILE:${type}:${JSON.stringify(metadata)}]`;
+        try {
+            await sendMessage(messageText, selectedChat.id);
+            setShowFileModal(false);
+        } catch (err) {
+            console.error('Failed to share file:', err);
+        }
+    };
+
+    const handleSendMessage = async (e) => {
+        if (e) e.preventDefault();
+        if (!inputText.trim() || !selectedChat) return;
+        try {
+            await sendMessage(inputText, selectedChat.id);
+            setInputText('');
+        } catch (err) {
+            console.error('Failed to send message:', err);
+        }
+    };
+
+    const handleStartRename = () => {
+        if (!selectedChat?.is_group) return;
+        setRenameChatName(selectedChat.name || '');
+        setIsRenamingChat(true);
+    };
+
+    const handleCancelRename = () => {
+        setRenameChatName(selectedChat?.name || '');
+        setIsRenamingChat(false);
+    };
+
+    const handleRenameConversation = async () => {
+        if (!selectedChat) return;
+        const nextName = renameChatName.trim();
+        if (!nextName) {
+            alert('채팅방 이름을 입력해 주세요.');
+            return;
+        }
+
+        try {
+            setRenameLoading(true);
+            const res = await chatApi.updateConversation(selectedChat.id, { name: nextName });
+            const updatedChat = res.data;
+
+            setSelectedChat(updatedChat);
+            setConversations((prev) => prev.map((chat) =>
+                Number(chat.id) === Number(updatedChat.id) ? { ...chat, ...updatedChat } : chat
+            ));
+            setIsRenamingChat(false);
+        } catch (err) {
+            console.error('Failed to rename conversation:', err);
+            alert('채팅방 이름 변경에 실패했습니다.');
+        } finally {
+            setRenameLoading(false);
+        }
+    };
+
+    const handleTranslateMessage = async (msg) => {
+        const msgId = msg.id || msg.tempId;
+        if (!msgId) return;
+
+        if (
+            messageTranslations[msgId]?.translatedText &&
+            messageTranslations[msgId]?.targetLanguage === targetLanguage
+        ) {
+            setMessageTranslations((prev) => ({
+                ...prev,
+                [msgId]: { ...prev[msgId], showTranslated: !prev[msgId].showTranslated },
+            }));
+            return;
+        }
+
+        try {
+            setMessageTranslations((prev) => ({
+                ...prev,
+                [msgId]: { ...prev[msgId], loading: true, targetLanguage },
+            }));
+
+            const res = await chatApi.translate(msg.text, targetLanguage);
+            const { translated_text, detected_source } = res.data;
+
+            setMessageTranslations((prev) => ({
+                ...prev,
+                [msgId]: {
+                    translatedText: translated_text,
+                    detectedSource: detected_source,
+                    targetLanguage,
+                    showTranslated: true,
+                    loading: false,
+                },
+            }));
+        } catch (err) {
+            console.error('Translation failed:', err);
+            setMessageTranslations((prev) => ({
+                ...prev,
+                [msgId]: { ...prev[msgId], loading: false },
+            }));
+        }
+    };
+
+    const getOtherParticipant = (chat) => {
+        if (!chat) return { displayName: 'Unknown' };
+        if (chat.is_group) return { displayName: chat.name || 'Group Chat' };
+        const other = chat.participants?.find((p) => p.id !== currentUser?.id) || {};
+        return {
+            ...other,
+            displayName: other.name || other.username || 'Unknown',
+        };
+    };
+
+    return (
+        <AnimatePresence>
+            {isOpen && (
+                <motion.div
+                    initial={{ x: '100%' }}
+                    animate={{ x: 0 }}
+                    exit={{ x: '100%' }}
+                    transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                    className={`fixed top-0 right-0 h-full w-full ${selectedChat ? 'sm:w-[900px]' : 'sm:w-[400px]'} bg-white text-gray-900 z-[200] shadow-2xl flex flex-col no-print transition-[width] duration-300`}
+                >
+                    <div className="flex-1 flex overflow-hidden">
+                        {selectedChat && (
+                            <div className="flex-1 flex flex-col border-r border-gray-200 relative">
+                                <div className="h-16 p-4 border-b border-gray-200 flex items-center justify-between bg-gray-50 shrink-0">
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            onClick={() => setSelectedChat(null)}
+                                            className="sm:hidden p-1 hover:bg-white rounded-full"
+                                        >
+                                            <ChevronLeft size={24} />
+                                        </button>
+
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs overflow-hidden shrink-0">
+                                                {getOtherParticipant(selectedChat).profile_picture ? (
+                                                    <img src={getOtherParticipant(selectedChat).profile_picture} alt="avatar" className="w-full h-full object-cover" />
+                                                ) : (
+                                                    (getOtherParticipant(selectedChat).displayName || '?').slice(0, 1).toUpperCase()
+                                                )}
+                                            </div>
+                                            <div className="flex flex-col min-w-0">
+                                                {selectedChat?.is_group && isRenamingChat ? (
+                                                    <div className="flex items-center gap-1">
+                                                        <input
+                                                            type="text"
+                                                            value={renameChatName}
+                                                            onChange={(e) => setRenameChatName(e.target.value)}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') {
+                                                                    e.preventDefault();
+                                                                    handleRenameConversation();
+                                                                }
+                                                                if (e.key === 'Escape') {
+                                                                    e.preventDefault();
+                                                                    handleCancelRename();
+                                                                }
+                                                            }}
+                                                            autoFocus
+                                                            maxLength={255}
+                                                            className="h-7 w-44 rounded border border-gray-300 bg-white px-2 text-sm text-gray-900 focus:outline-none focus:border-blue-500"
+                                                            placeholder="채팅방 이름"
+                                                        />
+                                                        <button
+                                                            onClick={handleRenameConversation}
+                                                            disabled={renameLoading || !renameChatName.trim()}
+                                                            className="p-1 rounded hover:bg-gray-200 text-blue-600 disabled:opacity-40"
+                                                            title="저장"
+                                                        >
+                                                            <Check size={14} />
+                                                        </button>
+                                                        <button
+                                                            onClick={handleCancelRename}
+                                                            disabled={renameLoading}
+                                                            className="p-1 rounded hover:bg-gray-200 text-gray-500 disabled:opacity-40"
+                                                            title="취소"
+                                                        >
+                                                            <X size={14} />
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex items-center gap-1">
+                                                        <h2 className="text-base font-bold leading-tight truncate">
+                                                            {getOtherParticipant(selectedChat).displayName}
+                                                        </h2>
+                                                        {selectedChat?.is_group && (
+                                                            <button
+                                                                onClick={handleStartRename}
+                                                                className="p-1 rounded hover:bg-gray-200 text-gray-500"
+                                                                title="채팅방 이름 변경"
+                                                            >
+                                                                <Pencil size={13} />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                )}
+                                                {!selectedChat?.is_group && getOtherParticipant(selectedChat).company && (
+                                                    <span className="text-[10px] text-gray-500">{getOtherParticipant(selectedChat).company}</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={() => setTranslationEnabled(!translationEnabled)}
+                                            className={`p-2 rounded-full transition-colors ${translationEnabled ? 'bg-blue-600 text-white' : 'hover:bg-gray-200 text-blue-600'}`}
+                                            title="AI 번역 모드"
+                                        >
+                                            <Globe size={20} />
+                                        </button>
+                                        <button
+                                            onClick={() => setSelectedChat(null)}
+                                            className="hidden sm:block p-2 hover:bg-gray-200 rounded-full text-gray-500 hover:text-gray-900"
+                                            title="채팅 닫기"
+                                        >
+                                            <X size={20} />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {translationEnabled && (
+                                    <div className="px-4 py-2 bg-blue-50 border-b border-blue-200 flex items-center justify-between shrink-0">
+                                        <div className="flex items-center gap-2 text-xs text-blue-700 font-medium">
+                                            <Languages size={14} />
+                                            <span>AI 번역 활성화 중</span>
+                                        </div>
+                                        <select
+                                            value={targetLanguage}
+                                            onChange={(e) => setTargetLanguage(e.target.value)}
+                                            className="bg-white text-xs text-blue-700 border border-blue-300 rounded px-2 py-1 outline-none focus:border-blue-500"
+                                        >
+                                            <option value="Korean">Korean</option>
+                                            <option value="English">English</option>
+                                            <option value="Vietnamese">Vietnamese</option>
+                                            <option value="Chinese">Chinese</option>
+                                            <option value="Thai">Thai</option>
+                                            <option value="Japanese">Japanese</option>
+                                            <option value="Indonesian">Indonesian</option>
+                                            <option value="Russian">Russian</option>
+                                            <option value="Spanish">Spanish</option>
+                                            <option value="French">French</option>
+                                            <option value="German">German</option>
+                                            <option value="Tagalog">Tagalog</option>
+                                            <option value="Hindi">Hindi</option>
+                                            <option value="Arabic">Arabic</option>
+                                        </select>
+                                    </div>
+                                )}
+
+                                <ChatRoom
+                                    selectedChat={selectedChat}
+                                    currentUser={currentUser}
+                                    messages={messages}
+                                    loading={loading}
+                                    scrollRef={scrollRef}
+                                    handleScroll={handleScroll}
+                                    handleTranslateMessage={handleTranslateMessage}
+                                    messageTranslations={messageTranslations}
+                                    translationEnabled={translationEnabled}
+                                    showScrollButton={showScrollButton}
+                                    unreadCount={unreadCount}
+                                    scrollToBottom={scrollToBottom}
+                                    handleSendMessage={handleSendMessage}
+                                    inputText={inputText}
+                                    setInputText={setInputText}
+                                    isTranslating={isTranslating}
+                                    isConnected={isConnected}
+                                    handleOpenFileModal={handleOpenFileModal}
+                                />
+                            </div>
+                        )}
+
+                        <div className={`w-full sm:w-[400px] flex flex-col bg-gray-50 z-10 ${selectedChat ? 'hidden sm:flex' : 'flex'}`}>
+                            <div className="h-16 p-4 border-b border-gray-200 flex items-center justify-between bg-white shrink-0">
+                                <div className="flex items-center gap-3">
+                                    {view === 'new' && (
+                                        <button
+                                            onClick={() => setView('list')}
+                                            className="p-1 hover:bg-white rounded-full"
+                                        >
+                                            <ChevronLeft size={24} />
+                                        </button>
+                                    )}
+                                    <h2 className="text-lg font-bold">{view === 'new' ? '새 채팅' : '메시지'}</h2>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    {view === 'list' && (
+                                        <button
+                                            onClick={() => setView('new')}
+                                            className="p-2 hover:bg-gray-200 rounded-full text-blue-600"
+                                            title="새 채팅 시작"
+                                        >
+                                            <UserPlus size={20} />
+                                        </button>
+                                    )}
+                                    <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full text-gray-500 hover:text-gray-900">
+                                        <X size={24} />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {view === 'new' ? (
+                                <UserListPanel
+                                    users={users}
+                                    currentUser={currentUser}
+                                    onStart1on1={handleStart1on1}
+                                    onCreateGroup={handleCreateGroup}
+                                />
+                            ) : (
+                                <ChatListPanel
+                                    conversations={conversations}
+                                    onSelectChat={setSelectedChat}
+                                    currentUser={currentUser}
+                                />
+                            )}
+                        </div>
+                    </div>
+
+                    <FileShareModal
+                        isOpen={showFileModal}
+                        onClose={() => setShowFileModal(false)}
+                        fileTab={fileTab}
+                        setFileTab={setFileTab}
+                        loadingFiles={loadingFiles}
+                        paperFiles={paperFiles}
+                        photos={photos}
+                        docs={docs}
+                        handleShareFile={handleShareFile}
+                    />
+                </motion.div>
+            )}
+        </AnimatePresence>
+    );
 };
 
-export default function ChatPanel({ isOpen, onClose }) {
-  const { user } = useAuth();
-  const [view, setView] = useState('list'); // list, chat, new
-  const [conversations, setConversations] = useState([]);
-  const [selectedChat, setSelectedChat] = useState(null);
-  const [messages, setMessages] = useState([]);
-  const [inputText, setInputText] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [users, setUsers] = useState([]);
-  const messagesEndRef = useRef(null);
-
-  // 대화방 목록 로드
-  const loadConversations = useCallback(async () => {
-    try {
-      const res = await api.get("chat/conversations/");
-      setConversations(res.data?.results ?? res.data ?? []);
-    } catch (err) {
-      console.error(err);
-    }
-  }, []);
-
-  // 사용자 목록 로드
-  const loadUsers = useCallback(async () => {
-    try {
-      const res = await api.get("core/users/");
-      setUsers(res.data?.results ?? res.data ?? []);
-    } catch (err) {
-      console.error(err);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (isOpen) {
-      loadConversations();
-      loadUsers();
-    }
-  }, [isOpen, loadConversations, loadUsers]);
-
-  // 메시지 로드
-  const loadMessages = useCallback(async (chatId) => {
-    setLoading(true);
-    try {
-      const res = await api.get(`chat/messages/?conversation=${chatId}`);
-      setMessages(res.data?.results ?? res.data ?? []);
-      
-      // 읽음 처리
-      await api.post("chat/messages/mark-read/", { conversation_id: chatId });
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (selectedChat) {
-      loadMessages(selectedChat.id);
-      setView('chat');
-    }
-  }, [selectedChat, loadMessages]);
-
-  // 메시지 스크롤
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  // 메시지 전송
-  const handleSendMessage = async (e) => {
-    e.preventDefault();
-    if (!inputText.trim() || !selectedChat) return;
-
-    try {
-      await api.post("chat/messages/", {
-        conversation: selectedChat.id,
-        text: inputText,
-      });
-      setInputText('');
-      loadMessages(selectedChat.id);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  // 1:1 대화 시작
-  const handleStart1on1 = async (userId) => {
-    try {
-      setLoading(true);
-      const res = await api.post("chat/conversations/get-or-create/", { user_id: userId });
-      setSelectedChat(res.data);
-      loadConversations();
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 상대방 정보
-  const getOtherParticipant = (chat) => {
-    if (!chat || !chat.participants) return { name: 'Unknown' };
-    if (chat.is_group) return { name: chat.name || '그룹 채팅' };
-    const other = chat.participants.find(p => p.id !== user?.id);
-    return other || { name: 'Unknown' };
-  };
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed top-0 right-0 h-full w-full sm:w-[400px] bg-slate-900 text-white z-50 shadow-2xl flex flex-col">
-      {/* 헤더 */}
-      <div className="h-14 px-4 border-b border-slate-700 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-3">
-          {view !== 'list' && (
-            <button onClick={() => { setView('list'); setSelectedChat(null); }} className="p-1 hover:bg-slate-700 rounded">
-              <ChevronLeft size={20} />
-            </button>
-          )}
-          <h2 className="font-semibold text-lg">
-            {view === 'new' ? '새 채팅' : view === 'chat' ? getOtherParticipant(selectedChat).name : '대화 내역'}
-          </h2>
-        </div>
-        <div className="flex items-center gap-2">
-          {view === 'list' && (
-            <button onClick={() => setView('new')} className="p-2 hover:bg-slate-700 rounded-full">
-              <UserPlus size={18} />
-            </button>
-          )}
-          <button onClick={onClose} className="p-2 hover:bg-slate-700 rounded-full">
-            <X size={18} />
-          </button>
-        </div>
-      </div>
-
-      {/* 콘텐츠 */}
-      <div className="flex-1 overflow-y-auto">
-        {view === 'list' && (
-          <div className="divide-y divide-slate-700">
-            {conversations.length === 0 ? (
-              <div className="text-center py-12 text-slate-400">
-                <MessageCircle size={48} className="mx-auto mb-4 opacity-50" />
-                <p>대화가 없습니다.</p>
-              </div>
-            ) : (
-              conversations.map((chat) => {
-                const other = getOtherParticipant(chat);
-                return (
-                  <div
-                    key={chat.id}
-                    onClick={() => setSelectedChat(chat)}
-                    className="p-4 hover:bg-slate-800 cursor-pointer flex items-center gap-3"
-                  >
-                    <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-lg font-bold shrink-0">
-                      {(other.name || '?')[0].toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{other.name}</p>
-                      {chat.last_message && (
-                        <p className="text-sm text-slate-400 truncate">{chat.last_message.text}</p>
-                      )}
-                    </div>
-                    {chat.unread_count > 0 && (
-                      <span className="w-5 h-5 bg-red-500 rounded-full text-xs flex items-center justify-center">
-                        {chat.unread_count}
-                      </span>
-                    )}
-                  </div>
-                );
-              })
-            )}
-          </div>
-        )}
-
-        {view === 'new' && (
-          <div className="divide-y divide-slate-700">
-            {users.filter(u => u.id !== user?.id).map((u) => (
-              <div
-                key={u.id}
-                onClick={() => handleStart1on1(u.id)}
-                className="p-4 hover:bg-slate-800 cursor-pointer flex items-center gap-3"
-              >
-                <div className="w-10 h-10 bg-green-600 rounded-full flex items-center justify-center text-lg font-bold shrink-0">
-                  {(u.last_name || u.first_name || u.username || '?')[0].toUpperCase()}
-                </div>
-                <div>
-                  <p className="font-medium">{u.last_name}{u.first_name}</p>
-                  <p className="text-sm text-slate-400">@{u.username}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {view === 'chat' && (
-          <div className="flex flex-col h-full">
-            {/* 메시지 영역 */}
-            <div className="flex-1 p-4 space-y-4 overflow-y-auto">
-              {loading ? (
-                <div className="flex justify-center py-8">
-                  <div className="animate-spin rounded-full h-6 w-6 border-2 border-blue-500 border-t-transparent"></div>
-                </div>
-              ) : messages.length === 0 ? (
-                <p className="text-center text-slate-400 py-8">아직 메시지가 없습니다.</p>
-              ) : (
-                messages.map((msg) => {
-                  const isMine = msg.sender === user?.id;
-                  return (
-                    <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[75%] ${isMine ? 'bg-blue-600' : 'bg-slate-700'} rounded-2xl px-4 py-2`}>
-                        {!isMine && (
-                          <p className="text-xs text-slate-400 mb-1">{msg.sender_name}</p>
-                        )}
-                        <p className="text-sm">{msg.text}</p>
-                        <p className="text-xs text-slate-400 mt-1 text-right">{formatTime(msg.created_at)}</p>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* 입력창 (chat 뷰일 때만) */}
-      {view === 'chat' && (
-        <form onSubmit={handleSendMessage} className="p-4 border-t border-slate-700 flex items-center gap-2">
-          <input
-            type="text"
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            placeholder="메시지 입력..."
-            className="flex-1 bg-slate-800 border border-slate-600 rounded-full px-4 py-2 text-sm outline-none focus:border-blue-500"
-          />
-          <button
-            type="submit"
-            disabled={!inputText.trim()}
-            className="p-2 bg-blue-600 rounded-full hover:bg-blue-700 disabled:opacity-50"
-          >
-            <Send size={18} />
-          </button>
-        </form>
-      )}
-
-      {/* P6ix AI 버튼 */}
-      <div className="p-4 border-t border-slate-700">
-        <button className="w-full py-2 bg-slate-800 rounded-lg text-sm hover:bg-slate-700 transition">
-          P6ix AI
-        </button>
-      </div>
-    </div>
-  );
-}
+export default ChatPanel;

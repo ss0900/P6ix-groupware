@@ -9,25 +9,68 @@ User = get_user_model()
 class UserSimpleSerializer(serializers.ModelSerializer):
     """간단 사용자 정보"""
     name = serializers.SerializerMethodField()
+    company = serializers.SerializerMethodField()
+    department = serializers.SerializerMethodField()
+    position = serializers.SerializerMethodField()
+    profile_picture = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'first_name', 'last_name', 'name']
+        fields = [
+            'id',
+            'username',
+            'first_name',
+            'last_name',
+            'name',
+            'company',
+            'department',
+            'position',
+            'profile_picture',
+        ]
 
     def get_name(self, obj):
         return f"{obj.last_name or ''}{obj.first_name or ''}".strip() or obj.username
 
+    def get_company(self, obj):
+        membership = obj.memberships.filter(is_primary=True).first() or obj.memberships.first()
+        return membership.company.name if membership and membership.company else None
+
+    def get_department(self, obj):
+        membership = obj.memberships.filter(is_primary=True).first() or obj.memberships.first()
+        return membership.department.name if membership and membership.department else None
+
+    def get_position(self, obj):
+        membership = obj.memberships.filter(is_primary=True).first() or obj.memberships.first()
+        return membership.position.name if membership and membership.position else None
+
+    def get_profile_picture(self, obj):
+        if obj.profile_picture:
+            try:
+                return obj.profile_picture.url
+            except Exception:
+                return str(obj.profile_picture)
+        return None
+
 
 class MessageSerializer(serializers.ModelSerializer):
     sender_name = serializers.SerializerMethodField()
+    sender_profile_picture = serializers.SerializerMethodField()
 
     class Meta:
         model = Message
-        fields = ['id', 'conversation', 'sender', 'sender_name', 'text', 'is_read', 'created_at']
+        fields = ['id', 'conversation', 'sender', 'sender_name', 'sender_profile_picture', 'text', 'is_read', 'created_at']
         read_only_fields = ['id', 'created_at']
 
     def get_sender_name(self, obj):
         return f"{obj.sender.last_name or ''}{obj.sender.first_name or ''}".strip() or obj.sender.username
+
+    def get_sender_profile_picture(self, obj):
+        if obj.sender.profile_picture:
+            try:
+                return obj.sender.profile_picture.url
+            except Exception:
+                return str(obj.sender.profile_picture)
+        return None
 
 
 class ConversationSerializer(serializers.ModelSerializer):
@@ -37,7 +80,7 @@ class ConversationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Conversation
-        fields = ['id', 'participants', 'is_group', 'name', 'last_message', 'unread_count', 'updated_at']
+        fields = ['id', 'project', 'participants', 'is_group', 'name', 'last_message', 'unread_count', 'updated_at']
 
     def get_last_message(self, obj):
         last_msg = obj.messages.last()

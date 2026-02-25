@@ -5,6 +5,14 @@ from django.conf import settings
 
 class Conversation(models.Model):
     """1:1 또는 그룹 대화방"""
+    project = models.ForeignKey(
+        "project.Project",
+        on_delete=models.CASCADE,
+        related_name="conversations",
+        null=True,
+        blank=True,
+        verbose_name="프로젝트",
+    )
     participants = models.ManyToManyField(
         settings.AUTH_USER_MODEL, 
         related_name='conversations',

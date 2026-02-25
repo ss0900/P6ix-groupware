@@ -1,4 +1,4 @@
-// src/components/layout/Header.jsx
+﻿// src/components/layout/Header.jsx
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Menu as MenuIcon, Bell, MessageSquare, HelpCircle } from "lucide-react";
@@ -23,6 +23,7 @@ function Header({ onMenuClick }) {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
   const [companyLogoUrl, setCompanyLogoUrl] = useState(null);
   const [companyLogoLoading, setCompanyLogoLoading] = useState(true);
 
@@ -218,13 +219,18 @@ function Header({ onMenuClick }) {
 
             <button
               onClick={() => {
-                setShowChat(!showChat);
+                setShowChat(true);
                 setShowNotifications(false);
               }}
-              className="p-2 rounded-lg hover:bg-slate-700 text-white transition-colors"
+              className="relative p-2 rounded-lg hover:bg-slate-700 text-white transition-colors"
               title="메신저"
             >
               <MessageSquare size={20} />
+              {chatUnreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                  {chatUnreadCount}
+                </span>
+              )}
             </button>
 
             <button
@@ -238,7 +244,12 @@ function Header({ onMenuClick }) {
         </div>
       </header>
 
-      <ChatPanel isOpen={showChat} onClose={() => setShowChat(false)} />
+      <ChatPanel
+        isOpen={showChat}
+        onClose={() => setShowChat(false)}
+        onOpenExternally={() => setShowChat(true)}
+        onUnreadCountChange={setChatUnreadCount}
+      />
     </>
   );
 }
