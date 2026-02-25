@@ -2,6 +2,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChevronLeft, UserPlus, Globe, Languages, Pencil, Check } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import api from '../../api/axios';
 import { chatApi } from '../../api/chat';
 import useChat from '../../hooks/useChat';
 import FileShareModal from './FileShareModal';
@@ -12,13 +13,14 @@ import ChatRoom from './ChatRoom';
 const ChatPanel = ({ isOpen, onClose, onOpenExternally, onUnreadCountChange }) => {
     const { user } = useAuth();
     const currentUser = user || {};
-    const projectId = localStorage.getItem('projectId');
 
     const [view, setView] = useState('list');
     const [conversations, setConversations] = useState([]);
     const [selectedChat, setSelectedChat] = useState(null);
     const [inputText, setInputText] = useState('');
     const [loading, setLoading] = useState(false);
+    const [companyId, setCompanyId] = useState(null);
+    const [scopeLoading, setScopeLoading] = useState(true);
 
     const [users, setUsers] = useState([]);
     const [translationEnabled, setTranslationEnabled] = useState(false);
@@ -44,9 +46,13 @@ const ChatPanel = ({ isOpen, onClose, onOpenExternally, onUnreadCountChange }) =
 
     const { messages, setMessages, sendMessage, isConnected, isTranslating, lastReadEvent } = useChat();
 
-    const loadConversations = async () => {
+    const loadConversations = async (scopeCompanyId = companyId) => {
+        if (!scopeCompanyId) {
+            setConversations([]);
+            return;
+        }
         try {
-            const res = await chatApi.getConversations(projectId);
+            const res = await chatApi.getConversations(scopeCompanyId);
             let data = res.data.results || res.data || [];
 
             if (selectedChat) {
@@ -63,9 +69,13 @@ const ChatPanel = ({ isOpen, onClose, onOpenExternally, onUnreadCountChange }) =
         }
     };
 
-    const loadUsers = async () => {
+    const loadUsers = async (scopeCompanyId = companyId) => {
+        if (!scopeCompanyId) {
+            setUsers([]);
+            return;
+        }
         try {
-            const res = await chatApi.getUsers(projectId);
+            const res = await chatApi.getUsers(scopeCompanyId);
             setUsers(res.data.results || res.data || []);
         } catch (e) {
             console.error('Failed to load users', e);
@@ -78,17 +88,71 @@ const ChatPanel = ({ isOpen, onClose, onOpenExternally, onUnreadCountChange }) =
     }, [conversations, onUnreadCountChange]);
 
     useEffect(() => {
-        loadConversations();
-        loadUsers();
-    }, []);
+        let mounted = true;
+
+        const resolveCompanyScope = async () => {
+            if (!currentUser?.id) {
+                if (mounted) {
+                    setCompanyId(null);
+                    setScopeLoading(false);
+                }
+                return;
+            }
+
+            setScopeLoading(true);
+            const cacheKey = currentUser?.username ? `header:company:${currentUser.username}:id` : null;
+            const cachedCompany = cacheKey ? localStorage.getItem(cacheKey) : null;
+            if (cachedCompany && mounted) {
+                setCompanyId(Number(cachedCompany) || null);
+            }
+
+            try {
+                const membershipRes = await api.get('core/membership/me/');
+                const memberships = membershipRes.data?.results || membershipRes.data || [];
+                const primaryMembership =
+                    memberships.find((membership) => membership.is_primary) || memberships[0] || null;
+                const nextCompanyId = primaryMembership?.company || null;
+
+                if (mounted) {
+                    setCompanyId(nextCompanyId);
+                }
+            } catch (e) {
+                console.error('Failed to resolve company scope for chat', e);
+                if (mounted && !cachedCompany) {
+                    setCompanyId(null);
+                }
+            } finally {
+                if (mounted) {
+                    setScopeLoading(false);
+                }
+            }
+        };
+
+        resolveCompanyScope();
+
+        return () => {
+            mounted = false;
+        };
+    }, [currentUser?.id, currentUser?.username]);
+
+    useEffect(() => {
+        if (!companyId) {
+            setConversations([]);
+            setUsers([]);
+            return;
+        }
+
+        loadConversations(companyId);
+        loadUsers(companyId);
+    }, [companyId]);
 
     useEffect(() => {
         window.isChatPanelOpen = isOpen;
-        if (isOpen) loadConversations();
+        if (isOpen && companyId) loadConversations(companyId);
         return () => {
             if (isOpen) window.isChatPanelOpen = false;
         };
-    }, [isOpen]);
+    }, [isOpen, companyId]);
 
     useEffect(() => {
         if (messages.length <= processedMessagesCount.current) return;
@@ -166,10 +230,10 @@ const ChatPanel = ({ isOpen, onClose, onOpenExternally, onUnreadCountChange }) =
     useEffect(() => {
         const handleOpenChat = async (e) => {
             const { userId } = e.detail || {};
-            if (!userId) return;
+            if (!userId || !companyId) return;
             try {
                 setLoading(true);
-                const res = await chatApi.getOrCreate1on1(userId, projectId);
+                const res = await chatApi.getOrCreate1on1(userId, companyId);
                 setSelectedChat(res.data);
                 onOpenExternally?.();
             } catch (err) {
@@ -196,12 +260,16 @@ const ChatPanel = ({ isOpen, onClose, onOpenExternally, onUnreadCountChange }) =
             window.removeEventListener('openChatWithUser', handleOpenChat);
             window.removeEventListener('openSpecificChat', handleOpenSpecificChat);
         };
-    }, [onOpenExternally, conversations, projectId]);
+    }, [onOpenExternally, conversations, companyId]);
 
     const handleStart1on1 = async (userId) => {
+        if (!companyId) {
+            alert('소속 회사가 설정되지 않아 채팅을 시작할 수 없습니다.');
+            return;
+        }
         try {
             setLoading(true);
-            const res = await chatApi.getOrCreate1on1(userId, projectId);
+            const res = await chatApi.getOrCreate1on1(userId, companyId);
             setSelectedChat(res.data);
         } catch (e) {
             console.error('Failed to start 1:1 chat', e);
@@ -211,12 +279,16 @@ const ChatPanel = ({ isOpen, onClose, onOpenExternally, onUnreadCountChange }) =
     };
 
     const handleCreateGroup = async (groupName, selectedUserIds) => {
+        if (!companyId) {
+            alert('소속 회사가 설정되지 않아 그룹 채팅을 만들 수 없습니다.');
+            return;
+        }
         if (selectedUserIds.length < 1) return;
         try {
             setLoading(true);
             const participants = [...selectedUserIds, currentUser?.id].filter(Boolean);
             const res = await chatApi.createConversation({
-                project: projectId || null,
+                company: companyId,
                 participants,
                 is_group: true,
                 name: groupName || `${currentUser?.username || currentUser?.name || 'Group'}'s Group`,
@@ -296,9 +368,9 @@ const ChatPanel = ({ isOpen, onClose, onOpenExternally, onUnreadCountChange }) =
 
         try {
             const [filesRes, photosRes, docsRes] = await Promise.allSettled([
-                chatApi.getPaperFiles(projectId),
-                chatApi.getPhotos(projectId),
-                chatApi.getDocs(projectId),
+                chatApi.getPaperFiles(),
+                chatApi.getPhotos(),
+                chatApi.getDocs(),
             ]);
 
             if (filesRes.status === 'fulfilled') {
@@ -642,7 +714,13 @@ const ChatPanel = ({ isOpen, onClose, onOpenExternally, onUnreadCountChange }) =
                                 </div>
                             </div>
 
-                            {view === 'new' ? (
+                            {scopeLoading ? (
+                                <div className="p-6 text-sm text-gray-500">회사 스코프를 불러오는 중입니다...</div>
+                            ) : !companyId ? (
+                                <div className="p-6 text-sm text-red-500">
+                                    소속 회사가 설정되지 않아 메신저를 사용할 수 없습니다.
+                                </div>
+                            ) : view === 'new' ? (
                                 <UserListPanel
                                     users={users}
                                     currentUser={currentUser}
@@ -677,3 +755,4 @@ const ChatPanel = ({ isOpen, onClose, onOpenExternally, onUnreadCountChange }) =
 };
 
 export default ChatPanel;
+

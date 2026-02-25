@@ -13,6 +13,14 @@ class Conversation(models.Model):
         blank=True,
         verbose_name="프로젝트",
     )
+    company = models.ForeignKey(
+        "core.Company",
+        on_delete=models.CASCADE,
+        related_name="conversations",
+        null=True,
+        blank=True,
+        verbose_name="회사",
+    )
     participants = models.ManyToManyField(
         settings.AUTH_USER_MODEL, 
         related_name='conversations',
