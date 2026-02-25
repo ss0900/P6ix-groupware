@@ -42,6 +42,7 @@ const ChatPanel = ({ isOpen, onClose, onOpenExternally, onUnreadCountChange }) =
     const [docs, setDocs] = useState([]);
     const [loadingFiles, setLoadingFiles] = useState(false);
 
+    const panelRef = useRef(null);
     const scrollRef = useRef(null);
     const isUserScrolling = useRef(false);
     const processedMessagesCount = useRef(0);
@@ -167,6 +168,33 @@ const ChatPanel = ({ isOpen, onClose, onOpenExternally, onUnreadCountChange }) =
             if (isOpen) window.isChatPanelOpen = false;
         };
     }, [isOpen, companyId]);
+
+    useEffect(() => {
+        if (isOpen) return;
+        setSelectedChat(null);
+        setView('list');
+        setShowFileModal(false);
+    }, [isOpen]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const handleOutsidePointerDown = (event) => {
+            const panelElement = panelRef.current;
+            if (!panelElement) return;
+            if (!panelElement.contains(event.target)) {
+                onClose?.();
+            }
+        };
+
+        document.addEventListener('mousedown', handleOutsidePointerDown);
+        document.addEventListener('touchstart', handleOutsidePointerDown);
+
+        return () => {
+            document.removeEventListener('mousedown', handleOutsidePointerDown);
+            document.removeEventListener('touchstart', handleOutsidePointerDown);
+        };
+    }, [isOpen, onClose]);
 
     useEffect(() => {
         if (messages.length <= processedMessagesCount.current) return;
@@ -547,6 +575,7 @@ const ChatPanel = ({ isOpen, onClose, onOpenExternally, onUnreadCountChange }) =
         <AnimatePresence>
             {isOpen && (
                 <motion.div
+                    ref={panelRef}
                     initial={{ x: '100%' }}
                     animate={{ x: 0 }}
                     exit={{ x: '100%' }}

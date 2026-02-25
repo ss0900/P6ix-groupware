@@ -47,8 +47,11 @@ const ChatListPanel = ({ conversations, onSelectChat, currentUser }) => {
                                 <div className="flex justify-between items-start mb-1">
                                     <h3 className="font-semibold truncate text-gray-900">
                                         {other.displayName}
-                                        {!chat.is_group && other.company && (
-                                            <span className="ml-2 text-[10px] text-blue-600 font-normal">({other.company})</span>
+                                        {!chat.is_group && other.position && (
+                                            <span className="ml-1 text-[12px] text-gray-600 font-normal">{other.position}</span>
+                                        )}
+                                        {!chat.is_group && other.department && (
+                                            <span className="ml-2 text-[10px] text-blue-600 font-normal">({other.department})</span>
                                         )}
                                     </h3>
                                     <span className="text-[10px] text-gray-500 whitespace-nowrap ml-2">

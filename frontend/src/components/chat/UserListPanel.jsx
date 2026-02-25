@@ -60,6 +60,11 @@ const UserListPanel = ({ users, currentUser, onStart1on1, onCreateGroup }) => {
         setSelectedUserIds([]);
     };
 
+    const getUserInitial = (user) => {
+        const source = user?.last_name || user?.first_name || user?.name || user?.username || '?';
+        return String(source).trim().slice(0, 1).toUpperCase();
+    };
+
     return (
         <div className="flex-1 flex flex-col overflow-hidden">
             <div className="p-4 space-y-3 bg-gray-50 border-b border-gray-200">
@@ -122,7 +127,7 @@ const UserListPanel = ({ users, currentUser, onStart1on1, onCreateGroup }) => {
                                                             {u.profile_picture ? (
                                                                 <img src={u.profile_picture} alt={u.username} className="w-full h-full object-cover" />
                                                             ) : (
-                                                                (u.username || '?').slice(0, 1).toUpperCase()
+                                                                getUserInitial(u)
                                                             )}
                                                         </div>
                                                         <div>
