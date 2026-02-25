@@ -118,15 +118,16 @@ export const projectMenus = {
         items: [
           { to: "main", label: "자료실" },
           { to: "attachments", label: "첨부파일" },
-        ],
-      },
-      {
-        title: "기타",
-        items: [
           { to: "trash", label: "휴지통" },
-          { to: "temporary", label: "임시파일" },
         ],
       },
+      // {
+      //   title: "기타",
+      //   items: [
+      //     { to: "trash", label: "휴지통" },
+      //     { to: "temporary", label: "임시파일" },
+      //   ],
+      // },
     ],
   },
   project: {
