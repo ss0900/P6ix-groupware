@@ -12,8 +12,10 @@ export const chatApi = {
     markAsRead: (conversationId) => api.post('chat/messages/mark-read/', { conversation_id: conversationId }),
     // Server currently returns passthrough text until translation provider is wired.
     translate: (text, targetLang) => api.post('chat/messages/translate/', { text, target_lang: targetLang }),
-    getPaperFiles: () => api.get('resources/files/?type=file'),
-    getPhotos: () => api.get('resources/files/?type=image'),
+    uploadResourceFile: (formData) =>
+        api.post('resources/files/', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        }),
+    getResourceFile: (fileId) => api.get(`resources/files/${fileId}/`),
     getUsers: (companyId) => api.get(`chat/users/${companyId ? `?company=${companyId}` : ''}`),
-    getDocs: () => api.get('resources/files/?type=document'),
 };

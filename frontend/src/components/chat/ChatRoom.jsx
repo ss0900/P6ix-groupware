@@ -19,7 +19,7 @@ const ChatRoom = ({
     setInputText,
     isTranslating,
     isConnected,
-    handleOpenFileModal,
+    handleOpenFilePicker,
 }) => {
     const parseFileMessage = (text) => {
         const filePattern = /^\[FILE:(paper|photo|doc):(.+)\]$/;
@@ -270,9 +270,9 @@ const ChatRoom = ({
                 <div className="flex items-end gap-2 bg-gray-50 rounded-2xl px-4 py-2 border border-gray-200 focus-within:border-blue-500 focus-within:bg-white transition-all shadow-sm">
                     <button
                         type="button"
-                        onClick={handleOpenFileModal}
+                        onClick={handleOpenFilePicker}
                         className="text-gray-400 hover:text-blue-500 transition-colors mb-2"
-                        title="파일 공유"
+                        title="파일 첨부"
                     >
                         <Paperclip size={20} />
                     </button>

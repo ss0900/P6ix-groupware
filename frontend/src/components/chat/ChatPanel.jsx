@@ -5,12 +5,12 @@ import { useAuth } from '../../context/AuthContext';
 import api from '../../api/axios';
 import { chatApi } from '../../api/chat';
 import useChat from '../../hooks/useChat';
-import FileShareModal from './FileShareModal';
 import ChatListPanel from './ChatListPanel';
 import UserListPanel from './UserListPanel';
 import ChatRoom from './ChatRoom';
 
 const getSelectedCompanyScopeKey = (username) => `chat:selected-company:${username || 'anonymous'}`;
+const DOC_EXTENSIONS = new Set(['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'hwp']);
 
 const ChatPanel = ({ isOpen, onClose, onOpenExternally, onUnreadCountChange }) => {
     const { user } = useAuth();
@@ -35,14 +35,8 @@ const ChatPanel = ({ isOpen, onClose, onOpenExternally, onUnreadCountChange }) =
     const [renameChatName, setRenameChatName] = useState('');
     const [renameLoading, setRenameLoading] = useState(false);
 
-    const [showFileModal, setShowFileModal] = useState(false);
-    const [fileTab, setFileTab] = useState('papers');
-    const [paperFiles, setPaperFiles] = useState([]);
-    const [photos, setPhotos] = useState([]);
-    const [docs, setDocs] = useState([]);
-    const [loadingFiles, setLoadingFiles] = useState(false);
-
     const panelRef = useRef(null);
+    const fileInputRef = useRef(null);
     const scrollRef = useRef(null);
     const isUserScrolling = useRef(false);
     const processedMessagesCount = useRef(0);
@@ -173,7 +167,6 @@ const ChatPanel = ({ isOpen, onClose, onOpenExternally, onUnreadCountChange }) =
         if (isOpen) return;
         setSelectedChat(null);
         setView('list');
-        setShowFileModal(false);
     }, [isOpen]);
 
     useEffect(() => {
@@ -410,63 +403,77 @@ const ChatPanel = ({ isOpen, onClose, onOpenExternally, onUnreadCountChange }) =
         setShowScrollButton(false);
     };
 
-    const handleOpenFileModal = async () => {
-        setShowFileModal(true);
-        setLoadingFiles(true);
-
-        try {
-            const [filesRes, photosRes, docsRes] = await Promise.allSettled([
-                chatApi.getPaperFiles(),
-                chatApi.getPhotos(),
-                chatApi.getDocs(),
-            ]);
-
-            if (filesRes.status === 'fulfilled') {
-                setPaperFiles(filesRes.value.data.results || filesRes.value.data || []);
-            }
-            if (photosRes.status === 'fulfilled') {
-                setPhotos(photosRes.value.data.results || photosRes.value.data || []);
-            }
-            if (docsRes.status === 'fulfilled') {
-                setDocs(docsRes.value.data.results || docsRes.value.data || []);
-            }
-        } finally {
-            setLoadingFiles(false);
-        }
+    const handleOpenFilePicker = () => {
+        if (!selectedChat) return;
+        fileInputRef.current?.click();
     };
 
-    const handleShareFile = async (file, type) => {
-        if (!selectedChat) return;
-
-        const metadata = { type, id: file.id };
-
-        if (type === 'paper') {
-            metadata.name = file.name;
-            metadata.url = file.file_url || file.url || file.file;
-            metadata.size = file.file_size || file.size || 0;
-            metadata.created_by = file.uploader_name || file.created_by_name || file.created_by || '';
-            metadata.date = file.created_at;
-        } else if (type === 'photo') {
-            metadata.name = file.title || file.name;
-            metadata.url = file.file_url || file.url;
-            metadata.description = file.description || '';
-            metadata.date = file.date || file.created_at;
-        } else if (type === 'doc') {
-            metadata.name = file.title || file.name;
-            metadata.url = file.file_url || file.url;
-            metadata.resource_type = file.resource_type || 'document';
-            metadata.status = file.status || '';
-            metadata.doc_type = file.doc_type || '';
-            metadata.created_by = file.created_by_name || file.uploader_name || '';
-            metadata.date = file.created_at;
+    const handleLocalFileSelected = async (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        if (!selectedChat) {
+            event.target.value = '';
+            return;
         }
 
-        const messageText = `[FILE:${type}:${JSON.stringify(metadata)}]`;
+        const currentUserName = `${currentUser?.last_name || ''}${currentUser?.first_name || ''}`.trim() || currentUser?.username || '';
+        const fileExt = String(file.name || '').split('.').pop()?.toLowerCase() || '';
+        const isImage = String(file.type || '').startsWith('image/');
+
         try {
-            await sendMessage(messageText, selectedChat.id);
-            setShowFileModal(false);
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('name', file.name);
+
+            const uploadRes = await chatApi.uploadResourceFile(formData);
+            const uploaded = uploadRes.data || {};
+
+            let resource = uploaded;
+            if (uploaded?.id) {
+                try {
+                    const detailRes = await chatApi.getResourceFile(uploaded.id);
+                    resource = detailRes.data || uploaded;
+                } catch {
+                    resource = uploaded;
+                }
+            }
+
+            const rawUrl = resource.file_url || resource.url || resource.file || '';
+            const normalizedUrl = rawUrl
+                ? (/^https?:\/\//i.test(rawUrl) ? rawUrl : `${window.location.origin}${rawUrl.startsWith('/') ? '' : '/'}${rawUrl}`)
+                : '';
+
+            if (!normalizedUrl) {
+                throw new Error('Uploaded file URL is empty');
+            }
+
+            const metadata = {
+                id: resource.id,
+                name: resource.name || file.name,
+                url: normalizedUrl,
+                date: resource.created_at || new Date().toISOString(),
+            };
+
+            let messageType = 'paper';
+            if (isImage || resource.resource_type === 'image') {
+                messageType = 'photo';
+                metadata.description = resource.description || '';
+            } else if (resource.resource_type === 'document' || DOC_EXTENSIONS.has(fileExt)) {
+                messageType = 'doc';
+                metadata.resource_type = resource.resource_type || 'document';
+                metadata.doc_type = resource.extension || fileExt || 'document';
+                metadata.created_by = resource.uploader_name || currentUserName;
+            } else {
+                metadata.size = resource.file_size || file.size || 0;
+                metadata.created_by = resource.uploader_name || currentUserName;
+            }
+
+            await sendMessage(`[FILE:${messageType}:${JSON.stringify(metadata)}]`, selectedChat.id);
         } catch (err) {
-            console.error('Failed to share file:', err);
+            console.error('Failed to attach local file:', err);
+            alert('파일 첨부에 실패했습니다.');
+        } finally {
+            event.target.value = '';
         }
     };
 
@@ -729,7 +736,7 @@ const ChatPanel = ({ isOpen, onClose, onOpenExternally, onUnreadCountChange }) =
                                     setInputText={setInputText}
                                     isTranslating={isTranslating}
                                     isConnected={isConnected}
-                                    handleOpenFileModal={handleOpenFileModal}
+                                    handleOpenFilePicker={handleOpenFilePicker}
                                 />
                             </div>
                         )}
@@ -785,17 +792,11 @@ const ChatPanel = ({ isOpen, onClose, onOpenExternally, onUnreadCountChange }) =
                             )}
                         </div>
                     </div>
-
-                    <FileShareModal
-                        isOpen={showFileModal}
-                        onClose={() => setShowFileModal(false)}
-                        fileTab={fileTab}
-                        setFileTab={setFileTab}
-                        loadingFiles={loadingFiles}
-                        paperFiles={paperFiles}
-                        photos={photos}
-                        docs={docs}
-                        handleShareFile={handleShareFile}
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        className="hidden"
+                        onChange={handleLocalFileSelected}
                     />
                 </motion.div>
             )}
