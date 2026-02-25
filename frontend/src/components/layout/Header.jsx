@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Menu as MenuIcon, Bell, MessageSquare, HelpCircle } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import api from "../../api/axios";
+import { getUnansweredCount } from "../../api/help";
 
 import ChatPanel from "../chat/ChatPanel";
 import NotificationPanel from "../notification/NotificationPanel";
@@ -24,6 +25,8 @@ function Header({ onMenuClick }) {
   const [showChat, setShowChat] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
+  const [faqUnansweredCount, setFaqUnansweredCount] = useState(0);
+  const [companyId, setCompanyId] = useState(null);
   const [companyLogoUrl, setCompanyLogoUrl] = useState(null);
   const [companyLogoLoading, setCompanyLogoLoading] = useState(true);
 
@@ -87,6 +90,7 @@ function Header({ onMenuClick }) {
     const loadCompanyLogo = async () => {
       if (!user) {
         if (mounted) {
+          setCompanyId(null);
           setCompanyLogoUrl(null);
           setCompanyLogoLoading(false);
         }
@@ -109,6 +113,7 @@ function Header({ onMenuClick }) {
         if (!companyId) {
           clearLogoCache(username);
           if (mounted) {
+            setCompanyId(null);
             setCompanyLogoUrl(null);
             setCompanyLogoLoading(false);
           }
@@ -118,6 +123,7 @@ function Header({ onMenuClick }) {
         writeLogoCache(username, companyId, companyLogoUrl);
 
         if (mounted) {
+          setCompanyId(companyId);
           setCompanyLogoUrl(companyLogoUrl);
           setCompanyLogoLoading(false);
         }
@@ -128,6 +134,7 @@ function Header({ onMenuClick }) {
         }
 
         if (mounted) {
+          setCompanyId(null);
           if (!cachedLogoUrl) {
             setCompanyLogoUrl(null);
           }
@@ -142,6 +149,26 @@ function Header({ onMenuClick }) {
       mounted = false;
     };
   }, [user]);
+
+  useEffect(() => {
+    if (!user?.is_superuser || !companyId) {
+      setFaqUnansweredCount(0);
+      return undefined;
+    }
+
+    const loadUnanswered = async () => {
+      try {
+        const res = await getUnansweredCount(companyId);
+        setFaqUnansweredCount(Number(res.data?.count || 0));
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    loadUnanswered();
+    const interval = setInterval(loadUnanswered, 30000);
+    return () => clearInterval(interval);
+  }, [companyId, user?.is_superuser]);
 
   const goDashboard = () => {
     navigate("/");
@@ -235,10 +262,15 @@ function Header({ onMenuClick }) {
 
             <button
               onClick={goHelp}
-              className="p-2 rounded-lg hover:bg-slate-700 text-white transition-colors"
+              className="relative p-2 rounded-lg hover:bg-slate-700 text-white transition-colors"
               title="도움말"
             >
               <HelpCircle size={20} />
+              {user?.is_superuser && faqUnansweredCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                  {faqUnansweredCount}
+                </span>
+              )}
             </button>
           </div>
         </div>

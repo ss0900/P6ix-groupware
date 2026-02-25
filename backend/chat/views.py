@@ -11,9 +11,10 @@ from rest_framework.response import Response
 from core.models import CustomUser, UserMembership
 from resources.models import Resource
 
-from .models import Conversation, HelpQuestion, Message, MessageReadReceipt, Notification
+from .models import Conversation, HelpAnswer, HelpQuestion, Message, MessageReadReceipt, Notification
 from .serializers import (
     ConversationSerializer,
+    HelpAnswerSerializer,
     HelpQuestionSerializer,
     MessageSerializer,
     NotificationSerializer,
@@ -309,7 +310,23 @@ class HelpQuestionViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        qs = HelpQuestion.objects.all()
+        company_id = _resolve_company_scope(self.request, payload=self.request.data, required=False)
+        if not company_id:
+            return HelpQuestion.objects.none()
+
+        qs = (
+            HelpQuestion.objects.filter(company_id=company_id)
+            .select_related("author")
+            .prefetch_related("answers__created_by")
+            .order_by("-created_at")
+        )
+
+        if not self.request.user.is_superuser:
+            qs = qs.filter(Q(author=self.request.user) | Q(is_public=True)).distinct()
+
+        search_term = self.request.query_params.get("search")
+        if search_term:
+            qs = qs.filter(Q(title__icontains=search_term) | Q(content__icontains=search_term))
 
         status_filter = self.request.query_params.get("status")
         if status_filter:
@@ -322,31 +339,128 @@ class HelpQuestionViewSet(viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
-        serializer.save(author=self.request.user)
+        company_id = _resolve_company_scope(self.request, payload=self.request.data, required=True)
+        serializer.save(author=self.request.user, company_id=company_id)
+
+    def perform_update(self, serializer):
+        instance = serializer.instance
+        if instance.author_id != self.request.user.id and not self.request.user.is_superuser:
+            raise PermissionDenied("You can only edit your own questions.")
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        if instance.author_id != self.request.user.id and not self.request.user.is_superuser:
+            raise PermissionDenied("You can only delete your own questions.")
+        instance.delete()
 
     @action(detail=True, methods=["post"])
     def answer(self, request, pk=None):
+        if not request.user.is_superuser:
+            raise PermissionDenied("Only superusers can answer questions.")
+
         question = self.get_object()
         answer_text = request.data.get("answer")
         if not answer_text:
             return Response({"error": "answer is required"}, status=status.HTTP_400_BAD_REQUEST)
 
+        HelpAnswer.objects.create(
+            question=question,
+            content=answer_text,
+            created_by=request.user,
+        )
         question.answer = answer_text
         question.status = "answered"
         question.answered_at = timezone.now()
-        question.save()
+        question.save(update_fields=["answer", "status", "answered_at"])
 
         serializer = self.get_serializer(question)
         return Response(serializer.data)
 
+    @action(detail=False, methods=["get"], url_path="unanswered_count")
+    def unanswered_count(self, request):
+        company_id = _resolve_company_scope(request, required=False)
+        if not company_id:
+            return Response({"count": 0})
+
+        qs = HelpQuestion.objects.filter(company_id=company_id, answers__isnull=True)
+        if not request.user.is_superuser:
+            qs = qs.filter(Q(author=request.user) | Q(is_public=True)).distinct()
+        return Response({"count": qs.count()})
+
     @action(detail=False, methods=["get"])
     def stats(self, request):
-        qs = HelpQuestion.objects.all()
+        qs = self.get_queryset()
         return Response(
             {
                 "total": qs.count(),
-                "answered": qs.filter(status="answered").count(),
-                "pending": qs.filter(status="pending").count(),
+                "answered": qs.filter(answers__isnull=False).distinct().count(),
+                "pending": qs.filter(answers__isnull=True).count(),
             }
         )
+
+
+class HelpAnswerViewSet(viewsets.ModelViewSet):
+    serializer_class = HelpAnswerSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        company_id = _resolve_company_scope(self.request, payload=self.request.data, required=False)
+        if not company_id:
+            return HelpAnswer.objects.none()
+
+        qs = (
+            HelpAnswer.objects.filter(question__company_id=company_id)
+            .select_related("question", "created_by")
+            .order_by("created_at")
+        )
+
+        if self.request.user.is_superuser:
+            return qs
+
+        return qs.filter(
+            Q(question__author=self.request.user) | Q(question__is_public=True)
+        ).distinct()
+
+    def perform_create(self, serializer):
+        if not self.request.user.is_superuser:
+            raise PermissionDenied("Only superusers can answer questions.")
+
+        question = serializer.validated_data["question"]
+        company_id = _resolve_company_scope(self.request, payload=self.request.data, required=True)
+
+        if question.company_id != company_id:
+            raise PermissionDenied("Question does not belong to the selected company scope.")
+
+        serializer.save(created_by=self.request.user)
+
+        question.answer = serializer.validated_data["content"]
+        question.status = "answered"
+        question.answered_at = timezone.now()
+        question.save(update_fields=["answer", "status", "answered_at"])
+
+    def perform_update(self, serializer):
+        if not self.request.user.is_superuser:
+            raise PermissionDenied("Only superusers can update answers.")
+        answer = serializer.save()
+        question = answer.question
+        question.answer = answer.content
+        question.status = "answered"
+        if not question.answered_at:
+            question.answered_at = timezone.now()
+        question.save(update_fields=["answer", "status", "answered_at"])
+
+    def perform_destroy(self, instance):
+        if not self.request.user.is_superuser:
+            raise PermissionDenied("Only superusers can delete answers.")
+        question = instance.question
+        instance.delete()
+        latest_answer = question.answers.order_by("-created_at").first()
+        if latest_answer:
+            question.answer = latest_answer.content
+            question.status = "answered"
+        else:
+            question.answer = ""
+            question.status = "pending"
+            question.answered_at = None
+        question.save(update_fields=["answer", "status", "answered_at"])
 

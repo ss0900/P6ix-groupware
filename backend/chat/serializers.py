@@ -1,7 +1,7 @@
 # backend/chat/serializers.py
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
-from .models import Conversation, Message, Notification, HelpQuestion
+from .models import Conversation, Message, Notification, HelpQuestion, HelpAnswer
 
 User = get_user_model()
 
@@ -128,15 +128,57 @@ class NotificationSerializer(serializers.ModelSerializer):
 
 class HelpQuestionSerializer(serializers.ModelSerializer):
     author_name = serializers.SerializerMethodField()
+    created_by_username = serializers.SerializerMethodField()
     status_display = serializers.CharField(source='get_status_display', read_only=True)
+    answers = serializers.SerializerMethodField()
 
     class Meta:
         model = HelpQuestion
         fields = [
-            'id', 'title', 'content', 'author', 'author_name', 
-            'status', 'status_display', 'answer', 'created_at', 'answered_at'
+            'id',
+            'company',
+            'title',
+            'content',
+            'author',
+            'author_name',
+            'created_by_username',
+            'is_public',
+            'status',
+            'status_display',
+            'answer',
+            'created_at',
+            'answered_at',
+            'answers',
         ]
         read_only_fields = ['id', 'author', 'created_at', 'answered_at']
 
     def get_author_name(self, obj):
         return f"{obj.author.last_name or ''}{obj.author.first_name or ''}".strip() or obj.author.username
+
+    def get_created_by_username(self, obj):
+        return self.get_author_name(obj)
+
+    def get_answers(self, obj):
+        answers = obj.answers.all()
+        return HelpAnswerSerializer(answers, many=True).data
+
+
+class HelpAnswerSerializer(serializers.ModelSerializer):
+    created_by_username = serializers.SerializerMethodField()
+
+    class Meta:
+        model = HelpAnswer
+        fields = [
+            'id',
+            'question',
+            'created_by',
+            'created_by_username',
+            'content',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'created_by', 'created_at', 'updated_at']
+
+    def get_created_by_username(self, obj):
+        user = obj.created_by
+        return f"{user.last_name or ''}{user.first_name or ''}".strip() or user.username

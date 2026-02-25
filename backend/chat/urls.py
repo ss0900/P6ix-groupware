@@ -12,6 +12,7 @@ router.register("docs", views.DocListView, basename="docs")
 router.register("users", views.CompanyChatUserListView, basename="chat-users")
 router.register("notifications", views.NotificationViewSet, basename="notification")
 router.register("help", views.HelpQuestionViewSet, basename="help")
+router.register("help-answers", views.HelpAnswerViewSet, basename="help-answer")
 
 urlpatterns = [
     path("", include(router.urls)),

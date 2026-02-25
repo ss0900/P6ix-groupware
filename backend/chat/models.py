@@ -125,10 +125,19 @@ class HelpQuestion(models.Model):
 
     title = models.CharField("제목", max_length=200)
     content = models.TextField("내용")
+    company = models.ForeignKey(
+        "core.Company",
+        on_delete=models.CASCADE,
+        related_name="help_questions",
+        null=True,
+        blank=True,
+        verbose_name="회사",
+    )
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
         related_name='help_questions', verbose_name="작성자"
     )
+    is_public = models.BooleanField(default=False)
     status = models.CharField("상태", max_length=20, choices=STATUS_CHOICES, default="pending")
     answer = models.TextField("답변", blank=True)
     
@@ -142,3 +151,29 @@ class HelpQuestion(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class HelpAnswer(models.Model):
+    question = models.ForeignKey(
+        HelpQuestion,
+        on_delete=models.CASCADE,
+        related_name="answers",
+        verbose_name="질문",
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="help_answers",
+        verbose_name="작성자",
+    )
+    content = models.TextField("내용")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "도움말 답변"
+        verbose_name_plural = "도움말 답변"
+        ordering = ["created_at"]
+
+    def __str__(self):
+        return f"Answer to {self.question_id}"
