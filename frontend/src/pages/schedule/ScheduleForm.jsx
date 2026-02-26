@@ -60,7 +60,6 @@ export default function ScheduleForm({
     location: initial?.location || "",
     date: initial?.start?.slice(0, 10) || format(initialDate, "yyyy-MM-dd"),
     time: initial?.start?.slice(11, 16) || "09:00",
-    end_date: initial?.end?.slice(0, 10) || "",
     end_time: initial?.end?.slice(11, 16) || "",
     is_all_day: initial?.is_all_day || false,
     memo: initial?.memo || "",
@@ -239,9 +238,9 @@ export default function ScheduleForm({
       const start = new Date(
         `${form.date}T${form.time || "00:00"}:00`,
       ).toISOString();
-      const end = form.end_date
+      const end = !form.is_all_day && form.end_time
         ? new Date(
-            `${form.end_date}T${form.end_time || "23:59"}:00`,
+            `${form.date}T${form.end_time}:00`,
           ).toISOString()
         : null;
 
@@ -456,25 +455,26 @@ export default function ScheduleForm({
         </div>
 
         {/* 일시 */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              시작 날짜 <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="date"
-              name="date"
-              value={form.date}
-              onChange={onChange}
-              disabled={isViewMode}
-              className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${
-                isViewMode
-                  ? "bg-gray-50 text-gray-700 cursor-default"
-                  : "focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              }`}
-            />
-          </div>
-          {!form.is_all_day && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            날짜 <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="date"
+            name="date"
+            value={form.date}
+            onChange={onChange}
+            disabled={isViewMode}
+            className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${
+              isViewMode
+                ? "bg-gray-50 text-gray-700 cursor-default"
+                : "focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            }`}
+          />
+        </div>
+
+        {!form.is_all_day && (
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 시작 시간
@@ -492,28 +492,6 @@ export default function ScheduleForm({
                 }`}
               />
             </div>
-          )}
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              종료 날짜
-            </label>
-            <input
-              type="date"
-              name="end_date"
-              value={form.end_date}
-              onChange={onChange}
-              disabled={isViewMode}
-              className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${
-                isViewMode
-                  ? "bg-gray-50 text-gray-700 cursor-default"
-                  : "focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              }`}
-            />
-          </div>
-          {!form.is_all_day && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 종료 시간
@@ -531,8 +509,8 @@ export default function ScheduleForm({
                 }`}
               />
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* 참여자 (회사 일정일 때) */}
         {form.scope === "company" && (
