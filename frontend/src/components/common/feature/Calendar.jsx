@@ -56,33 +56,43 @@ const CAL_CSS = `
   width: 100%;
   margin-top: 3px;
   padding: 0 4px;
+  text-align: left;
 }
 .pmis-calendar .pmis-tile-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr);
+  align-items: start;
+  column-gap: 4px;
   width: 100%;
   font-size: 11px;
   line-height: 1.35;
   color: #111827;
+  text-align: left !important;
 }
+.pmis-calendar .pmis-tile-item.is-clickable { cursor: pointer; border-radius: 4px; }
+.pmis-calendar .pmis-tile-item.is-clickable:hover { background: rgba(59, 130, 246, 0.12); }
 .pmis-calendar .pmis-tile-item .bullet {
-  flex: 0 0 auto;
+  display: inline-block;
+  width: 10px;
   font-size: 7px;
   color: #6b7280;
+  line-height: 1.35;
+  text-align: center;
 }
-.pmis-calendar .pmis-tile-item .text {
+.pmis-calendar .pmis-tile-item .pmis-tile-item__label {
   display: block;
-  width: 100%;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-align: left !important;
 }
 .pmis-calendar .pmis-tile-more {
   padding-left: 11px;
   font-size: 10px;
   line-height: 1.2;
   color: #6b7280;
+  text-align: left;
 }
 
 /* 공휴일 라벨 */
@@ -178,12 +188,15 @@ const CAL_CSS = `
   font-weight: 400; /* 선택시 너무 두껍지 않게 */
 }
 .pmis-calendar .react-calendar__tile--active .pmis-tile-item,
-.pmis-calendar .react-calendar__tile--active .pmis-tile-item .text,
+.pmis-calendar .react-calendar__tile--active .pmis-tile-item .pmis-tile-item__label,
 .pmis-calendar .react-calendar__tile--active .pmis-tile-more {
   color: #fff !important;
 }
 .pmis-calendar .react-calendar__tile--active .pmis-tile-item .bullet {
   color: #fff !important;
+}
+.pmis-calendar .react-calendar__tile--active .pmis-tile-item.is-clickable:hover {
+  background: rgba(255, 255, 255, 0.22);
 }
 
 /* ✅ 상태 도트(● N건) 줄 */
@@ -551,6 +564,7 @@ export default function ReusableCalendar({
   showTileItems = false,
   maxTileItems = 3,
   getTileItemLabel = (item) => item?.title || "",
+  onTileItemClick,
   formatDayLabel,
   showHolidayLabels = true,
   holidayMap: holidayMapProp,
@@ -644,14 +658,26 @@ export default function ReusableCalendar({
                   const label = String(
                     getTileItemLabel(item) || item?.title || "(제목 없음)"
                   ).trim();
+                  const isClickable = typeof onTileItemClick === "function";
                   return (
                     <div
                       key={item?.id || `${key}-item-${idx}`}
-                      className="pmis-tile-item"
+                      className={`pmis-tile-item${isClickable ? " is-clickable" : ""}`}
                       title={label}
+                      onMouseDown={(e) => {
+                        if (!isClickable) return;
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
+                      onClick={(e) => {
+                        if (!isClickable) return;
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onTileItemClick(item, date);
+                      }}
                     >
                       <span className="bullet">●</span>
-                      <span className="text">{label}</span>
+                      <span className="pmis-tile-item__label">{label}</span>
                     </div>
                   );
                 })}

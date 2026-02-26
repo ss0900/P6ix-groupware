@@ -261,6 +261,13 @@ export default function ScheduleCalendar({ scope, category }) {
     setPanelOpen(true);
   };
 
+  const openView = (item) => {
+    if (!item) return;
+    setActiveItem(item);
+    setPanelMode("view");
+    setPanelOpen(true);
+  };
+
   const closePanel = () => {
     setPanelOpen(false);
     setPanelMode(null);
@@ -355,6 +362,7 @@ export default function ScheduleCalendar({ scope, category }) {
                   const title = item?.title || "(제목 없음)";
                   return `${calendarPrefix}${title}`;
                 }}
+                onTileItemClick={(item) => openView(item)}
                 formatDayLabel={(date, dayLabel, holidayLabels = []) => {
                   if (!Array.isArray(holidayLabels) || holidayLabels.length === 0) {
                     return dayLabel;
