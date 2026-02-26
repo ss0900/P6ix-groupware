@@ -1,7 +1,7 @@
 // src/pages/schedule/ScheduleForm.jsx
 import React, { useState, useEffect, useCallback } from "react";
 import { format } from "date-fns";
-import { Search, X, Edit, Trash2 } from "lucide-react";
+import { Search, X, Edit, Trash2, Check } from "lucide-react";
 import { scheduleApi, calendarApi } from "../../api/schedule";
 import api from "../../api/axios";
 import PageHeader from "../../components/common/ui/PageHeader";
@@ -443,16 +443,28 @@ export default function ScheduleForm({
 
         {/* 종일 */}
         <div>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              name="is_all_day"
-              checked={form.is_all_day}
-              onChange={onChange}
-              disabled={isViewMode}
-              className="rounded text-blue-600"
-            />
-            <span className="text-sm text-gray-700">종일</span>
+          <label className={`flex items-center gap-2 ${isViewMode ? "cursor-default" : "cursor-pointer"}`}>
+            {isViewMode ? (
+              <span
+                className={`inline-flex h-4 w-4 items-center justify-center rounded border ${
+                  form.is_all_day
+                    ? "bg-blue-600 border-blue-600 text-white"
+                    : "bg-white border-gray-300 text-transparent"
+                }`}
+                aria-hidden="true"
+              >
+                {form.is_all_day && <Check size={12} strokeWidth={3} />}
+              </span>
+            ) : (
+              <input
+                type="checkbox"
+                name="is_all_day"
+                checked={form.is_all_day}
+                onChange={onChange}
+                className="rounded text-blue-600"
+              />
+            )}
+            <span className={`text-sm ${isViewMode ? "text-gray-900" : "text-gray-700"}`}>종일</span>
           </label>
         </div>
 
