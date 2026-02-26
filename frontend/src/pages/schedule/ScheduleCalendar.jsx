@@ -367,7 +367,8 @@ export default function ScheduleCalendar({ scope, category }) {
                   if (!Array.isArray(holidayLabels) || holidayLabels.length === 0) {
                     return dayLabel;
                   }
-                  return `${dayLabel} ${holidayLabels[0]}`;
+                  const dayHolidayGap = String.fromCharCode(160).repeat(3);
+                  return `${dayLabel}${dayHolidayGap}${holidayLabels[0]}`;
                 }}
                 holidayMap={holidayMap}
                 onMonthChange={(d) => setCurrentDate(d)}
