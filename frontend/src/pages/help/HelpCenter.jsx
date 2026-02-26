@@ -127,7 +127,7 @@ export default function HelpCenter() {
 
   return (
     <div className="min-h-screen bg-gray-50/50 p-6 pb-24">
-      <PageHeader>워크스페이스 Q&A</PageHeader>
+      <PageHeader>Q&A</PageHeader>
 
       {user?.is_superuser && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
@@ -177,8 +177,7 @@ export default function HelpCenter() {
                     onClick={() => setView("create")}
                     className="btn-create flex items-center gap-2"
                   >
-                    <PenTool size={16} />
-                    새 질문하기
+                    <PenTool size={16} />새 질문하기
                   </button>
                 }
               />
@@ -195,7 +194,10 @@ export default function HelpCenter() {
           )}
 
           {view === "create" && (
-            <FAQCreateView onCancel={() => setView("list")} onSaved={onCreated} />
+            <FAQCreateView
+              onCancel={() => setView("list")}
+              onSaved={onCreated}
+            />
           )}
 
           {view === "detail" && (
@@ -231,13 +233,22 @@ const SummaryCard = ({ icon, label, value, color = "blue" }) => {
   );
 };
 
-function FAQListView({ loading, questions, page, total, onPageChange, onSelect }) {
+function FAQListView({
+  loading,
+  questions,
+  page,
+  total,
+  onPageChange,
+  onSelect,
+}) {
   return (
     <>
       <div className="divide-y mt-4">
         {loading && <div className="p-6 text-center">로딩 중...</div>}
         {!loading && questions.length === 0 && (
-          <div className="p-6 text-center text-gray-400">등록된 질문이 없습니다.</div>
+          <div className="p-6 text-center text-gray-400">
+            등록된 질문이 없습니다.
+          </div>
         )}
         {questions.map((question) => (
           <div
@@ -248,7 +259,8 @@ function FAQListView({ loading, questions, page, total, onPageChange, onSelect }
             <div className="flex items-center gap-2">
               {!question.is_public && <Lock size={12} />}
               <span className="font-medium">{question.title}</span>
-              {Array.isArray(question.answers) && question.answers.length > 0 ? (
+              {Array.isArray(question.answers) &&
+              question.answers.length > 0 ? (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-green-50 text-green-700">
                   답변 완료
                 </span>
@@ -259,7 +271,8 @@ function FAQListView({ loading, questions, page, total, onPageChange, onSelect }
               )}
             </div>
             <div className="text-xs text-gray-400 mt-1">
-              {question.created_by_username || question.author_name} · {toDate(question.created_at)}
+              {question.created_by_username || question.author_name} ·{" "}
+              {toDate(question.created_at)}
             </div>
           </div>
         ))}
@@ -327,7 +340,10 @@ function FAQCreateView({ onCancel, onSaved }) {
             onChange={(e) => setIsPublic(e.target.checked)}
             disabled={submitting}
           />
-          <label htmlFor="faq-public" className="text-sm cursor-pointer select-none">
+          <label
+            htmlFor="faq-public"
+            className="text-sm cursor-pointer select-none"
+          >
             전체 공개
           </label>
         </div>
@@ -341,7 +357,11 @@ function FAQCreateView({ onCancel, onSaved }) {
         />
 
         <div className="flex justify-end gap-2">
-          <button className="btn-cancel" onClick={onCancel} disabled={submitting}>
+          <button
+            className="btn-cancel"
+            onClick={onCancel}
+            disabled={submitting}
+          >
             취소
           </button>
           <button className="btn-create" onClick={submit} disabled={submitting}>
@@ -405,14 +425,18 @@ function FAQDetailView({ user, question, canDelete, onBack, onRefresh }) {
       <div className="flex justify-between items-start gap-4">
         <h3 className="text-lg font-bold">{question.title}</h3>
         {canDelete && (
-          <button onClick={onDelete} className="text-red-500 hover:text-red-600">
+          <button
+            onClick={onDelete}
+            className="text-red-500 hover:text-red-600"
+          >
             <Trash2 size={16} />
           </button>
         )}
       </div>
 
       <div className="text-sm text-gray-500">
-        {question.created_by_username || question.author_name} · {toDate(question.created_at)}
+        {question.created_by_username || question.author_name} ·{" "}
+        {toDate(question.created_at)}
       </div>
 
       <div className="whitespace-pre-wrap">{question.content}</div>
@@ -422,12 +446,16 @@ function FAQDetailView({ user, question, canDelete, onBack, onRefresh }) {
       {Array.isArray(question.answers) && question.answers.length > 0 ? (
         question.answers.map((answer) => (
           <div key={answer.id} className="bg-gray-50 p-3 rounded">
-            <div className="text-xs text-gray-400 mb-1">관리자 · {toDate(answer.created_at)}</div>
+            <div className="text-xs text-gray-400 mb-1">
+              관리자 · {toDate(answer.created_at)}
+            </div>
             {answer.content}
           </div>
         ))
       ) : (
-        <div className="text-sm text-gray-400">아직 등록된 답변이 없습니다.</div>
+        <div className="text-sm text-gray-400">
+          아직 등록된 답변이 없습니다.
+        </div>
       )}
 
       {isAdmin && (
@@ -439,7 +467,11 @@ function FAQDetailView({ user, question, canDelete, onBack, onRefresh }) {
             onChange={(e) => setReply(e.target.value)}
             disabled={sending}
           />
-          <button className="btn-create" onClick={onSubmitReply} disabled={sending}>
+          <button
+            className="btn-create"
+            onClick={onSubmitReply}
+            disabled={sending}
+          >
             <Send size={16} />
           </button>
         </div>
