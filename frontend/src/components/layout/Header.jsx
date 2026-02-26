@@ -1,5 +1,5 @@
-﻿// src/components/layout/Header.jsx
-import React, { useState, useEffect } from "react";
+// src/components/layout/Header.jsx
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Menu as MenuIcon, Bell, MessageSquare, HelpCircle } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
@@ -9,6 +9,7 @@ import { getUnansweredCount } from "../../api/help";
 import ChatPanel from "../chat/ChatPanel";
 import NotificationPanel from "../notification/NotificationPanel";
 import Menu from "./Menu";
+import "../notification/NotificationPanel.css";
 
 const getLogoCacheKeys = (username) => {
   const safeUsername = username || "anonymous";
@@ -29,21 +30,42 @@ function Header({ onMenuClick }) {
   const [companyId, setCompanyId] = useState(null);
   const [companyLogoUrl, setCompanyLogoUrl] = useState(null);
   const [companyLogoLoading, setCompanyLogoLoading] = useState(true);
+  const [ringBell, setRingBell] = useState(false);
+
+  const notificationButtonRef = useRef(null);
+  const previousUnreadRef = useRef(0);
+  const initializedUnreadRef = useRef(false);
+
+  const applyUnreadCount = useCallback((count) => {
+    const nextCount = Number(count || 0);
+
+    if (
+      initializedUnreadRef.current &&
+      nextCount > previousUnreadRef.current
+    ) {
+      setRingBell(true);
+      setTimeout(() => setRingBell(false), 800);
+    }
+
+    previousUnreadRef.current = nextCount;
+    initializedUnreadRef.current = true;
+    setUnreadNotifications(nextCount);
+  }, []);
+
+  const loadUnreadCount = useCallback(async () => {
+    try {
+      const res = await api.get("chat/notifications/unread-count/");
+      applyUnreadCount(res.data?.count || 0);
+    } catch (err) {
+      console.error(err);
+    }
+  }, [applyUnreadCount]);
 
   useEffect(() => {
-    const loadUnreadCount = async () => {
-      try {
-        const res = await api.get("chat/notifications/unread-count/");
-        setUnreadNotifications(res.data.count || 0);
-      } catch (err) {
-        console.error(err);
-      }
-    };
-
     loadUnreadCount();
     const interval = setInterval(loadUnreadCount, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [loadUnreadCount]);
 
   useEffect(() => {
     let mounted = true;
@@ -223,6 +245,7 @@ function Header({ onMenuClick }) {
           <div className="flex items-center gap-2">
             <div className="relative">
               <button
+                ref={notificationButtonRef}
                 onClick={() => {
                   setShowNotifications(!showNotifications);
                   setShowChat(false);
@@ -230,9 +253,9 @@ function Header({ onMenuClick }) {
                 className="relative p-2 rounded-lg hover:bg-slate-700 text-white transition-colors"
                 title="알림"
               >
-                <Bell size={20} />
+                <Bell size={20} className={ringBell ? "ring-bell" : ""} />
                 {unreadNotifications > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full min-w-[18px] text-center pulse-badge">
                     {unreadNotifications}
                   </span>
                 )}
@@ -241,6 +264,8 @@ function Header({ onMenuClick }) {
               <NotificationPanel
                 isOpen={showNotifications}
                 onClose={() => setShowNotifications(false)}
+                buttonRef={notificationButtonRef}
+                onUnreadCountChange={applyUnreadCount}
               />
             </div>
 
