@@ -291,7 +291,7 @@ export default function ScheduleCalendar({ scope, category }) {
   };
 
   const defaultScope = scope === "personal" ? "personal" : "company";
-  const panelWidthClass = panelMode === "create" ? "max-w-[1000px]" : "max-w-md";
+  const panelWidthClass = "max-w-md";
 
   return (
     <div className="flex-1 flex flex-col h-full">
