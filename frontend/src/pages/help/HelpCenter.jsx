@@ -30,6 +30,18 @@ const toDate = (value) => {
   return new Date(value).toLocaleDateString("ko-KR");
 };
 
+const toDateTime = (value) => {
+  if (!value) return "-";
+  return new Date(value).toLocaleString("ko-KR", {
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+};
+
 const toListPayload = (response) => {
   const payload = response?.data;
   if (Array.isArray(payload)) {
@@ -173,12 +185,14 @@ export default function HelpCenter() {
                   </div>
                 }
                 right={
-                  <button
-                    onClick={() => setView("create")}
-                    className="btn-create flex items-center gap-2"
-                  >
-                    <PenTool size={16} />새 질문하기
-                  </button>
+                  !user?.is_superuser && (
+                    <button
+                      onClick={() => setView("create")}
+                      className="btn-create flex items-center gap-2"
+                    >
+                      <PenTool size={16} />새 질문하기
+                    </button>
+                  )
                 }
               />
 
@@ -436,7 +450,7 @@ function FAQDetailView({ user, question, canDelete, onBack, onRefresh }) {
 
       <div className="text-sm text-gray-500">
         {question.created_by_username || question.author_name} ·{" "}
-        {toDate(question.created_at)}
+        {toDateTime(question.created_at)}
       </div>
 
       <div className="whitespace-pre-wrap">{question.content}</div>
@@ -447,7 +461,7 @@ function FAQDetailView({ user, question, canDelete, onBack, onRefresh }) {
         question.answers.map((answer) => (
           <div key={answer.id} className="bg-gray-50 p-3 rounded">
             <div className="text-xs text-gray-400 mb-1">
-              관리자 · {toDate(answer.created_at)}
+              관리자 · {toDateTime(answer.created_at)}
             </div>
             {answer.content}
           </div>
