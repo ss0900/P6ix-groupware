@@ -125,6 +125,104 @@ const CALENDAR_DAY_DIVIDER_CSS = `
   align-items: flex-start;
   min-height: 0;
 }
+
+.pmis-calendar.schedule-week-calendar {
+  background-color: #ffffff !important;
+}
+
+.pmis-calendar.schedule-week-calendar .react-calendar__navigation {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  margin: 0 auto 8px;
+}
+
+.pmis-calendar.schedule-week-calendar .react-calendar__navigation__arrow {
+  flex: 0 0 auto !important;
+  min-width: 28px;
+  width: 28px;
+  padding: 0;
+}
+
+.pmis-calendar.schedule-week-calendar .react-calendar__navigation__label {
+  flex-grow: 0 !important;
+  flex-shrink: 0 !important;
+  flex-basis: auto !important;
+  min-width: max-content !important;
+  width: auto !important;
+  margin: 0 12px;
+  padding: 0 6px;
+  text-align: center;
+}
+
+.pmis-calendar.schedule-week-calendar .schedule-week-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  border-top: 1px solid #e5e7eb;
+  border-left: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.pmis-calendar.schedule-week-calendar .schedule-week-cell {
+  min-height: 180px;
+  border-right: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e5e7eb;
+  box-sizing: border-box;
+  padding: 4px 2px;
+}
+
+.pmis-calendar.schedule-week-calendar .schedule-week-cell.is-today {
+  border: 1.5px solid #3b82f6;
+  position: relative;
+  z-index: 2;
+}
+
+.pmis-calendar.schedule-week-calendar .schedule-week-day-button {
+  display: block;
+  width: calc(100% - 30px);
+  padding-left: 4px;
+  text-align: left;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pmis-calendar.schedule-week-calendar .schedule-week-day-button.is-sunday,
+.pmis-calendar.schedule-week-calendar .schedule-week-day-button.is-sunday * {
+  color: #ef4444;
+}
+
+.pmis-calendar.schedule-week-calendar .schedule-week-day-button.is-saturday,
+.pmis-calendar.schedule-week-calendar .schedule-week-day-button.is-saturday * {
+  color: #3b82f6;
+}
+
+.pmis-calendar.schedule-week-calendar .schedule-week-day-button.is-selected {
+  color: #1d4ed8;
+}
+
+.pmis-calendar.schedule-week-calendar .schedule-week-overflow-count {
+  margin-top: 3px;
+  margin-left: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 16px;
+  padding: 0 6px;
+  border-radius: 999px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 600;
+  color: #475569;
+}
 `;
 
 export default function ScheduleCalendar({ scope, category }) {
@@ -368,6 +466,9 @@ export default function ScheduleCalendar({ scope, category }) {
     );
   }, [activeItem, myUserId]);
 
+  const selectedDateYmd = format(selectedDate, "yyyy-MM-dd");
+  const todayYmd = format(new Date(), "yyyy-MM-dd");
+
   return (
     <div className="flex-1 flex flex-col h-full">
       <div className="px-4 py-3 border-b border-gray-200">
@@ -438,67 +539,80 @@ export default function ScheduleCalendar({ scope, category }) {
           </div>
         ) : (
           <div className="schedule-calendar-shell w-full border rounded-xl bg-white p-6">
+            <style>{CALENDAR_DAY_DIVIDER_CSS}</style>
             {dateRangeMode === "thisWeek" ? (
-              <div className="w-full">
-                <div className="flex items-center justify-center gap-3 mb-4">
+              <div className="pmis-calendar schedule-week-calendar w-full">
+                <div className="react-calendar__navigation">
                   <button
+                    type="button"
                     onClick={() => {
                       const nextDate = addWeeks(currentDate, -1);
                       setCurrentDate(nextDate);
                       setSelectedDate(nextDate);
                     }}
-                    className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-50"
+                    className="react-calendar__navigation__arrow"
                   >
                     ‹
                   </button>
-                  <div className="text-sm font-semibold text-gray-700">
+                  <div className="react-calendar__navigation__label text-sm font-semibold text-gray-700">
                     {format(weekStartDate, "yyyy년 M월 d일")} ~ {format(weekEndDate, "M월 d일")}
                   </div>
                   <button
+                    type="button"
                     onClick={() => {
                       const nextDate = addWeeks(currentDate, 1);
                       setCurrentDate(nextDate);
                       setSelectedDate(nextDate);
                     }}
-                    className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-50"
+                    className="react-calendar__navigation__arrow"
                   >
                     ›
                   </button>
                 </div>
 
-                <div className="grid grid-cols-7 border border-gray-200 rounded-lg overflow-hidden">
+                <div className="schedule-week-grid">
                   {weekDates.map((date) => {
                     const ymd = format(date, "yyyy-MM-dd");
                     const dayItems = tileItemsByDate[ymd] || [];
                     const dow = date.getDay();
-                    const dayColor =
-                      dow === 0 ? "text-red-500" : dow === 6 ? "text-blue-500" : "text-gray-800";
+                    const isSelected = ymd === selectedDateYmd;
+                    const isToday = ymd === todayYmd;
+                    const dayStyleClass =
+                      dow === 0
+                        ? "is-sunday"
+                        : dow === 6
+                          ? "is-saturday"
+                          : "text-gray-800";
                     const dayLabel = ["일", "월", "화", "수", "목", "금", "토"][dow];
 
                     return (
                       <div
                         key={ymd}
-                        className="min-h-[180px] border-r border-gray-200 last:border-r-0 p-2"
+                        className={`schedule-week-cell${isToday ? " is-today" : ""}`}
                       >
                         <button
+                          type="button"
                           onClick={() => setSelectedDate(date)}
-                          className={`text-sm font-semibold ${dayColor}`}
+                          className={`schedule-week-day-button ${dayStyleClass}${isSelected ? " is-selected" : ""}`}
                         >
                           {dayLabel} {format(date, "d")}
                         </button>
-                        <div className="mt-2 space-y-1">
+                        <div className="pmis-tile-items">
                           {dayItems.slice(0, 5).map((item, idx) => (
                             <button
+                              type="button"
                               key={item?.id || `${ymd}-item-${idx}`}
                               onClick={() => openView(item)}
-                              className="w-full text-left px-2 py-1 text-xs border border-gray-200 rounded bg-gray-50 hover:bg-blue-50 hover:border-blue-300 truncate"
+                              className="pmis-tile-item is-clickable"
                               title={getScheduleLabel(item)}
                             >
-                              {getScheduleLabel(item)}
+                              <span className="pmis-tile-item__label">
+                                {getScheduleLabel(item)}
+                              </span>
                             </button>
                           ))}
                           {dayItems.length > 5 && (
-                            <div className="text-xs text-gray-500 px-1">
+                            <div className="schedule-week-overflow-count">
                               +{dayItems.length - 5}개 더 있음
                             </div>
                           )}
@@ -509,39 +623,36 @@ export default function ScheduleCalendar({ scope, category }) {
                 </div>
               </div>
             ) : (
-              <>
-                <style>{CALENDAR_DAY_DIVIDER_CSS}</style>
-                <div className="w-full">
-                  <Calendar
-                    className="schedule-calendar-grid-lines w-full"
-                    value={selectedDate}
-                    activeStartDate={startOfMonth(currentDate)}
-                    onChange={setSelectedDate}
-                    tileItemsByDate={tileItemsByDate}
-                    showTileItems={true}
-                    maxTileItems={3}
-                    getTileItemLabel={getScheduleLabel}
-                    onTileItemClick={(item) => openView(item)}
-                    formatDayLabel={(date, dayLabel, holidayLabels = []) => {
-                      if (
-                        !Array.isArray(holidayLabels) ||
-                        holidayLabels.length === 0
-                      ) {
-                        return dayLabel;
-                      }
-                      const dayHolidayGap = String.fromCharCode(160).repeat(3);
-                      return `${dayLabel}${dayHolidayGap}${holidayLabels[0]}`;
-                    }}
-                    holidayMap={holidayMap}
-                    onMonthChange={(d) => {
-                      setDateRangeMode("month");
-                      setCurrentDate(d);
-                    }}
-                    showCounts={false}
-                    showHolidayLabels={false}
-                  />
-                </div>
-              </>
+              <div className="w-full">
+                <Calendar
+                  className="schedule-calendar-grid-lines w-full"
+                  value={selectedDate}
+                  activeStartDate={startOfMonth(currentDate)}
+                  onChange={setSelectedDate}
+                  tileItemsByDate={tileItemsByDate}
+                  showTileItems={true}
+                  maxTileItems={3}
+                  getTileItemLabel={getScheduleLabel}
+                  onTileItemClick={(item) => openView(item)}
+                  formatDayLabel={(date, dayLabel, holidayLabels = []) => {
+                    if (
+                      !Array.isArray(holidayLabels) ||
+                      holidayLabels.length === 0
+                    ) {
+                      return dayLabel;
+                    }
+                    const dayHolidayGap = String.fromCharCode(160).repeat(3);
+                    return `${dayLabel}${dayHolidayGap}${holidayLabels[0]}`;
+                  }}
+                  holidayMap={holidayMap}
+                  onMonthChange={(d) => {
+                    setDateRangeMode("month");
+                    setCurrentDate(d);
+                  }}
+                  showCounts={false}
+                  showHolidayLabels={false}
+                />
+              </div>
             )}
           </div>
         )}
