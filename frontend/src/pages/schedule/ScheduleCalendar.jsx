@@ -275,6 +275,7 @@ export default function ScheduleCalendar({ scope, category }) {
   };
 
   const defaultScope = scope === "personal" ? "personal" : "company";
+  const panelWidthClass = panelMode === "create" ? "max-w-[1000px]" : "max-w-md";
 
   return (
     <div className="flex-1 flex flex-col h-full">
@@ -386,7 +387,7 @@ export default function ScheduleCalendar({ scope, category }) {
             className="absolute inset-0 bg-black bg-opacity-30"
             onClick={closePanel}
           />
-          <div className="relative w-full max-w-md bg-white shadow-xl overflow-y-auto">
+          <div className={`relative w-full ${panelWidthClass} bg-white shadow-xl overflow-y-auto`}>
             <div className="p-6">
               {panelMode === "create" && (
                 <ScheduleForm
