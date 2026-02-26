@@ -227,8 +227,8 @@ export default function ScheduleForm({
           </label>
           <div className="flex gap-2">
             {[
+              { value: "company", label: "공유", color: "red" },
               { value: "personal", label: "개인", color: "green" },
-              { value: "company", label: "회사", color: "red" },
             ].map((opt) => (
               <button
                 key={opt.value}
