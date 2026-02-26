@@ -297,6 +297,10 @@ export default function ScheduleCalendar({ scope, category }) {
     setCurrentDate(today);
   };
 
+  const goToMonthCalendar = () => {
+    setDateRangeMode("month");
+  };
+
   const openCreate = (date) => {
     setSelectedDate(date || new Date());
     setActiveItem(null);
@@ -377,10 +381,10 @@ export default function ScheduleCalendar({ scope, category }) {
               일정 추가
             </button>
             <button
-              onClick={goToThisWeek}
+              onClick={dateRangeMode === "thisWeek" ? goToMonthCalendar : goToThisWeek}
               className="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50"
             >
-              금주일정
+              {dateRangeMode === "thisWeek" ? "전체달력" : "금주일정"}
             </button>
             <button
               onClick={goToToday}
