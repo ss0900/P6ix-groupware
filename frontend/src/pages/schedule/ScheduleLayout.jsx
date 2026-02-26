@@ -5,14 +5,17 @@ import { projectMenus } from "../../components/layout/ProjectMenus";
 import { calendarApi } from "../../api/schedule";
 import CalendarManageModal from "./CalendarManageModal";
 import { Settings, Calendar as CalendarIcon } from "lucide-react";
+import { useAuth } from "../../context/AuthContext";
 
 export default function ScheduleLayout() {
+  const { user } = useAuth();
   const [menuConfig, setMenuConfig] = useState(projectMenus.schedule);
   const [isManageOpen, setIsManageOpen] = useState(false);
+  const canManageCustomCalendar = Boolean(user?.is_staff || user?.is_superuser);
 
   useEffect(() => {
     fetchCustomCalendars();
-  }, []);
+  }, [canManageCustomCalendar]);
 
   const fetchCustomCalendars = async () => {
     let dynamicItems = [];
@@ -56,7 +59,7 @@ export default function ScheduleLayout() {
               to: "category/custom",
               items: [
                 ...dynamicItems,
-                {
+                canManageCustomCalendar && {
                   label: "사용자 정의 일정 관리",
                   icon: Settings,
                   onClick: () => setIsManageOpen(true),
@@ -64,7 +67,7 @@ export default function ScheduleLayout() {
                   className:
                     "!text-red-500 hover:!bg-red-50 focus:!bg-red-50 !bg-transparent",
                 },
-              ],
+              ].filter(Boolean),
             },
           ],
         };
@@ -80,11 +83,13 @@ export default function ScheduleLayout() {
   return (
     <>
       <SidebarLayout title={title} base={base} sections={sections} />
-      <CalendarManageModal
-        isOpen={isManageOpen}
-        onClose={() => setIsManageOpen(false)}
-        onRefresh={fetchCustomCalendars}
-      />
+      {canManageCustomCalendar && (
+        <CalendarManageModal
+          isOpen={isManageOpen}
+          onClose={() => setIsManageOpen(false)}
+          onRefresh={fetchCustomCalendars}
+        />
+      )}
     </>
   );
 }
