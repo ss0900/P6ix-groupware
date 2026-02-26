@@ -269,6 +269,11 @@ const CAL_CSS = `
 .pmis-calendar .react-calendar__tile--active .pmis-tile-item.is-clickable:hover {
   background: rgba(255, 255, 255, 0.3);
 }
+.pmis-calendar .react-calendar__tile--active .pmis-tile-overflow-count.is-clickable:hover {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: #93c5fd;
+  color: #fff !important;
+}
 .pmis-calendar .react-calendar__tile--active .pmis-tile-overflow-popover {
   border-color: rgba(191, 219, 254, 0.9);
 }
