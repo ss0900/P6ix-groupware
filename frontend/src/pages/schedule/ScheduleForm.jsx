@@ -437,7 +437,7 @@ export default function ScheduleForm({
                 ? "bg-gray-50 text-gray-900 placeholder:text-gray-500 cursor-default"
                 : "focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             }`}
-            placeholder="장소를 입력하세요"
+            placeholder={isViewMode ? "" : "장소를 입력하세요"}
           />
         </div>
 
