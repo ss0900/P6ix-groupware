@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { Plus, Printer, Search, X } from "lucide-react";
-import { scheduleApi, calendarApi } from "../../api/schedule";
+import { scheduleApi, calendarApi, getMyUserIdFromToken } from "../../api/schedule";
 import api from "../../api/axios";
 import PageHeader from "../../components/common/ui/PageHeader";
 import Calendar, {
@@ -276,6 +276,7 @@ export default function ScheduleCalendar({ scope, category }) {
   };
 
   const handleDeleteFromView = async () => {
+    if (!canManageActiveItem) return;
     if (!activeItem?.id) return;
     if (!window.confirm("정말 이 일정을 삭제하시겠습니까?")) return;
     setDeleting(true);
@@ -292,6 +293,27 @@ export default function ScheduleCalendar({ scope, category }) {
 
   const defaultScope = scope === "personal" ? "personal" : "company";
   const panelWidthClass = "max-w-md";
+  const myUserId = getMyUserIdFromToken();
+
+  const canManageActiveItem = useMemo(() => {
+    if (!activeItem || myUserId == null) return false;
+
+    const ownerCandidates = [
+      activeItem.owner,
+      activeItem.owner_id,
+      activeItem.created_by,
+      activeItem.created_by_id,
+      activeItem.user,
+      activeItem.user_id,
+      activeItem.owner?.id,
+      activeItem.created_by?.id,
+      activeItem.user?.id,
+    ];
+
+    return ownerCandidates.some(
+      (ownerId) => ownerId != null && String(ownerId) === String(myUserId),
+    );
+  }, [activeItem, myUserId]);
 
   return (
     <div className="flex-1 flex flex-col h-full">
@@ -429,8 +451,8 @@ export default function ScheduleCalendar({ scope, category }) {
                   initial={activeItem}
                   companyId={companyId}
                   onClose={closePanel}
-                  onEdit={() => openEdit(activeItem)}
-                  onDelete={handleDeleteFromView}
+                  onEdit={canManageActiveItem ? () => openEdit(activeItem) : undefined}
+                  onDelete={canManageActiveItem ? handleDeleteFromView : undefined}
                   deleting={deleting}
                 />
               )}
