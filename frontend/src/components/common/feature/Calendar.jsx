@@ -47,6 +47,44 @@ const CAL_CSS = `
   font-weight: 500;
 }
 
+/* 날짜 셀 항목 리스트 */
+.pmis-calendar .pmis-tile-items {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  margin-top: 3px;
+  padding: 0 4px;
+}
+.pmis-calendar .pmis-tile-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #111827;
+}
+.pmis-calendar .pmis-tile-item .bullet {
+  flex: 0 0 auto;
+  font-size: 7px;
+  color: #6b7280;
+}
+.pmis-calendar .pmis-tile-item .text {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pmis-calendar .pmis-tile-more {
+  padding-left: 11px;
+  font-size: 10px;
+  line-height: 1.2;
+  color: #6b7280;
+}
+
 /* 공휴일 라벨 */
 .pmis-calendar .holiday-label {
   margin-top: 2px;
@@ -138,6 +176,14 @@ const CAL_CSS = `
 .pmis-calendar .react-calendar__tile--active:enabled:focus .meeting-calendar__count {
   color: #fff !important;
   font-weight: 400; /* 선택시 너무 두껍지 않게 */
+}
+.pmis-calendar .react-calendar__tile--active .pmis-tile-item,
+.pmis-calendar .react-calendar__tile--active .pmis-tile-item .text,
+.pmis-calendar .react-calendar__tile--active .pmis-tile-more {
+  color: #fff !important;
+}
+.pmis-calendar .react-calendar__tile--active .pmis-tile-item .bullet {
+  color: #fff !important;
 }
 
 /* ✅ 상태 도트(● N건) 줄 */
@@ -296,6 +342,13 @@ const CAL_CSS = `
     margin-top: 1px;
     color: #6b7280; /* gray-500 */
     font-weight: 500;
+  }
+  .pmis-calendar .pmis-tile-item {
+    font-size: 10px;
+    line-height: 1.2;
+  }
+  .pmis-calendar .pmis-tile-more {
+    font-size: 10px;
   }
   
   /* 선택된 날의 라벨 */
@@ -490,10 +543,14 @@ export default function ReusableCalendar({
   value,
   onChange,
   countsByDate = {},
+  tileItemsByDate = {},
   onMonthChange,
   className = "",
   locale = "ko-KR",
   showCounts = true,
+  showTileItems = false,
+  maxTileItems = 3,
+  getTileItemLabel = (item) => item?.title || "",
   showHolidayLabels = true,
   holidayMap: holidayMapProp,
   statusCountsByDate = {},
@@ -523,6 +580,10 @@ export default function ReusableCalendar({
     () => new Map(Object.entries(countsByDate)),
     [countsByDate]
   );
+  const tileItems = useMemo(
+    () => new Map(Object.entries(tileItemsByDate || {})),
+    [tileItemsByDate]
+  );
   const statusCounts = useMemo(
     () => new Map(Object.entries(statusCountsByDate || {})),
     [statusCountsByDate]
@@ -537,7 +598,7 @@ export default function ReusableCalendar({
       className={`pmis-calendar ${className}`}
       value={selected}
       onChange={handleChange}
-      locale="en-US"
+      locale={locale}
       formatShortWeekday={(l, d) =>
         ["일", "월", "화", "수", "목", "금", "토"][d.getDay()]
       }
@@ -564,25 +625,38 @@ export default function ReusableCalendar({
       tileContent={({ date, view }) => {
         if (view !== "month") return null;
         const key = format(date, "yyyy-MM-dd");
-        const count = meetingCounts.get(key) || 0;
         const stat = statusCounts.get(key); // { blue, green, yellow, red, gray, total }
-        const total = stat
-          ? stat.total ?? stat.green + stat.yellow + stat.red
-          : 0;
         const labels = holidays.get(key);
+        const dayItems = tileItems.get(key) || [];
         return (
           <div className="pmis-calendar__tile-inner">
-            {showCounts &&
+            {showTileItems && Array.isArray(dayItems) && dayItems.length > 0 ? (
+              <div className="pmis-tile-items">
+                {dayItems.slice(0, maxTileItems).map((item, idx) => {
+                  const label = String(
+                    getTileItemLabel(item) || item?.title || "(제목 없음)"
+                  ).trim();
+                  return (
+                    <div
+                      key={item?.id || `${key}-item-${idx}`}
+                      className="pmis-tile-item"
+                      title={label}
+                    >
+                      <span className="bullet">●</span>
+                      <span className="text">{label}</span>
+                    </div>
+                  );
+                })}
+                {dayItems.length > maxTileItems && (
+                  <div className="pmis-tile-more">
+                    +{dayItems.length - maxTileItems}
+                  </div>
+                )}
+              </div>
+            ) : (
+              showCounts &&
               (() => {
                 const s = stat || {};
-                // 총합: stat.total 없으면 카테고리 합으로 계산
-                const totalCount =
-                  (typeof s.total === "number" ? s.total : 0) ||
-                  (s.green || 0) +
-                  (s.yellow || 0) +
-                  (s.red || 0) +
-                  (s.gray || 0);
-
                 const hasAny =
                   (s.green || 0) > 0 ||
                   (s.yellow || 0) > 0 ||
@@ -639,7 +713,8 @@ export default function ReusableCalendar({
                     총 {fallback}건
                   </div>
                 ) : null;
-              })()}
+              })()
+            )}
 
             {showHolidayLabels &&
               Array.isArray(labels) &&

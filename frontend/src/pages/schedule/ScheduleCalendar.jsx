@@ -7,7 +7,6 @@ import { scheduleApi, calendarApi } from "../../api/schedule";
 import api from "../../api/axios";
 import PageHeader from "../../components/common/ui/PageHeader";
 import Calendar, {
-  buildCounts,
   getKRHolidayMap,
 } from "../../components/common/feature/Calendar";
 import ScheduleForm from "./ScheduleForm";
@@ -95,6 +94,22 @@ const CALENDAR_DAY_DIVIDER_CSS = `
 
 .pmis-calendar.schedule-calendar-grid-lines .react-calendar__tile {
   height: 140px;
+  align-items: stretch;
+  padding: 4px 2px;
+}
+
+.pmis-calendar.schedule-calendar-grid-lines .react-calendar__tile abbr {
+  display: block;
+  width: 100%;
+  padding-left: 4px;
+  text-align: left;
+  font-weight: 600;
+}
+
+.pmis-calendar.schedule-calendar-grid-lines .pmis-calendar__tile-inner {
+  width: 100%;
+  align-items: flex-start;
+  min-height: 0;
 }
 `;
 
@@ -198,10 +213,25 @@ export default function ScheduleCalendar({ scope, category }) {
     fetchSchedules();
   }, [fetchSchedules]);
 
-  const countsByDate = useMemo(
-    () => buildCounts(schedules, (s) => s.start),
-    [schedules],
-  );
+  const tileItemsByDate = useMemo(() => {
+    const grouped = {};
+    for (const item of schedules) {
+      if (!item?.start) continue;
+      const ymd = String(item.start).slice(0, 10);
+      if (!grouped[ymd]) grouped[ymd] = [];
+      grouped[ymd].push(item);
+    }
+
+    Object.values(grouped).forEach((items) => {
+      items.sort((a, b) => {
+        const aTime = a?.start ? new Date(a.start).getTime() : 0;
+        const bTime = b?.start ? new Date(b.start).getTime() : 0;
+        return aTime - bTime;
+      });
+    });
+
+    return grouped;
+  }, [schedules]);
 
   const goToToday = () => {
     const today = new Date();
@@ -312,10 +342,19 @@ export default function ScheduleCalendar({ scope, category }) {
                 className="schedule-calendar-grid-lines w-full"
                 value={selectedDate}
                 onChange={setSelectedDate}
-                countsByDate={countsByDate}
+                tileItemsByDate={tileItemsByDate}
+                showTileItems={true}
+                maxTileItems={3}
+                getTileItemLabel={(item) => {
+                  const calendarPrefix = item?.calendar_name
+                    ? `[${item.calendar_name}] `
+                    : "";
+                  const title = item?.title || "(제목 없음)";
+                  return `${calendarPrefix}${title}`;
+                }}
                 holidayMap={holidayMap}
                 onMonthChange={(d) => setCurrentDate(d)}
-                showCounts={true}
+                showCounts={false}
               />
             </div>
           </div>
