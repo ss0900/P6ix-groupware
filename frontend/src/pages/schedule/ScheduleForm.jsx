@@ -122,7 +122,7 @@ export default function ScheduleForm({
     setParticipantIds((prev) =>
       prev.includes(userId)
         ? prev.filter((id) => id !== userId)
-        : [...prev, userId]
+        : [...prev, userId],
     );
   };
 
@@ -133,9 +133,13 @@ export default function ScheduleForm({
 
     setLoading(true);
     try {
-      const start = new Date(`${form.date}T${form.time || "00:00"}:00`).toISOString();
+      const start = new Date(
+        `${form.date}T${form.time || "00:00"}:00`,
+      ).toISOString();
       const end = form.end_date
-        ? new Date(`${form.end_date}T${form.end_time || "23:59"}:00`).toISOString()
+        ? new Date(
+            `${form.end_date}T${form.end_time || "23:59"}:00`,
+          ).toISOString()
         : null;
 
       const payload = {
@@ -150,11 +154,16 @@ export default function ScheduleForm({
         color: form.color,
         calendar: form.calendar || null,
         company: form.scope === "company" && companyId ? companyId : null,
-        participant_ids: (form.scope === "company" || isMeeting) ? participantIds : [],
+        participant_ids:
+          form.scope === "company" || isMeeting ? participantIds : [],
         // 회의 전용 필드
         location_type: isMeeting ? form.location_type : "",
-        meet_url: isMeeting && form.location_type === "online" ? form.meet_url : "",
-        resource: isMeeting && form.location_type === "offline_room" ? form.resource : null,
+        meet_url:
+          isMeeting && form.location_type === "online" ? form.meet_url : "",
+        resource:
+          isMeeting && form.location_type === "offline_room"
+            ? form.resource
+            : null,
         agenda: isMeeting ? form.agenda : "",
         is_urgent: isMeeting ? form.is_urgent : false,
       };
@@ -195,7 +204,9 @@ export default function ScheduleForm({
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* scope 선택 */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">일정 구분</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            일정 구분
+          </label>
           <div className="flex gap-2">
             {[
               { value: "personal", label: "개인", color: "green" },
@@ -211,11 +222,13 @@ export default function ScheduleForm({
                 }}
                 className={`
                   px-4 py-2 rounded-lg border text-sm
-                  ${form.scope === opt.value
-                    ? opt.color === "green"
-                      ? "bg-green-600 text-white border-green-600"
-                      : "bg-red-600 text-white border-red-600"
-                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"}
+                  ${
+                    form.scope === opt.value
+                      ? opt.color === "green"
+                        ? "bg-green-600 text-white border-green-600"
+                        : "bg-red-600 text-white border-red-600"
+                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                  }
                   ${mode === "edit" ? "opacity-50 cursor-not-allowed" : ""}
                 `}
               >
@@ -227,7 +240,9 @@ export default function ScheduleForm({
 
         {/* 일정 유형 */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">일정 유형</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            일정 유형
+          </label>
           <select
             name="event_type"
             value={form.event_type}
@@ -244,7 +259,9 @@ export default function ScheduleForm({
 
         {/* 제목 */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">제목</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            제목 <span className="text-red-500">*</span>
+          </label>
           <input
             type="text"
             name="title"
@@ -277,7 +294,9 @@ export default function ScheduleForm({
 
             {/* 장소 구분 */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">장소 구분</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                장소 구분
+              </label>
               <select
                 name="location_type"
                 value={form.location_type}
@@ -295,7 +314,9 @@ export default function ScheduleForm({
             {/* 온라인 링크 */}
             {form.location_type === "online" && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">온라인 링크</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  온라인 링크
+                </label>
                 <input
                   type="url"
                   name="meet_url"
@@ -310,11 +331,18 @@ export default function ScheduleForm({
             {/* 회의실 선택 */}
             {form.location_type === "offline_room" && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">회의실</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  회의실
+                </label>
                 <select
                   name="resource"
                   value={form.resource || ""}
-                  onChange={(e) => setForm(prev => ({ ...prev, resource: e.target.value || null }))}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      resource: e.target.value || null,
+                    }))
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="">회의실 선택</option>
@@ -329,7 +357,9 @@ export default function ScheduleForm({
 
             {/* 안건 */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">안건</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                안건
+              </label>
               <textarea
                 name="agenda"
                 value={form.agenda}
@@ -345,7 +375,9 @@ export default function ScheduleForm({
         {/* 일반 장소 (회의가 아닌 경우) */}
         {!isMeeting && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">장소</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              장소
+            </label>
             <input
               type="text"
               name="location"
@@ -360,7 +392,9 @@ export default function ScheduleForm({
         {/* 오프라인 주소 (회의 + 오프라인 주소 타입일 때) */}
         {isMeeting && form.location_type === "offline_address" && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">주소</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              주소
+            </label>
             <input
               type="text"
               name="location"
@@ -389,7 +423,9 @@ export default function ScheduleForm({
         {/* 일시 */}
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">시작 날짜</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              시작 날짜
+            </label>
             <input
               type="date"
               name="date"
@@ -400,7 +436,9 @@ export default function ScheduleForm({
           </div>
           {!form.is_all_day && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">시작 시간</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                시작 시간
+              </label>
               <input
                 type="time"
                 name="time"
@@ -414,7 +452,9 @@ export default function ScheduleForm({
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">종료 날짜</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              종료 날짜
+            </label>
             <input
               type="date"
               name="end_date"
@@ -425,7 +465,9 @@ export default function ScheduleForm({
           </div>
           {!form.is_all_day && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">종료 시간</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                종료 시간
+              </label>
               <input
                 type="time"
                 name="end_time"
@@ -440,11 +482,18 @@ export default function ScheduleForm({
         {/* 캘린더 선택 */}
         {calendars.length > 0 && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">캘린더</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              캘린더
+            </label>
             <select
               name="calendar"
               value={form.calendar || ""}
-              onChange={(e) => setForm(prev => ({ ...prev, calendar: e.target.value || null }))}
+              onChange={(e) =>
+                setForm((prev) => ({
+                  ...prev,
+                  calendar: e.target.value || null,
+                }))
+              }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="">캘린더 선택 (선택사항)</option>
@@ -459,7 +508,9 @@ export default function ScheduleForm({
 
         {/* 색상 */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">색상</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            색상
+          </label>
           <input
             type="color"
             name="color"
@@ -472,7 +523,9 @@ export default function ScheduleForm({
         {/* 참여자 (회사 일정 또는 회의일 때) */}
         {(form.scope === "company" || isMeeting) && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">참여자</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              참여자
+            </label>
             <div className="border border-gray-300 rounded-lg p-3 max-h-40 overflow-y-auto">
               {users.length === 0 ? (
                 <p className="text-gray-400 text-sm">사용자가 없습니다.</p>
@@ -490,7 +543,8 @@ export default function ScheduleForm({
                         className="rounded text-blue-600"
                       />
                       <span className="text-sm">
-                        {user.last_name}{user.first_name}
+                        {user.last_name}
+                        {user.first_name}
                       </span>
                     </label>
                   ))}
@@ -502,7 +556,9 @@ export default function ScheduleForm({
 
         {/* 메모 */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">메모</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            메모
+          </label>
           <textarea
             name="memo"
             value={form.memo}
