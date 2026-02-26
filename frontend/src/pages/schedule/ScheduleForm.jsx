@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import { X, AlertTriangle } from "lucide-react";
 import { scheduleApi, calendarApi, resourceApi } from "../../api/schedule";
 import api from "../../api/axios";
+import PageHeader from "../../components/common/ui/PageHeader";
 
 const EVENT_TYPES = [
   { value: "general", label: "일반" },
@@ -186,20 +187,24 @@ export default function ScheduleForm({
   return (
     <div className="space-y-6">
       {/* 헤더 */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold flex items-center gap-2">
-          {mode === "create" ? "일정 등록" : "일정 수정"}
-          {form.is_urgent && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">
-              <AlertTriangle size={12} />
-              긴급
-            </span>
-          )}
-        </h2>
+      <PageHeader
+        className="mb-0"
+        title={(
+          <span className="text-xl font-semibold flex items-center gap-2">
+            {mode === "create" ? "일정 등록" : "일정 수정"}
+            {form.is_urgent && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">
+                <AlertTriangle size={12} />
+                긴급
+              </span>
+            )}
+          </span>
+        )}
+      >
         <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
           <X size={20} />
         </button>
-      </div>
+      </PageHeader>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* scope 선택 */}

@@ -6,6 +6,7 @@ import {
   AlertTriangle, Video, Check, XCircle, Users, Link as LinkIcon 
 } from "lucide-react";
 import { scheduleApi, getMyUserIdFromToken } from "../../api/schedule";
+import PageHeader from "../../components/common/ui/PageHeader";
 
 // 이벤트 타입별 스타일
 const EVENT_TYPE_STYLES = {
@@ -97,10 +98,12 @@ export default function ScheduleDetail({
   return (
     <div className="space-y-6">
       {/* 헤더 */}
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="text-xl font-semibold text-gray-900">{item.title}</h2>
+      <PageHeader
+        className="mb-0"
+        subtitle="일정 상세 정보"
+        title={(
+          <span className="flex items-center gap-2 flex-wrap">
+            <span className="text-xl font-semibold text-gray-900">{item.title}</span>
             <span className={`px-2 py-0.5 text-xs rounded-full border ${scopeStyle.bg} ${scopeStyle.text} ${scopeStyle.border}`}>
               {item.scope === "personal" ? "개인" : "회사"}
             </span>
@@ -115,13 +118,13 @@ export default function ScheduleDetail({
                 긴급
               </span>
             )}
-          </div>
-          <p className="text-sm text-gray-500 mt-1">일정 상세 정보</p>
-        </div>
+          </span>
+        )}
+      >
         <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
           <X size={20} />
         </button>
-      </div>
+      </PageHeader>
 
       {/* RSVP 영역 (회의이고 참석자인 경우) */}
       {isMeeting && isParticipant && (

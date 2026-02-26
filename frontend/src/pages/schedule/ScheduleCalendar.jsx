@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { scheduleApi, calendarApi } from "../../api/schedule";
 import api from "../../api/axios";
+import PageHeader from "../../components/common/ui/PageHeader";
 import ScheduleForm from "./ScheduleForm";
 import ScheduleDetail from "./ScheduleDetail";
 
@@ -223,13 +224,15 @@ export default function ScheduleCalendar({ scope, category }) {
     <div className="flex-1 flex flex-col bg-white h-full">
       {/* 상단 헤더 */}
       <div className="px-4 py-3 border-b border-gray-200">
-        <div className="flex items-center justify-between">
-          <h1 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-            <span className="text-gray-400">≡</span>
-            {pageTitle}
-          </h1>
-
-          {/* 액션 버튼들 */}
+        <PageHeader
+          className="mb-0"
+          title={(
+            <span className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+              <span className="text-gray-400">≡</span>
+              {pageTitle}
+            </span>
+          )}
+        >
           <div className="flex items-center gap-2">
             <button
               onClick={() => openCreate()}
@@ -284,7 +287,7 @@ export default function ScheduleCalendar({ scope, category }) {
               </button>
             </div>
           </div>
-        </div>
+        </PageHeader>
 
         {/* 검색 입력 */}
         {searchOpen && (

@@ -16,6 +16,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { resourceApi, reservationApi } from "../../api/schedule";
+import PageHeader from "../../components/common/ui/PageHeader";
 
 // 자원 타입별 아이콘
 const RESOURCE_ICONS = {
@@ -229,18 +230,12 @@ export default function ResourceReservation() {
       {/* 메인: 예약 현황 */}
       <div className="flex-1 flex flex-col bg-white">
         {/* 헤더 */}
-        <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-semibold text-gray-800">
-              {selectedResource?.name || "자원을 선택하세요"}
-            </h1>
-            {selectedResource?.location && (
-              <p className="text-sm text-gray-500">
-                {selectedResource.location}
-              </p>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
+        <div className="px-4 py-3 border-b border-gray-200">
+          <PageHeader
+            className="mb-0"
+            title={selectedResource?.name || "자원을 선택하세요"}
+            subtitle={selectedResource?.location || undefined}
+          >
             <button
               onClick={() => setShowForm(true)}
               disabled={!selectedResource}
@@ -249,7 +244,7 @@ export default function ResourceReservation() {
               <Plus size={18} />
               예약하기
             </button>
-          </div>
+          </PageHeader>
         </div>
 
         {/* 주간 네비게이션 */}
