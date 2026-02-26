@@ -5,6 +5,8 @@ import { scheduleApi, calendarApi } from "../../api/schedule";
 import api from "../../api/axios";
 import PageHeader from "../../components/common/ui/PageHeader";
 
+const HEADQUARTERS_FALLBACK_VALUE = "__headquarters__";
+
 function flattenCalendars(nodes = []) {
   const out = [];
   const walk = (list) => {
@@ -82,10 +84,10 @@ export default function ScheduleForm({
             (cal) => cal?.category === "headquarters" || cal?.name === "본사일정",
           );
 
-        const options = [];
-        if (headquarters?.id) {
-          options.push({ id: String(headquarters.id), name: "본사일정" });
-        }
+        const headquartersOptionId = headquarters?.id
+          ? String(headquarters.id)
+          : HEADQUARTERS_FALLBACK_VALUE;
+        const options = [{ id: headquartersOptionId, name: "본사일정" }];
 
         const seen = new Set(options.map((opt) => opt.id));
         customCalendars.forEach((cal) => {
@@ -99,13 +101,16 @@ export default function ScheduleForm({
         setForm((prev) => {
           if (initial?.calendar) return { ...prev, calendar: String(initial.calendar) };
           if (prev.calendar) return prev;
-          if (headquarters?.id) return { ...prev, calendar: String(headquarters.id) };
-          if (options.length > 0) return { ...prev, calendar: options[0].id };
-          return prev;
+          return { ...prev, calendar: headquartersOptionId };
         });
       } catch (err) {
         console.error("카테고리 목록 로드 실패:", err);
-        setCategoryOptions([]);
+        setCategoryOptions([{ id: HEADQUARTERS_FALLBACK_VALUE, name: "본사일정" }]);
+        setForm((prev) => {
+          if (initial?.calendar) return prev;
+          if (prev.calendar) return prev;
+          return { ...prev, calendar: HEADQUARTERS_FALLBACK_VALUE };
+        });
       }
     })();
   }, [initial?.calendar]);
@@ -149,6 +154,11 @@ export default function ScheduleForm({
           ).toISOString()
         : null;
 
+      const selectedCalendarId =
+        form.calendar && form.calendar !== HEADQUARTERS_FALLBACK_VALUE
+          ? Number(form.calendar)
+          : null;
+
       const payload = {
         title: form.title,
         scope: form.scope,
@@ -158,7 +168,7 @@ export default function ScheduleForm({
         end,
         is_all_day: form.is_all_day,
         memo: form.memo,
-        calendar: form.calendar ? Number(form.calendar) : null,
+        calendar: Number.isFinite(selectedCalendarId) ? selectedCalendarId : null,
         company: form.scope === "company" && companyId ? companyId : null,
         participant_ids: form.scope === "company" ? participantIds : [],
       };
@@ -255,9 +265,6 @@ export default function ScheduleForm({
             }
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
-            {categoryOptions.length === 0 && (
-              <option value="">본사일정</option>
-            )}
             {categoryOptions.map((opt) => (
               <option key={opt.id} value={opt.id}>
                 {opt.name}
