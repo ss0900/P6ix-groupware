@@ -1,7 +1,7 @@
 // src/pages/schedule/ScheduleForm.jsx
 import React, { useState, useEffect } from "react";
 import { format } from "date-fns";
-import { X, AlertTriangle } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { scheduleApi, calendarApi, resourceApi } from "../../api/schedule";
 import api from "../../api/axios";
 import PageHeader from "../../components/common/ui/PageHeader";
@@ -36,6 +36,7 @@ export default function ScheduleForm({
   const [calendars, setCalendars] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [participantIds, setParticipantIds] = useState([]);
+  const formId = "schedule-form";
 
   const [form, setForm] = useState({
     title: initial?.title || "",
@@ -197,12 +198,24 @@ export default function ScheduleForm({
             긴급
           </span>
         )}
-        <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
-          <X size={20} />
+        <button
+          type="button"
+          onClick={onClose}
+          className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+        >
+          취소
+        </button>
+        <button
+          type="submit"
+          form={formId}
+          disabled={loading}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+        >
+          {loading ? "저장 중..." : mode === "create" ? "등록" : "저장"}
         </button>
       </PageHeader>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form id={formId} onSubmit={handleSubmit} className="space-y-4">
         {/* scope 선택 */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -570,23 +583,6 @@ export default function ScheduleForm({
           />
         </div>
 
-        {/* 버튼 */}
-        <div className="flex justify-end gap-3 pt-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-          >
-            취소
-          </button>
-          <button
-            type="submit"
-            disabled={loading}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-          >
-            {loading ? "저장 중..." : mode === "create" ? "등록" : "저장"}
-          </button>
-        </div>
       </form>
     </div>
   );
