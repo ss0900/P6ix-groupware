@@ -1,7 +1,15 @@
 // src/pages/schedule/ScheduleCalendar.jsx
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import { format, startOfMonth, endOfMonth } from "date-fns";
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  startOfWeek,
+  endOfWeek,
+  eachDayOfInterval,
+  addWeeks,
+} from "date-fns";
 import { Plus, Printer, Search, X } from "lucide-react";
 import {
   scheduleApi,
@@ -129,6 +137,7 @@ export default function ScheduleCalendar({ scope, category }) {
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [dateRangeMode, setDateRangeMode] = useState("month");
 
   const [companyId, setCompanyId] = useState(null);
 
@@ -186,8 +195,18 @@ export default function ScheduleCalendar({ scope, category }) {
   const fetchSchedules = useCallback(async () => {
     setLoading(true);
     try {
-      const start = format(startOfMonth(currentDate), "yyyy-MM-dd");
-      const end = format(endOfMonth(currentDate), "yyyy-MM-dd");
+      const start = format(
+        dateRangeMode === "thisWeek"
+          ? startOfWeek(currentDate, { weekStartsOn: 1 })
+          : startOfMonth(currentDate),
+        "yyyy-MM-dd",
+      );
+      const end = format(
+        dateRangeMode === "thisWeek"
+          ? endOfWeek(currentDate, { weekStartsOn: 1 })
+          : endOfMonth(currentDate),
+        "yyyy-MM-dd",
+      );
 
       const params = {
         date_from: start,
@@ -214,7 +233,7 @@ export default function ScheduleCalendar({ scope, category }) {
     } finally {
       setLoading(false);
     }
-  }, [currentDate, searchQuery, scope, calendarId]);
+  }, [currentDate, dateRangeMode, searchQuery, scope, calendarId]);
 
   useEffect(() => {
     fetchSchedules();
@@ -240,14 +259,40 @@ export default function ScheduleCalendar({ scope, category }) {
     return grouped;
   }, [schedules]);
 
+  const weekStartDate = useMemo(
+    () => startOfWeek(currentDate, { weekStartsOn: 1 }),
+    [currentDate],
+  );
+  const weekEndDate = useMemo(
+    () => endOfWeek(currentDate, { weekStartsOn: 1 }),
+    [currentDate],
+  );
+  const weekDates = useMemo(
+    () => eachDayOfInterval({ start: weekStartDate, end: weekEndDate }),
+    [weekStartDate, weekEndDate],
+  );
+
+  const getScheduleLabel = useCallback((item) => {
+    const calendarPrefix = item?.calendar_name ? `[${item.calendar_name}] ` : "";
+    const startDate = item?.start ? new Date(item.start) : null;
+    const timePrefix =
+      startDate && !Number.isNaN(startDate.getTime()) && item?.is_all_day !== true
+        ? `${format(startDate, "HH:mm")} `
+        : "";
+    const title = item?.title || "(제목 없음)";
+    return `${timePrefix}${calendarPrefix}${title}`;
+  }, []);
+
   const goToToday = () => {
     const today = new Date();
+    setDateRangeMode("month");
     setSelectedDate(today);
     setCurrentDate(today);
   };
 
   const goToThisWeek = () => {
     const today = new Date();
+    setDateRangeMode("thisWeek");
     setSelectedDate(today);
     setCurrentDate(today);
   };
@@ -389,47 +434,111 @@ export default function ScheduleCalendar({ scope, category }) {
           </div>
         ) : (
           <div className="schedule-calendar-shell w-full border rounded-xl bg-white p-6">
-            <style>{CALENDAR_DAY_DIVIDER_CSS}</style>
-            <div className="w-full">
-              <Calendar
-                className="schedule-calendar-grid-lines w-full"
-                value={selectedDate}
-                activeStartDate={startOfMonth(currentDate)}
-                onChange={setSelectedDate}
-                tileItemsByDate={tileItemsByDate}
-                showTileItems={true}
-                maxTileItems={3}
-                getTileItemLabel={(item) => {
-                  const calendarPrefix = item?.calendar_name
-                    ? `[${item.calendar_name}] `
-                    : "";
-                  const startDate = item?.start ? new Date(item.start) : null;
-                  const timePrefix =
-                    startDate &&
-                    !Number.isNaN(startDate.getTime()) &&
-                    item?.is_all_day !== true
-                      ? `${format(startDate, "HH:mm")} `
-                      : "";
-                  const title = item?.title || "(제목 없음)";
-                  return `${timePrefix}${calendarPrefix}${title}`;
-                }}
-                onTileItemClick={(item) => openView(item)}
-                formatDayLabel={(date, dayLabel, holidayLabels = []) => {
-                  if (
-                    !Array.isArray(holidayLabels) ||
-                    holidayLabels.length === 0
-                  ) {
-                    return dayLabel;
-                  }
-                  const dayHolidayGap = String.fromCharCode(160).repeat(3);
-                  return `${dayLabel}${dayHolidayGap}${holidayLabels[0]}`;
-                }}
-                holidayMap={holidayMap}
-                onMonthChange={(d) => setCurrentDate(d)}
-                showCounts={false}
-                showHolidayLabels={false}
-              />
-            </div>
+            {dateRangeMode === "thisWeek" ? (
+              <div className="w-full">
+                <div className="flex items-center justify-center gap-3 mb-4">
+                  <button
+                    onClick={() => {
+                      const nextDate = addWeeks(currentDate, -1);
+                      setCurrentDate(nextDate);
+                      setSelectedDate(nextDate);
+                    }}
+                    className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-50"
+                  >
+                    ‹
+                  </button>
+                  <div className="text-sm font-semibold text-gray-700">
+                    {format(weekStartDate, "yyyy년 M월 d일")} ~ {format(weekEndDate, "M월 d일")}
+                  </div>
+                  <button
+                    onClick={() => {
+                      const nextDate = addWeeks(currentDate, 1);
+                      setCurrentDate(nextDate);
+                      setSelectedDate(nextDate);
+                    }}
+                    className="px-2 py-1 border border-gray-300 rounded hover:bg-gray-50"
+                  >
+                    ›
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-7 border border-gray-200 rounded-lg overflow-hidden">
+                  {weekDates.map((date) => {
+                    const ymd = format(date, "yyyy-MM-dd");
+                    const dayItems = tileItemsByDate[ymd] || [];
+                    const dow = date.getDay();
+                    const dayColor =
+                      dow === 0 ? "text-red-500" : dow === 6 ? "text-blue-500" : "text-gray-800";
+                    const dayLabel = ["일", "월", "화", "수", "목", "금", "토"][dow];
+
+                    return (
+                      <div
+                        key={ymd}
+                        className="min-h-[180px] border-r border-gray-200 last:border-r-0 p-2"
+                      >
+                        <button
+                          onClick={() => setSelectedDate(date)}
+                          className={`text-sm font-semibold ${dayColor}`}
+                        >
+                          {dayLabel} {format(date, "d")}
+                        </button>
+                        <div className="mt-2 space-y-1">
+                          {dayItems.slice(0, 5).map((item, idx) => (
+                            <button
+                              key={item?.id || `${ymd}-item-${idx}`}
+                              onClick={() => openView(item)}
+                              className="w-full text-left px-2 py-1 text-xs border border-gray-200 rounded bg-gray-50 hover:bg-blue-50 hover:border-blue-300 truncate"
+                              title={getScheduleLabel(item)}
+                            >
+                              {getScheduleLabel(item)}
+                            </button>
+                          ))}
+                          {dayItems.length > 5 && (
+                            <div className="text-xs text-gray-500 px-1">
+                              +{dayItems.length - 5}개 더 있음
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <>
+                <style>{CALENDAR_DAY_DIVIDER_CSS}</style>
+                <div className="w-full">
+                  <Calendar
+                    className="schedule-calendar-grid-lines w-full"
+                    value={selectedDate}
+                    activeStartDate={startOfMonth(currentDate)}
+                    onChange={setSelectedDate}
+                    tileItemsByDate={tileItemsByDate}
+                    showTileItems={true}
+                    maxTileItems={3}
+                    getTileItemLabel={getScheduleLabel}
+                    onTileItemClick={(item) => openView(item)}
+                    formatDayLabel={(date, dayLabel, holidayLabels = []) => {
+                      if (
+                        !Array.isArray(holidayLabels) ||
+                        holidayLabels.length === 0
+                      ) {
+                        return dayLabel;
+                      }
+                      const dayHolidayGap = String.fromCharCode(160).repeat(3);
+                      return `${dayLabel}${dayHolidayGap}${holidayLabels[0]}`;
+                    }}
+                    holidayMap={holidayMap}
+                    onMonthChange={(d) => {
+                      setDateRangeMode("month");
+                      setCurrentDate(d);
+                    }}
+                    showCounts={false}
+                    showHolidayLabels={false}
+                  />
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
