@@ -363,7 +363,7 @@ export default function ScheduleForm({
                         : "bg-red-600 text-white border-red-600"
                       : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
                   }
-                  ${(isEditMode || isViewMode) ? "opacity-50 cursor-not-allowed" : ""}
+                  ${isEditMode ? "opacity-50 cursor-not-allowed" : isViewMode ? "cursor-default" : ""}
                 `}
               >
                 {opt.label}
