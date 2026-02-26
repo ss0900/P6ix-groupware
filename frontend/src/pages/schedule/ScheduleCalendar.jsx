@@ -93,7 +93,7 @@ const CALENDAR_DAY_DIVIDER_CSS = `
 }
 
 .pmis-calendar.schedule-calendar-grid-lines .react-calendar__tile {
-  height: 140px;
+  height: 108px;
   align-items: stretch;
   padding: 4px 2px;
 }
@@ -104,6 +104,9 @@ const CALENDAR_DAY_DIVIDER_CSS = `
   padding-left: 4px;
   text-align: left;
   font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .pmis-calendar.schedule-calendar-grid-lines .pmis-calendar__tile-inner {
@@ -352,9 +355,16 @@ export default function ScheduleCalendar({ scope, category }) {
                   const title = item?.title || "(제목 없음)";
                   return `${calendarPrefix}${title}`;
                 }}
+                formatDayLabel={(date, dayLabel, holidayLabels = []) => {
+                  if (!Array.isArray(holidayLabels) || holidayLabels.length === 0) {
+                    return dayLabel;
+                  }
+                  return `${dayLabel} ${holidayLabels[0]}`;
+                }}
                 holidayMap={holidayMap}
                 onMonthChange={(d) => setCurrentDate(d)}
                 showCounts={false}
+                showHolidayLabels={false}
               />
             </div>
           </div>

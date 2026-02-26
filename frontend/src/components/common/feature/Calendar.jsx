@@ -551,6 +551,7 @@ export default function ReusableCalendar({
   showTileItems = false,
   maxTileItems = 3,
   getTileItemLabel = (item) => item?.title || "",
+  formatDayLabel,
   showHolidayLabels = true,
   holidayMap: holidayMapProp,
   statusCountsByDate = {},
@@ -602,6 +603,13 @@ export default function ReusableCalendar({
       formatShortWeekday={(l, d) =>
         ["일", "월", "화", "수", "목", "금", "토"][d.getDay()]
       }
+      formatDay={(l, d) => {
+        const base = String(d.getDate());
+        if (!formatDayLabel) return base;
+        const key = format(d, "yyyy-MM-dd");
+        const holidayLabels = holidays.get(key) || [];
+        return formatDayLabel(d, base, holidayLabels);
+      }}
       formatMonthYear={(l, d) => format(d, "yyyy년 M월")}
       formatMonth={(l, d) => `${d.getMonth() + 1}월`}
       formatYear={(l, d) => format(d, "yyyy년")}
