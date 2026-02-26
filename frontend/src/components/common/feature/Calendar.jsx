@@ -52,32 +52,31 @@ const CAL_CSS = `
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 2px;
+  gap: 4px;
   width: 100%;
   margin-top: 3px;
   padding: 0 4px;
   text-align: left;
 }
 .pmis-calendar .pmis-tile-item {
-  display: grid;
-  grid-template-columns: 10px minmax(0, 1fr);
-  align-items: start;
-  column-gap: 4px;
+  display: block;
   width: 100%;
+  padding: 2px 6px;
+  border: 1px solid #dbe3f0;
+  background: #f8fafc;
+  border-radius: 6px;
   font-size: 11px;
   line-height: 1.35;
   color: #111827;
   text-align: left !important;
 }
-.pmis-calendar .pmis-tile-item.is-clickable { cursor: pointer; border-radius: 4px; }
-.pmis-calendar .pmis-tile-item.is-clickable:hover { background: rgba(59, 130, 246, 0.12); }
+.pmis-calendar .pmis-tile-item.is-clickable { cursor: pointer; }
+.pmis-calendar .pmis-tile-item.is-clickable:hover {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
 .pmis-calendar .pmis-tile-item .bullet {
-  display: inline-block;
-  width: 10px;
-  font-size: 7px;
-  color: #6b7280;
-  line-height: 1.35;
-  text-align: center;
+  display: none;
 }
 .pmis-calendar .pmis-tile-item .pmis-tile-item__label {
   display: block;
@@ -85,10 +84,11 @@ const CAL_CSS = `
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-weight: 500;
   text-align: left !important;
 }
 .pmis-calendar .pmis-tile-more {
-  padding-left: 11px;
+  padding-left: 2px;
   font-size: 10px;
   line-height: 1.2;
   color: #6b7280;
@@ -192,11 +192,12 @@ const CAL_CSS = `
 .pmis-calendar .react-calendar__tile--active .pmis-tile-more {
   color: #fff !important;
 }
-.pmis-calendar .react-calendar__tile--active .pmis-tile-item .bullet {
-  color: #fff !important;
+.pmis-calendar .react-calendar__tile--active .pmis-tile-item {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.45);
 }
 .pmis-calendar .react-calendar__tile--active .pmis-tile-item.is-clickable:hover {
-  background: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.3);
 }
 
 /* ✅ 상태 도트(● N건) 줄 */
