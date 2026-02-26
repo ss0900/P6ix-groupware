@@ -188,19 +188,15 @@ export default function ScheduleForm({
     <div className="space-y-6">
       {/* 헤더 */}
       <PageHeader
-        className="mb-0"
-        title={(
-          <span className="text-xl font-semibold flex items-center gap-2">
-            {mode === "create" ? "일정 등록" : "일정 수정"}
-            {form.is_urgent && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">
-                <AlertTriangle size={12} />
-                긴급
-              </span>
-            )}
+        className="mb-0 pb-2 border-b border-gray-200"
+        title={mode === "create" ? "일정 등록" : "일정 수정"}
+      >
+        {form.is_urgent && (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">
+            <AlertTriangle size={12} />
+            긴급
           </span>
         )}
-      >
         <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
           <X size={20} />
         </button>
