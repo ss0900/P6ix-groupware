@@ -10,7 +10,6 @@ import Calendar, {
   getKRHolidayMap,
 } from "../../components/common/feature/Calendar";
 import ScheduleForm from "./ScheduleForm";
-import ScheduleDetail from "./ScheduleDetail";
 
 const SCOPE_TITLES = {
   all: "전체 일정",
@@ -132,6 +131,7 @@ export default function ScheduleCalendar({ scope, category }) {
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelMode, setPanelMode] = useState(null);
   const [activeItem, setActiveItem] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   const [holidayMap, setHolidayMap] = useState({});
 
@@ -269,9 +269,25 @@ export default function ScheduleCalendar({ scope, category }) {
   };
 
   const closePanel = () => {
+    setDeleting(false);
     setPanelOpen(false);
     setPanelMode(null);
     setActiveItem(null);
+  };
+
+  const handleDeleteFromView = async () => {
+    if (!activeItem?.id) return;
+    if (!window.confirm("정말 이 일정을 삭제하시겠습니까?")) return;
+    setDeleting(true);
+    try {
+      await scheduleApi.remove(activeItem.id);
+      await fetchSchedules();
+      closePanel();
+    } catch (err) {
+      console.error("삭제 실패:", err);
+      alert("삭제에 실패했습니다.");
+      setDeleting(false);
+    }
   };
 
   const defaultScope = scope === "personal" ? "personal" : "company";
@@ -403,15 +419,14 @@ export default function ScheduleCalendar({ scope, category }) {
                 />
               )}
               {panelMode === "view" && activeItem && (
-                <ScheduleDetail
-                  item={activeItem}
-                  onEdit={() => openEdit(activeItem)}
-                  onDeleted={() => {
-                    fetchSchedules();
-                    closePanel();
-                  }}
+                <ScheduleForm
+                  mode="view"
+                  initial={activeItem}
+                  companyId={companyId}
                   onClose={closePanel}
-                  onRsvpChanged={fetchSchedules}
+                  onEdit={() => openEdit(activeItem)}
+                  onDelete={handleDeleteFromView}
+                  deleting={deleting}
                 />
               )}
               {panelMode === "edit" && activeItem && (

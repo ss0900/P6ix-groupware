@@ -1,7 +1,7 @@
 // src/pages/schedule/ScheduleForm.jsx
 import React, { useState, useEffect, useCallback } from "react";
 import { format } from "date-fns";
-import { Search, X } from "lucide-react";
+import { Search, X, Edit, Trash2 } from "lucide-react";
 import { scheduleApi, calendarApi } from "../../api/schedule";
 import api from "../../api/axios";
 import PageHeader from "../../components/common/ui/PageHeader";
@@ -37,7 +37,13 @@ export default function ScheduleForm({
   defaultScope = "personal",
   onSaved,
   onClose,
+  onEdit,
+  onDelete,
+  deleting = false,
 }) {
+  const isViewMode = mode === "view";
+  const isEditMode = mode === "edit";
+  const formTitle = mode === "create" ? "일정 등록" : mode === "edit" ? "일정 수정" : "일정 상세";
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState([]);
@@ -224,6 +230,7 @@ export default function ScheduleForm({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isViewMode) return;
     if (!form.title.trim()) return alert("제목을 입력해주세요.");
     if (!form.date) return alert("날짜를 선택해주세요.");
 
@@ -279,23 +286,35 @@ export default function ScheduleForm({
       {/* 헤더 */}
       <PageHeader
         className="mb-0 pb-2 border-b border-gray-200"
-        title={mode === "create" ? "일정 등록" : "일정 수정"}
+        title={formTitle}
       >
-        <button
-          type="button"
-          onClick={onClose}
-          className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-        >
-          취소
-        </button>
-        <button
-          type="submit"
-          form={formId}
-          disabled={loading}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-        >
-          {loading ? "저장 중..." : mode === "create" ? "등록" : "저장"}
-        </button>
+        {isViewMode ? (
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+          >
+            닫기
+          </button>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              취소
+            </button>
+            <button
+              type="submit"
+              form={formId}
+              disabled={loading}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {loading ? "저장 중..." : mode === "create" ? "등록" : "저장"}
+            </button>
+          </>
+        )}
       </PageHeader>
 
       <form id={formId} onSubmit={handleSubmit} className="space-y-4">
@@ -312,8 +331,9 @@ export default function ScheduleForm({
               <button
                 key={opt.value}
                 type="button"
-                disabled={mode === "edit"}
+                disabled={isEditMode || isViewMode}
                 onClick={() => {
+                  if (isViewMode) return;
                   setForm((prev) => ({ ...prev, scope: opt.value }));
                   setParticipantIds([]);
                 }}
@@ -326,7 +346,7 @@ export default function ScheduleForm({
                         : "bg-red-600 text-white border-red-600"
                       : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
                   }
-                  ${mode === "edit" ? "opacity-50 cursor-not-allowed" : ""}
+                  ${(isEditMode || isViewMode) ? "opacity-50 cursor-not-allowed" : ""}
                 `}
               >
                 {opt.label}
@@ -349,7 +369,12 @@ export default function ScheduleForm({
                 calendar: e.target.value || "",
               }))
             }
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            disabled={isViewMode}
+            className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${
+              isViewMode
+                ? "bg-gray-50 text-gray-700 cursor-default"
+                : "focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            }`}
           >
             {categoryOptions.map((opt) => (
               <option key={opt.id} value={opt.id}>
@@ -369,7 +394,12 @@ export default function ScheduleForm({
             name="title"
             value={form.title}
             onChange={onChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            readOnly={isViewMode}
+            className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${
+              isViewMode
+                ? "bg-gray-50 text-gray-700 cursor-default"
+                : "focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            }`}
             placeholder="일정 제목을 입력하세요"
           />
         </div>
@@ -384,7 +414,12 @@ export default function ScheduleForm({
             name="location"
             value={form.location}
             onChange={onChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            readOnly={isViewMode}
+            className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${
+              isViewMode
+                ? "bg-gray-50 text-gray-700 cursor-default"
+                : "focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            }`}
             placeholder="장소를 입력하세요"
           />
         </div>
@@ -397,6 +432,7 @@ export default function ScheduleForm({
               name="is_all_day"
               checked={form.is_all_day}
               onChange={onChange}
+              disabled={isViewMode}
               className="rounded text-blue-600"
             />
             <span className="text-sm text-gray-700">종일</span>
@@ -414,7 +450,12 @@ export default function ScheduleForm({
               name="date"
               value={form.date}
               onChange={onChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              disabled={isViewMode}
+              className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${
+                isViewMode
+                  ? "bg-gray-50 text-gray-700 cursor-default"
+                  : "focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              }`}
             />
           </div>
           {!form.is_all_day && (
@@ -427,7 +468,12 @@ export default function ScheduleForm({
                 name="time"
                 value={form.time}
                 onChange={onChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                disabled={isViewMode}
+                className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${
+                  isViewMode
+                    ? "bg-gray-50 text-gray-700 cursor-default"
+                    : "focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                }`}
               />
             </div>
           )}
@@ -443,7 +489,12 @@ export default function ScheduleForm({
               name="end_date"
               value={form.end_date}
               onChange={onChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              disabled={isViewMode}
+              className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${
+                isViewMode
+                  ? "bg-gray-50 text-gray-700 cursor-default"
+                  : "focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              }`}
             />
           </div>
           {!form.is_all_day && (
@@ -456,7 +507,12 @@ export default function ScheduleForm({
                 name="end_time"
                 value={form.end_time}
                 onChange={onChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                disabled={isViewMode}
+                className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${
+                  isViewMode
+                    ? "bg-gray-50 text-gray-700 cursor-default"
+                    : "focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                }`}
               />
             </div>
           )}
@@ -467,14 +523,16 @@ export default function ScheduleForm({
           <div>
             <div className="flex items-center justify-between gap-2 mb-2">
               <div className="text-sm font-medium text-gray-700">참여자</div>
-              <button
-                type="button"
-                onClick={() => setShowParticipantModal(true)}
-                className="inline-flex items-center gap-1 px-3 py-1.5 text-sm text-sky-700 bg-sky-50 rounded-lg hover:bg-sky-100"
-              >
-                <Search size={15} />
-                참여자 검색
-              </button>
+              {!isViewMode && (
+                <button
+                  type="button"
+                  onClick={() => setShowParticipantModal(true)}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-sm text-sky-700 bg-sky-50 rounded-lg hover:bg-sky-100"
+                >
+                  <Search size={15} />
+                  참여자 검색
+                </button>
+              )}
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -489,13 +547,15 @@ export default function ScheduleForm({
                     className="inline-flex items-center gap-1 px-2 py-1 bg-sky-100 text-sky-700 rounded text-sm"
                   >
                     {getParticipantName(uid)}
-                    <button
-                      type="button"
-                      onClick={() => removeParticipant(uid)}
-                      className="text-sky-500 hover:text-sky-700"
-                    >
-                      <X size={14} />
-                    </button>
+                    {!isViewMode && (
+                      <button
+                        type="button"
+                        onClick={() => removeParticipant(uid)}
+                        className="text-sky-500 hover:text-sky-700"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
                   </span>
                 ))
               )}
@@ -512,28 +572,61 @@ export default function ScheduleForm({
             name="memo"
             value={form.memo}
             onChange={onChange}
+            readOnly={isViewMode}
             rows={3}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${
+              isViewMode
+                ? "bg-gray-50 text-gray-700 cursor-default"
+                : "focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            }`}
             placeholder="내용을 입력하세요"
           />
         </div>
       </form>
 
-      <UserSelectModal
-        isOpen={showParticipantModal}
-        onClose={() => setShowParticipantModal(false)}
-        users={users}
-        departmentOrderById={departmentOrderById}
-        positionLevelById={positionLevelById}
-        initialSelectedIds={participantIds}
-        currentUserId={user?.id}
-        currentUsername={user?.username}
-        onSave={(nextParticipantIds) => {
-          setParticipantIds(nextParticipantIds);
-          setShowParticipantModal(false);
-        }}
-        entityLabel="참여자"
-      />
+      {isViewMode && (onEdit || onDelete) && (
+        <div className="flex justify-end gap-3">
+          {onEdit && (
+            <button
+              type="button"
+              onClick={onEdit}
+              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              <Edit size={16} />
+              수정
+            </button>
+          )}
+          {onDelete && (
+            <button
+              type="button"
+              onClick={onDelete}
+              disabled={deleting}
+              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+            >
+              <Trash2 size={16} />
+              {deleting ? "삭제 중..." : "삭제"}
+            </button>
+          )}
+        </div>
+      )}
+
+      {!isViewMode && (
+        <UserSelectModal
+          isOpen={showParticipantModal}
+          onClose={() => setShowParticipantModal(false)}
+          users={users}
+          departmentOrderById={departmentOrderById}
+          positionLevelById={positionLevelById}
+          initialSelectedIds={participantIds}
+          currentUserId={user?.id}
+          currentUsername={user?.username}
+          onSave={(nextParticipantIds) => {
+            setParticipantIds(nextParticipantIds);
+            setShowParticipantModal(false);
+          }}
+          entityLabel="참여자"
+        />
+      )}
     </div>
   );
 }
