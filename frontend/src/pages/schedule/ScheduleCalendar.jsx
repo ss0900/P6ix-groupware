@@ -13,15 +13,6 @@ import Calendar, {
 import ScheduleForm from "./ScheduleForm";
 import ScheduleDetail from "./ScheduleDetail";
 
-const EVENT_TYPE_STYLES = {
-  general: { bg: "bg-gray-100", text: "text-gray-700", label: "일반" },
-  annual: { bg: "bg-yellow-100", text: "text-yellow-800", label: "연차" },
-  monthly: { bg: "bg-orange-100", text: "text-orange-700", label: "월차" },
-  half: { bg: "bg-blue-100", text: "text-blue-700", label: "반차" },
-  meeting: { bg: "bg-purple-100", text: "text-purple-700", label: "회의" },
-  trip: { bg: "bg-green-100", text: "text-green-700", label: "출장" },
-};
-
 const SCOPE_TITLES = {
   all: "전체 일정",
   shared: "공유 일정",
@@ -31,6 +22,25 @@ const SCOPE_TITLES = {
 const CATEGORY_TITLES = {
   headquarters: "본사일정",
 };
+
+const CALENDAR_DAY_DIVIDER_CSS = `
+.pmis-calendar.schedule-calendar-grid-lines .react-calendar__month-view__days {
+  border-top: 1px solid #e5e7eb;
+  border-left: 1px solid #e5e7eb;
+}
+
+.pmis-calendar.schedule-calendar-grid-lines .react-calendar__month-view__days__day {
+  border-right: 1px solid #e5e7eb !important;
+  border-bottom: 1px solid #e5e7eb !important;
+  box-sizing: border-box;
+}
+
+.pmis-calendar.schedule-calendar-grid-lines .react-calendar__month-view__days__day.react-calendar__tile--active,
+.pmis-calendar.schedule-calendar-grid-lines .react-calendar__month-view__days__day.react-calendar__tile--now {
+  border-right: 1px solid #e5e7eb !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+`;
 
 export default function ScheduleCalendar({ scope, category }) {
   const { calendarId } = useParams();
@@ -137,17 +147,6 @@ export default function ScheduleCalendar({ scope, category }) {
     [schedules]
   );
 
-  const selectedDaySchedules = useMemo(() => {
-    const dateStr = format(selectedDate, "yyyy-MM-dd");
-    return schedules
-      .filter((s) => {
-        const startDate = (s.start || "").slice(0, 10);
-        const endDate = (s.end || s.start || "").slice(0, 10);
-        return startDate <= dateStr && endDate >= dateStr;
-      })
-      .sort((a, b) => String(a.start || "").localeCompare(String(b.start || "")));
-  }, [schedules, selectedDate]);
-
   const goToToday = () => {
     const today = new Date();
     setSelectedDate(today);
@@ -164,12 +163,6 @@ export default function ScheduleCalendar({ scope, category }) {
     setSelectedDate(date || new Date());
     setActiveItem(null);
     setPanelMode("create");
-    setPanelOpen(true);
-  };
-
-  const openView = (item) => {
-    setActiveItem(item);
-    setPanelMode("view");
     setPanelOpen(true);
   };
 
@@ -264,10 +257,11 @@ export default function ScheduleCalendar({ scope, category }) {
             일정을 불러오는 중입니다...
           </div>
         ) : (
-          <div className="flex gap-6 items-start">
-            <div className="w-[550px] border rounded-xl bg-white shadow-sm p-4">
+          <div className="w-full max-w-[1200px] mx-auto border rounded-xl bg-white shadow-sm p-6">
+              <style>{CALENDAR_DAY_DIVIDER_CSS}</style>
               <div className="flex justify-center">
                 <Calendar
+                  className="schedule-calendar-grid-lines"
                   value={selectedDate}
                   onChange={setSelectedDate}
                   countsByDate={countsByDate}
@@ -276,50 +270,6 @@ export default function ScheduleCalendar({ scope, category }) {
                   showCounts={true}
                 />
               </div>
-            </div>
-
-            <div className="flex-1 border rounded-xl bg-white shadow-sm p-4 max-h-[80vh] overflow-y-auto">
-              <h3 className="text-base font-semibold mb-4">
-                {format(selectedDate, "yyyy-MM-dd")} 일정
-              </h3>
-
-              {selectedDaySchedules.length === 0 ? (
-                <p className="text-sm text-gray-400">일정이 없습니다.</p>
-              ) : (
-                <div className="space-y-2">
-                  {selectedDaySchedules.map((item) => {
-                    const typeStyle = EVENT_TYPE_STYLES[item.event_type] || EVENT_TYPE_STYLES.general;
-                    const time = item.is_all_day ? "종일" : format(new Date(item.start), "HH:mm");
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => openView(item)}
-                        className="w-full text-left border border-gray-200 rounded-lg p-3 hover:bg-gray-50"
-                      >
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm font-medium text-gray-800">{item.title}</span>
-                          {item.event_type && item.event_type !== "general" && (
-                            <span className={`px-2 py-0.5 rounded-full text-xs ${typeStyle.bg} ${typeStyle.text}`}>
-                              {typeStyle.label}
-                            </span>
-                          )}
-                          {item.is_urgent && (
-                            <span className="px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-700">
-                              긴급
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {time}
-                          {item.owner_name ? ` · ${item.owner_name}` : ""}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
           </div>
         )}
       </div>
