@@ -22,6 +22,7 @@ const CAL_CSS = `
 .pmis-calendar .react-calendar__tile {
   height: 80px;
   padding: 6px 0;
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -87,12 +88,15 @@ const CAL_CSS = `
   font-weight: 500;
   text-align: left !important;
 }
-.pmis-calendar .pmis-tile-more {
-  padding-left: 2px;
+.pmis-calendar .pmis-tile-overflow-count {
+  position: absolute;
+  top: 6px;
+  right: 6px;
   font-size: 10px;
-  line-height: 1.2;
+  line-height: 1;
+  font-weight: 600;
   color: #6b7280;
-  text-align: left;
+  pointer-events: none;
 }
 
 /* 공휴일 라벨 */
@@ -189,7 +193,7 @@ const CAL_CSS = `
 }
 .pmis-calendar .react-calendar__tile--active .pmis-tile-item,
 .pmis-calendar .react-calendar__tile--active .pmis-tile-item .pmis-tile-item__label,
-.pmis-calendar .react-calendar__tile--active .pmis-tile-more {
+.pmis-calendar .react-calendar__tile--active .pmis-tile-overflow-count {
   color: #fff !important;
 }
 .pmis-calendar .react-calendar__tile--active .pmis-tile-item {
@@ -361,7 +365,7 @@ const CAL_CSS = `
     font-size: 10px;
     line-height: 1.2;
   }
-  .pmis-calendar .pmis-tile-more {
+  .pmis-calendar .pmis-tile-overflow-count {
     font-size: 10px;
   }
   
@@ -651,6 +655,7 @@ export default function ReusableCalendar({
         const stat = statusCounts.get(key); // { blue, green, yellow, red, gray, total }
         const labels = holidays.get(key);
         const dayItems = tileItems.get(key) || [];
+        const overflowCount = Math.max((dayItems?.length || 0) - maxTileItems, 0);
         return (
           <div className="pmis-calendar__tile-inner">
             {showTileItems && Array.isArray(dayItems) && dayItems.length > 0 ? (
@@ -682,11 +687,6 @@ export default function ReusableCalendar({
                     </div>
                   );
                 })}
-                {dayItems.length > maxTileItems && (
-                  <div className="pmis-tile-more">
-                    +{dayItems.length - maxTileItems}
-                  </div>
-                )}
               </div>
             ) : (
               showCounts &&
@@ -749,6 +749,9 @@ export default function ReusableCalendar({
                   </div>
                 ) : null;
               })()
+            )}
+            {showTileItems && overflowCount > 0 && (
+              <div className="pmis-tile-overflow-count">+{overflowCount}</div>
             )}
 
             {showHolidayLabels &&

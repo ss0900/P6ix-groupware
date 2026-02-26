@@ -100,7 +100,7 @@ const CALENDAR_DAY_DIVIDER_CSS = `
 
 .pmis-calendar.schedule-calendar-grid-lines .react-calendar__tile abbr {
   display: block;
-  width: 100%;
+  width: calc(100% - 30px);
   padding-left: 4px;
   text-align: left;
   font-weight: 600;
