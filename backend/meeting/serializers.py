@@ -131,8 +131,45 @@ class ScheduleCreateSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id"]
 
+    def _get_default_headquarters_calendar(self, validated_data, instance=None):
+        if validated_data.get("calendar"):
+            return validated_data.get("calendar")
+        if instance is not None and getattr(instance, "calendar", None):
+            return instance.calendar
+
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        company = validated_data.get("company")
+        if company is None and user is not None and getattr(user, "is_authenticated", False):
+            company = getattr(user, "company", None)
+
+        qs = Calendar.objects.filter(
+            category=Calendar.CATEGORY_HEADQUARTERS,
+            is_active=True,
+        )
+
+        if company is not None:
+            cal = qs.filter(company=company).order_by("-is_default", "order", "id").first()
+            if cal:
+                return cal
+
+        if user is not None and getattr(user, "is_authenticated", False):
+            cal = qs.filter(owner=user).order_by("-is_default", "order", "id").first()
+            if cal:
+                return cal
+
+        cal = qs.filter(is_default=True).order_by("order", "id").first()
+        if cal:
+            return cal
+
+        return qs.order_by("order", "id").first()
+
     def create(self, validated_data):
         participant_ids = validated_data.pop("participant_ids", [])
+        if not validated_data.get("calendar"):
+            default_calendar = self._get_default_headquarters_calendar(validated_data)
+            if default_calendar:
+                validated_data["calendar"] = default_calendar
         schedule = Schedule.objects.create(**validated_data)
 
         # 참여자 추가
@@ -148,6 +185,12 @@ class ScheduleCreateSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         participant_ids = validated_data.pop("participant_ids", None)
+        if not validated_data.get("calendar") and not getattr(instance, "calendar", None):
+            default_calendar = self._get_default_headquarters_calendar(
+                validated_data, instance=instance
+            )
+            if default_calendar:
+                validated_data["calendar"] = default_calendar
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)

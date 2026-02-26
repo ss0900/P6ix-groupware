@@ -1,26 +1,23 @@
 // src/pages/schedule/ScheduleForm.jsx
 import React, { useState, useEffect } from "react";
 import { format } from "date-fns";
-import { AlertTriangle } from "lucide-react";
-import { scheduleApi, calendarApi, resourceApi } from "../../api/schedule";
+import { scheduleApi, calendarApi } from "../../api/schedule";
 import api from "../../api/axios";
 import PageHeader from "../../components/common/ui/PageHeader";
 
-const EVENT_TYPES = [
-  { value: "general", label: "일반" },
-  { value: "annual", label: "연차" },
-  { value: "monthly", label: "월차" },
-  { value: "half", label: "반차" },
-  { value: "meeting", label: "회의" },
-  { value: "trip", label: "출장" },
-];
-
-const LOCATION_TYPES = [
-  { value: "", label: "선택 안함" },
-  { value: "online", label: "온라인" },
-  { value: "offline_room", label: "오프라인(회의실)" },
-  { value: "offline_address", label: "오프라인(주소)" },
-];
+function flattenCalendars(nodes = []) {
+  const out = [];
+  const walk = (list) => {
+    list.forEach((node) => {
+      out.push(node);
+      if (Array.isArray(node?.sub_calendars) && node.sub_calendars.length > 0) {
+        walk(node.sub_calendars);
+      }
+    });
+  };
+  walk(nodes);
+  return out;
+}
 
 export default function ScheduleForm({
   mode = "create",
@@ -33,15 +30,13 @@ export default function ScheduleForm({
 }) {
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState([]);
-  const [calendars, setCalendars] = useState([]);
-  const [rooms, setRooms] = useState([]);
+  const [categoryOptions, setCategoryOptions] = useState([]);
   const [participantIds, setParticipantIds] = useState([]);
   const formId = "schedule-form";
 
   const [form, setForm] = useState({
     title: initial?.title || "",
     scope: initial?.scope || defaultScope,
-    event_type: initial?.event_type || "general",
     location: initial?.location || "",
     date: initial?.start?.slice(0, 10) || format(initialDate, "yyyy-MM-dd"),
     time: initial?.start?.slice(11, 16) || "09:00",
@@ -49,21 +44,12 @@ export default function ScheduleForm({
     end_time: initial?.end?.slice(11, 16) || "",
     is_all_day: initial?.is_all_day || false,
     memo: initial?.memo || "",
-    color: initial?.color || "#3B82F6",
-    calendar: initial?.calendar || null,
-    // 회의 전용 필드
-    location_type: initial?.location_type || "",
-    meet_url: initial?.meet_url || "",
-    resource: initial?.resource || null,
-    agenda: initial?.agenda || "",
-    is_urgent: initial?.is_urgent || false,
+    calendar: initial?.calendar ? String(initial.calendar) : "",
   });
-
-  const isMeeting = form.event_type === "meeting";
 
   // 사용자 목록 로드
   useEffect(() => {
-    if (form.scope === "company" || isMeeting) {
+    if (form.scope === "company") {
       (async () => {
         try {
           const res = await api.get("/users/");
@@ -75,35 +61,54 @@ export default function ScheduleForm({
     } else {
       setUsers([]);
     }
-  }, [form.scope, isMeeting]);
+  }, [form.scope]);
 
-  // 캘린더 목록 로드
+  // 카테고리 목록 로드 (본사일정 + 사용자정의)
   useEffect(() => {
     (async () => {
       try {
-        const res = await calendarApi.myCalendars();
-        setCalendars(res.data ?? []);
+        const [myRes, customRes] = await Promise.all([
+          calendarApi.myCalendars(),
+          calendarApi.customCalendars(),
+        ]);
+        const myCalendars = myRes.data ?? [];
+        const customCalendars = flattenCalendars(customRes.data ?? []);
+
+        const headquarters =
+          myCalendars.find(
+            (cal) => cal?.category === "headquarters" || cal?.name === "본사일정",
+          ) ||
+          customCalendars.find(
+            (cal) => cal?.category === "headquarters" || cal?.name === "본사일정",
+          );
+
+        const options = [];
+        if (headquarters?.id) {
+          options.push({ id: String(headquarters.id), name: "본사일정" });
+        }
+
+        const seen = new Set(options.map((opt) => opt.id));
+        customCalendars.forEach((cal) => {
+          const id = String(cal?.id ?? "");
+          if (!id || seen.has(id)) return;
+          options.push({ id, name: cal?.name || "사용자 정의 일정" });
+          seen.add(id);
+        });
+
+        setCategoryOptions(options);
+        setForm((prev) => {
+          if (initial?.calendar) return { ...prev, calendar: String(initial.calendar) };
+          if (prev.calendar) return prev;
+          if (headquarters?.id) return { ...prev, calendar: String(headquarters.id) };
+          if (options.length > 0) return { ...prev, calendar: options[0].id };
+          return prev;
+        });
       } catch (err) {
-        console.error("캘린더 목록 로드 실패:", err);
+        console.error("카테고리 목록 로드 실패:", err);
+        setCategoryOptions([]);
       }
     })();
-  }, []);
-
-  // 회의실 목록 로드
-  useEffect(() => {
-    if (isMeeting && form.location_type === "offline_room") {
-      (async () => {
-        try {
-          const res = await resourceApi.rooms();
-          setRooms(res.data ?? []);
-        } catch (err) {
-          console.error("회의실 목록 로드 실패:", err);
-        }
-      })();
-    } else {
-      setRooms([]);
-    }
-  }, [isMeeting, form.location_type]);
+  }, [initial?.calendar]);
 
   // 기존 참여자 설정 (수정 모드)
   useEffect(() => {
@@ -147,27 +152,15 @@ export default function ScheduleForm({
       const payload = {
         title: form.title,
         scope: form.scope,
-        event_type: form.event_type,
+        event_type: "general",
         location: form.location,
         start,
         end,
         is_all_day: form.is_all_day,
         memo: form.memo,
-        color: form.color,
-        calendar: form.calendar || null,
+        calendar: form.calendar ? Number(form.calendar) : null,
         company: form.scope === "company" && companyId ? companyId : null,
-        participant_ids:
-          form.scope === "company" || isMeeting ? participantIds : [],
-        // 회의 전용 필드
-        location_type: isMeeting ? form.location_type : "",
-        meet_url:
-          isMeeting && form.location_type === "online" ? form.meet_url : "",
-        resource:
-          isMeeting && form.location_type === "offline_room"
-            ? form.resource
-            : null,
-        agenda: isMeeting ? form.agenda : "",
-        is_urgent: isMeeting ? form.is_urgent : false,
+        participant_ids: form.scope === "company" ? participantIds : [],
       };
 
       if (mode === "create") {
@@ -192,12 +185,6 @@ export default function ScheduleForm({
         className="mb-0 pb-2 border-b border-gray-200"
         title={mode === "create" ? "일정 등록" : "일정 수정"}
       >
-        {form.is_urgent && (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">
-            <AlertTriangle size={12} />
-            긴급
-          </span>
-        )}
         <button
           type="button"
           onClick={onClose}
@@ -252,20 +239,28 @@ export default function ScheduleForm({
           </div>
         </div>
 
-        {/* 일정 유형 */}
+        {/* 카테고리 구분 */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            일정 유형
+            카테고리 구분
           </label>
           <select
-            name="event_type"
-            value={form.event_type}
-            onChange={onChange}
+            name="calendar"
+            value={form.calendar || ""}
+            onChange={(e) =>
+              setForm((prev) => ({
+                ...prev,
+                calendar: e.target.value || "",
+              }))
+            }
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
-            {EVENT_TYPES.map((type) => (
-              <option key={type.value} value={type.value}>
-                {type.label}
+            {categoryOptions.length === 0 && (
+              <option value="">본사일정</option>
+            )}
+            {categoryOptions.map((opt) => (
+              <option key={opt.id} value={opt.id}>
+                {opt.name}
               </option>
             ))}
           </select>
@@ -286,139 +281,20 @@ export default function ScheduleForm({
           />
         </div>
 
-        {/* ===== 회의 전용 필드 ===== */}
-        {isMeeting && (
-          <>
-            {/* 긴급 여부 */}
-            <div>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  name="is_urgent"
-                  checked={form.is_urgent}
-                  onChange={onChange}
-                  className="rounded text-red-600"
-                />
-                <span className="text-sm text-gray-700 flex items-center gap-1">
-                  <AlertTriangle size={14} className="text-red-500" />
-                  긴급 회의
-                </span>
-              </label>
-            </div>
-
-            {/* 장소 구분 */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                장소 구분
-              </label>
-              <select
-                name="location_type"
-                value={form.location_type}
-                onChange={onChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                {LOCATION_TYPES.map((type) => (
-                  <option key={type.value} value={type.value}>
-                    {type.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* 온라인 링크 */}
-            {form.location_type === "online" && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  온라인 링크
-                </label>
-                <input
-                  type="url"
-                  name="meet_url"
-                  value={form.meet_url}
-                  onChange={onChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="https://meet.google.com/..."
-                />
-              </div>
-            )}
-
-            {/* 회의실 선택 */}
-            {form.location_type === "offline_room" && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  회의실
-                </label>
-                <select
-                  name="resource"
-                  value={form.resource || ""}
-                  onChange={(e) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      resource: e.target.value || null,
-                    }))
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="">회의실 선택</option>
-                  {rooms.map((room) => (
-                    <option key={room.id} value={room.id}>
-                      {room.name} ({room.capacity}명)
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {/* 안건 */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                안건
-              </label>
-              <textarea
-                name="agenda"
-                value={form.agenda}
-                onChange={onChange}
-                rows={2}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="회의 안건을 입력하세요"
-              />
-            </div>
-          </>
-        )}
-
-        {/* 일반 장소 (회의가 아닌 경우) */}
-        {!isMeeting && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              장소
-            </label>
-            <input
-              type="text"
-              name="location"
-              value={form.location}
-              onChange={onChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="장소를 입력하세요 (선택)"
-            />
-          </div>
-        )}
-
-        {/* 오프라인 주소 (회의 + 오프라인 주소 타입일 때) */}
-        {isMeeting && form.location_type === "offline_address" && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              주소
-            </label>
-            <input
-              type="text"
-              name="location"
-              value={form.location}
-              onChange={onChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="회의 장소 주소를 입력하세요"
-            />
-          </div>
-        )}
+        {/* 장소 */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            장소
+          </label>
+          <input
+            type="text"
+            name="location"
+            value={form.location}
+            onChange={onChange}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            placeholder="장소를 입력하세요 (선택)"
+          />
+        </div>
 
         {/* 종일 */}
         <div>
@@ -493,49 +369,8 @@ export default function ScheduleForm({
           )}
         </div>
 
-        {/* 캘린더 선택 */}
-        {calendars.length > 0 && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              캘린더
-            </label>
-            <select
-              name="calendar"
-              value={form.calendar || ""}
-              onChange={(e) =>
-                setForm((prev) => ({
-                  ...prev,
-                  calendar: e.target.value || null,
-                }))
-              }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="">캘린더 선택 (선택사항)</option>
-              {calendars.map((cal) => (
-                <option key={cal.id} value={cal.id}>
-                  {cal.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        {/* 색상 */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            색상
-          </label>
-          <input
-            type="color"
-            name="color"
-            value={form.color}
-            onChange={onChange}
-            className="w-16 h-10 border border-gray-300 rounded-lg cursor-pointer"
-          />
-        </div>
-
-        {/* 참여자 (회사 일정 또는 회의일 때) */}
-        {(form.scope === "company" || isMeeting) && (
+        {/* 참여자 (회사 일정일 때) */}
+        {form.scope === "company" && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               참여자
@@ -568,10 +403,10 @@ export default function ScheduleForm({
           </div>
         )}
 
-        {/* 메모 */}
+        {/* 내용 */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            메모
+            내용
           </label>
           <textarea
             name="memo"
@@ -579,7 +414,7 @@ export default function ScheduleForm({
             onChange={onChange}
             rows={3}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="메모를 입력하세요"
+            placeholder="내용을 입력하세요"
           />
         </div>
 
