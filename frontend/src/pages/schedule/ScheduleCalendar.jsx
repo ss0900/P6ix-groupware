@@ -24,6 +24,14 @@ const CATEGORY_TITLES = {
 };
 
 const CALENDAR_DAY_DIVIDER_CSS = `
+.schedule-calendar-shell {
+  background-color: #ffffff;
+}
+
+.pmis-calendar.schedule-calendar-grid-lines {
+  background-color: #ffffff !important;
+}
+
 .pmis-calendar.schedule-calendar-grid-lines .react-calendar__month-view__days {
   border-top: 1px solid #e5e7eb;
   border-left: 1px solid #e5e7eb;
@@ -50,6 +58,43 @@ const CALENDAR_DAY_DIVIDER_CSS = `
 .pmis-calendar.schedule-calendar-grid-lines .react-calendar__month-view__days__day.react-calendar__tile--now {
   border-right: 1px solid #e5e7eb !important;
   border-bottom: 1px solid #e5e7eb !important;
+}
+
+.pmis-calendar.schedule-calendar-grid-lines .react-calendar__month-view__days__day.react-calendar__tile--now:not(.react-calendar__tile--active) {
+  border: 1.5px solid #3b82f6 !important;
+  position: relative;
+  z-index: 2;
+}
+
+.pmis-calendar.schedule-calendar-grid-lines .react-calendar__navigation {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  margin: 0 auto 8px;
+}
+
+.pmis-calendar.schedule-calendar-grid-lines .react-calendar__navigation__arrow {
+  flex: 0 0 auto !important;
+  min-width: 28px;
+  width: 28px;
+  padding: 0;
+}
+
+.pmis-calendar.schedule-calendar-grid-lines .react-calendar__navigation__label {
+  flex-grow: 0 !important;
+  flex-shrink: 0 !important;
+  flex-basis: auto !important;
+  min-width: max-content !important;
+  width: auto !important;
+  margin: 0 12px;
+  padding: 0 6px;
+  text-align: center;
+}
+
+.pmis-calendar.schedule-calendar-grid-lines .react-calendar__tile {
+  height: 140px;
 }
 `;
 
@@ -155,7 +200,7 @@ export default function ScheduleCalendar({ scope, category }) {
 
   const countsByDate = useMemo(
     () => buildCounts(schedules, (s) => s.start),
-    [schedules]
+    [schedules],
   );
 
   const goToToday = () => {
@@ -194,10 +239,7 @@ export default function ScheduleCalendar({ scope, category }) {
   return (
     <div className="flex-1 flex flex-col h-full">
       <div className="px-4 py-3 border-b border-gray-200">
-        <PageHeader
-          className="mb-0"
-          title={pageTitle}
-        >
+        <PageHeader className="mb-0" title={pageTitle}>
           <div className="flex items-center gap-2">
             <button
               onClick={() => openCreate(selectedDate)}
@@ -263,26 +305,29 @@ export default function ScheduleCalendar({ scope, category }) {
             일정을 불러오는 중입니다...
           </div>
         ) : (
-          <div className="w-full max-w-[1200px] mx-auto border rounded-xl p-6">
-              <style>{CALENDAR_DAY_DIVIDER_CSS}</style>
-              <div className="flex justify-center">
-                <Calendar
-                  className="schedule-calendar-grid-lines"
-                  value={selectedDate}
-                  onChange={setSelectedDate}
-                  countsByDate={countsByDate}
-                  holidayMap={holidayMap}
-                  onMonthChange={(d) => setCurrentDate(d)}
-                  showCounts={true}
-                />
-              </div>
+          <div className="schedule-calendar-shell w-full border rounded-xl bg-white p-6">
+            <style>{CALENDAR_DAY_DIVIDER_CSS}</style>
+            <div className="w-full">
+              <Calendar
+                className="schedule-calendar-grid-lines w-full"
+                value={selectedDate}
+                onChange={setSelectedDate}
+                countsByDate={countsByDate}
+                holidayMap={holidayMap}
+                onMonthChange={(d) => setCurrentDate(d)}
+                showCounts={true}
+              />
+            </div>
           </div>
         )}
       </div>
 
       {panelOpen && (
         <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="absolute inset-0 bg-black bg-opacity-30" onClick={closePanel} />
+          <div
+            className="absolute inset-0 bg-black bg-opacity-30"
+            onClick={closePanel}
+          />
           <div className="relative w-full max-w-md bg-white shadow-xl overflow-y-auto">
             <div className="p-6">
               {panelMode === "create" && (
