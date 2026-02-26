@@ -29,6 +29,17 @@ const CALENDAR_DAY_DIVIDER_CSS = `
   border-left: 1px solid #e5e7eb;
 }
 
+.pmis-calendar.schedule-calendar-grid-lines .react-calendar__month-view__weekdays {
+  border-top: 1px solid #e5e7eb;
+  border-left: 1px solid #e5e7eb;
+}
+
+.pmis-calendar.schedule-calendar-grid-lines .react-calendar__month-view__weekdays__weekday {
+  border-right: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e5e7eb;
+  box-sizing: border-box;
+}
+
 .pmis-calendar.schedule-calendar-grid-lines .react-calendar__month-view__days__day {
   border-right: 1px solid #e5e7eb !important;
   border-bottom: 1px solid #e5e7eb !important;
