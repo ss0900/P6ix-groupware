@@ -78,10 +78,12 @@ export default function ScheduleForm({
 
         const headquarters =
           myCalendars.find(
-            (cal) => cal?.category === "headquarters" || cal?.name === "본사일정",
+            (cal) =>
+              cal?.category === "headquarters" || cal?.name === "본사일정",
           ) ||
           customCalendars.find(
-            (cal) => cal?.category === "headquarters" || cal?.name === "본사일정",
+            (cal) =>
+              cal?.category === "headquarters" || cal?.name === "본사일정",
           );
 
         const headquartersOptionId = headquarters?.id
@@ -99,13 +101,16 @@ export default function ScheduleForm({
 
         setCategoryOptions(options);
         setForm((prev) => {
-          if (initial?.calendar) return { ...prev, calendar: String(initial.calendar) };
+          if (initial?.calendar)
+            return { ...prev, calendar: String(initial.calendar) };
           if (prev.calendar) return prev;
           return { ...prev, calendar: headquartersOptionId };
         });
       } catch (err) {
         console.error("카테고리 목록 로드 실패:", err);
-        setCategoryOptions([{ id: HEADQUARTERS_FALLBACK_VALUE, name: "본사일정" }]);
+        setCategoryOptions([
+          { id: HEADQUARTERS_FALLBACK_VALUE, name: "본사일정" },
+        ]);
         setForm((prev) => {
           if (initial?.calendar) return prev;
           if (prev.calendar) return prev;
@@ -168,7 +173,9 @@ export default function ScheduleForm({
         end,
         is_all_day: form.is_all_day,
         memo: form.memo,
-        calendar: Number.isFinite(selectedCalendarId) ? selectedCalendarId : null,
+        calendar: Number.isFinite(selectedCalendarId)
+          ? selectedCalendarId
+          : null,
         company: form.scope === "company" && companyId ? companyId : null,
         participant_ids: form.scope === "company" ? participantIds : [],
       };
@@ -299,7 +306,7 @@ export default function ScheduleForm({
             value={form.location}
             onChange={onChange}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="장소를 입력하세요 (선택)"
+            placeholder="장소를 입력하세요"
           />
         </div>
 
@@ -424,7 +431,6 @@ export default function ScheduleForm({
             placeholder="내용을 입력하세요"
           />
         </div>
-
       </form>
     </div>
   );
