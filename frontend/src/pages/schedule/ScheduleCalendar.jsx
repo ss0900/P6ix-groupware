@@ -376,8 +376,13 @@ export default function ScheduleCalendar({ scope, category }) {
                   const calendarPrefix = item?.calendar_name
                     ? `[${item.calendar_name}] `
                     : "";
+                  const startDate = item?.start ? new Date(item.start) : null;
+                  const timePrefix =
+                    startDate && !Number.isNaN(startDate.getTime()) && item?.is_all_day !== true
+                      ? `${format(startDate, "HH:mm")} `
+                      : "";
                   const title = item?.title || "(제목 없음)";
-                  return `${calendarPrefix}${title}`;
+                  return `${timePrefix}${calendarPrefix}${title}`;
                 }}
                 onTileItemClick={(item) => openView(item)}
                 formatDayLabel={(date, dayLabel, holidayLabels = []) => {
