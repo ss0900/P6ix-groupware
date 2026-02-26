@@ -280,6 +280,8 @@ export default function ScheduleForm({
     }
   };
 
+  const memoDisplayValue = isViewMode ? form.memo || "-" : form.memo;
+
   return (
     <div className="space-y-6">
       {/* 헤더 */}
@@ -387,7 +389,7 @@ export default function ScheduleForm({
             disabled={isViewMode}
             className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${
               isViewMode
-                ? "bg-gray-50 text-gray-700 cursor-default"
+                ? "bg-gray-50 text-gray-900 disabled:text-gray-900 disabled:opacity-100 cursor-default"
                 : "focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             }`}
           >
@@ -412,7 +414,7 @@ export default function ScheduleForm({
             readOnly={isViewMode}
             className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${
               isViewMode
-                ? "bg-gray-50 text-gray-700 cursor-default"
+                ? "bg-gray-50 text-gray-900 placeholder:text-gray-500 cursor-default"
                 : "focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             }`}
             placeholder="일정 제목을 입력하세요"
@@ -432,7 +434,7 @@ export default function ScheduleForm({
             readOnly={isViewMode}
             className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${
               isViewMode
-                ? "bg-gray-50 text-gray-700 cursor-default"
+                ? "bg-gray-50 text-gray-900 placeholder:text-gray-500 cursor-default"
                 : "focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             }`}
             placeholder="장소를 입력하세요"
@@ -467,7 +469,7 @@ export default function ScheduleForm({
             disabled={isViewMode}
             className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${
               isViewMode
-                ? "bg-gray-50 text-gray-700 cursor-default"
+                ? "bg-gray-50 text-gray-900 disabled:text-gray-900 disabled:opacity-100 cursor-default"
                 : "focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             }`}
           />
@@ -487,7 +489,7 @@ export default function ScheduleForm({
                 disabled={isViewMode}
                 className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${
                   isViewMode
-                    ? "bg-gray-50 text-gray-700 cursor-default"
+                    ? "bg-gray-50 text-gray-900 disabled:text-gray-900 disabled:opacity-100 cursor-default"
                     : "focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 }`}
               />
@@ -504,7 +506,7 @@ export default function ScheduleForm({
                 disabled={isViewMode}
                 className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${
                   isViewMode
-                    ? "bg-gray-50 text-gray-700 cursor-default"
+                    ? "bg-gray-50 text-gray-900 disabled:text-gray-900 disabled:opacity-100 cursor-default"
                     : "focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 }`}
               />
@@ -564,16 +566,16 @@ export default function ScheduleForm({
           </label>
           <textarea
             name="memo"
-            value={form.memo}
+            value={memoDisplayValue}
             onChange={onChange}
             readOnly={isViewMode}
             rows={3}
             className={`w-full px-3 py-2 border border-gray-300 rounded-lg ${
               isViewMode
-                ? "bg-gray-50 text-gray-700 cursor-default"
+                ? "bg-gray-50 text-gray-900 placeholder:text-gray-500 cursor-default"
                 : "focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             }`}
-            placeholder="내용을 입력하세요"
+            placeholder={isViewMode ? "" : "내용을 입력하세요"}
           />
         </div>
       </form>
