@@ -289,13 +289,29 @@ export default function ScheduleForm({
         title={formTitle}
       >
         {isViewMode ? (
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-          >
-            닫기
-          </button>
+          <div className="flex items-center gap-3">
+            {onEdit && (
+              <button
+                type="button"
+                onClick={onEdit}
+                className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                <Edit size={16} />
+                수정
+              </button>
+            )}
+            {onDelete && (
+              <button
+                type="button"
+                onClick={onDelete}
+                disabled={deleting}
+                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+              >
+                <Trash2 size={16} />
+                {deleting ? "삭제 중..." : "삭제"}
+              </button>
+            )}
+          </div>
         ) : (
           <>
             <button
@@ -583,32 +599,6 @@ export default function ScheduleForm({
           />
         </div>
       </form>
-
-      {isViewMode && (onEdit || onDelete) && (
-        <div className="flex justify-end gap-3">
-          {onEdit && (
-            <button
-              type="button"
-              onClick={onEdit}
-              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              <Edit size={16} />
-              수정
-            </button>
-          )}
-          {onDelete && (
-            <button
-              type="button"
-              onClick={onDelete}
-              disabled={deleting}
-              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
-            >
-              <Trash2 size={16} />
-              {deleting ? "삭제 중..." : "삭제"}
-            </button>
-          )}
-        </div>
-      )}
 
       {!isViewMode && (
         <UserSelectModal
