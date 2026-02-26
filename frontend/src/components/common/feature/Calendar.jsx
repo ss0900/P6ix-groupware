@@ -23,6 +23,7 @@ const CAL_CSS = `
   height: 80px;
   padding: 6px 0;
   position: relative;
+  overflow: visible;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -90,13 +91,74 @@ const CAL_CSS = `
 }
 .pmis-calendar .pmis-tile-overflow-count {
   position: absolute;
-  top: 6px;
+  top: 5px;
   right: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 16px;
+  padding: 0 6px;
+  border-radius: 999px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
   font-size: 10px;
   line-height: 1;
   font-weight: 600;
-  color: #6b7280;
-  pointer-events: none;
+  color: #475569;
+  z-index: 4;
+}
+.pmis-calendar .pmis-tile-overflow-count.is-clickable {
+  cursor: pointer;
+}
+.pmis-calendar .pmis-tile-overflow-count.is-clickable:hover {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  color: #1d4ed8;
+}
+.pmis-calendar .pmis-tile-overflow-wrap {
+  position: static;
+}
+.pmis-calendar .pmis-tile-overflow-popover {
+  position: absolute;
+  top: 24px;
+  right: 4px;
+  width: calc(100% - 8px);
+  max-height: 92px;
+  overflow: auto;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.18);
+  z-index: 5;
+}
+.pmis-calendar .pmis-tile-overflow-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+}
+.pmis-calendar .pmis-tile-overflow-item {
+  display: block;
+  width: 100%;
+  padding: 2px 6px;
+  border: 1px solid #dbe3f0;
+  background: #f8fafc;
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #111827;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pmis-calendar .pmis-tile-overflow-item.is-clickable {
+  cursor: pointer;
+}
+.pmis-calendar .pmis-tile-overflow-item.is-clickable:hover {
+  border-color: #93c5fd;
+  background: #eff6ff;
 }
 
 /* 공휴일 라벨 */
@@ -196,12 +258,19 @@ const CAL_CSS = `
 .pmis-calendar .react-calendar__tile--active .pmis-tile-overflow-count {
   color: #fff !important;
 }
+.pmis-calendar .react-calendar__tile--active .pmis-tile-overflow-count {
+  border-color: rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.16);
+}
 .pmis-calendar .react-calendar__tile--active .pmis-tile-item {
   background: rgba(255, 255, 255, 0.2);
   border-color: rgba(255, 255, 255, 0.45);
 }
 .pmis-calendar .react-calendar__tile--active .pmis-tile-item.is-clickable:hover {
   background: rgba(255, 255, 255, 0.3);
+}
+.pmis-calendar .react-calendar__tile--active .pmis-tile-overflow-popover {
+  border-color: rgba(191, 219, 254, 0.9);
 }
 
 /* ✅ 상태 도트(● N건) 줄 */
@@ -367,6 +436,10 @@ const CAL_CSS = `
   }
   .pmis-calendar .pmis-tile-overflow-count {
     font-size: 10px;
+  }
+  .pmis-calendar .pmis-tile-overflow-item {
+    font-size: 10px;
+    line-height: 1.2;
   }
   
   /* 선택된 날의 라벨 */
@@ -577,10 +650,12 @@ export default function ReusableCalendar({
 }) {
   // --- 선택 날짜: 컨트롤드/언컨트롤드 겸용 ---
   const [internalDate, setInternalDate] = useState(() => new Date());
+  const [openOverflowKey, setOpenOverflowKey] = useState(null);
   const selected = value ?? internalDate;
   const handleChange = (next) => {
     if (onChange) onChange(next); // 컨트롤드
     else setInternalDate(next); // 언컨트롤드
+    setOpenOverflowKey(null);
   };
 
   // --- 활성 연도: 선택 날짜/월 이동에 맞춰 내부에서 관리 ---
@@ -595,6 +670,16 @@ export default function ReusableCalendar({
     if (holidayMapProp) return; // 외부 제공 시 로딩 스킵
     (async () => setHolidayMapState(await getKRHolidayMap(activeYear)))();
   }, [activeYear, holidayMapProp]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return undefined;
+    const handleDocMouseDown = (e) => {
+      if (e.target?.closest?.(".pmis-tile-overflow-wrap")) return;
+      setOpenOverflowKey(null);
+    };
+    document.addEventListener("mousedown", handleDocMouseDown);
+    return () => document.removeEventListener("mousedown", handleDocMouseDown);
+  }, []);
 
   const meetingCounts = useMemo(
     () => new Map(Object.entries(countsByDate)),
@@ -636,6 +721,7 @@ export default function ReusableCalendar({
         if (view === "month") {
           const y = activeStartDate.getFullYear();
           if (y !== activeYear) setActiveYear(y); // 내부 연도 갱신
+          setOpenOverflowKey(null);
           onMonthChange?.(activeStartDate); // 필요시 부모 알림
         }
       }}
@@ -656,6 +742,8 @@ export default function ReusableCalendar({
         const labels = holidays.get(key);
         const dayItems = tileItems.get(key) || [];
         const overflowCount = Math.max((dayItems?.length || 0) - maxTileItems, 0);
+        const hiddenItems = overflowCount > 0 ? dayItems.slice(maxTileItems) : [];
+        const isOverflowOpen = openOverflowKey === key;
         return (
           <div className="pmis-calendar__tile-inner">
             {showTileItems && Array.isArray(dayItems) && dayItems.length > 0 ? (
@@ -751,7 +839,58 @@ export default function ReusableCalendar({
               })()
             )}
             {showTileItems && overflowCount > 0 && (
-              <div className="pmis-tile-overflow-count">+{overflowCount}</div>
+              <div className="pmis-tile-overflow-wrap">
+                <button
+                  type="button"
+                  className="pmis-tile-overflow-count is-clickable"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setOpenOverflowKey((prev) => (prev === key ? null : key));
+                  }}
+                  title={`숨겨진 일정 ${overflowCount}개 보기`}
+                  aria-label={`숨겨진 일정 ${overflowCount}개 보기`}
+                >
+                  +{overflowCount}
+                </button>
+                {isOverflowOpen && (
+                  <div className="pmis-tile-overflow-popover">
+                    <div className="pmis-tile-overflow-list">
+                      {hiddenItems.map((item, idx) => {
+                        const label = String(
+                          getTileItemLabel(item) || item?.title || "(제목 없음)"
+                        ).trim();
+                        const isClickable = typeof onTileItemClick === "function";
+                        return (
+                          <div
+                            key={item?.id || `${key}-hidden-${idx}`}
+                            className={`pmis-tile-overflow-item${isClickable ? " is-clickable" : ""}`}
+                            title={label}
+                            onMouseDown={(e) => {
+                              if (!isClickable) return;
+                              e.preventDefault();
+                              e.stopPropagation();
+                            }}
+                            onClick={(e) => {
+                              if (!isClickable) return;
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setOpenOverflowKey(null);
+                              onTileItemClick(item, date);
+                            }}
+                          >
+                            {label}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
 
             {showHolidayLabels &&
