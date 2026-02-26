@@ -192,7 +192,7 @@ export default function ScheduleCalendar({ scope, category }) {
   const defaultScope = scope === "personal" ? "personal" : "company";
 
   return (
-    <div className="flex-1 flex flex-col bg-white h-full">
+    <div className="flex-1 flex flex-col h-full">
       <div className="px-4 py-3 border-b border-gray-200">
         <PageHeader
           className="mb-0"
@@ -263,7 +263,7 @@ export default function ScheduleCalendar({ scope, category }) {
             일정을 불러오는 중입니다...
           </div>
         ) : (
-          <div className="w-full max-w-[1200px] mx-auto border rounded-xl bg-white shadow-sm p-6">
+          <div className="w-full max-w-[1200px] mx-auto border rounded-xl p-6">
               <style>{CALENDAR_DAY_DIVIDER_CSS}</style>
               <div className="flex justify-center">
                 <Calendar

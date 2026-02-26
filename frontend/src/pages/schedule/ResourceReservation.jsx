@@ -168,7 +168,7 @@ export default function ResourceReservation() {
   return (
     <div className="flex h-full">
       {/* 좌측: 자원 목록 */}
-      <div className="w-56 bg-white border-r border-gray-200 p-4 flex-shrink-0 overflow-y-auto">
+      <div className="w-56 border-r border-gray-200 p-4 flex-shrink-0 overflow-y-auto">
         <h2 className="text-sm font-semibold text-gray-700 mb-3">자원 유형</h2>
 
         {/* 자원 타입 탭 */}
@@ -228,7 +228,7 @@ export default function ResourceReservation() {
       </div>
 
       {/* 메인: 예약 현황 */}
-      <div className="flex-1 flex flex-col bg-white">
+      <div className="flex-1 flex flex-col">
         {/* 헤더 */}
         <div className="px-4 py-3 border-b border-gray-200">
           <PageHeader
