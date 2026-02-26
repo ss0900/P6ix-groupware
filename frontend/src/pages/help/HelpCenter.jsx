@@ -66,21 +66,32 @@ export default function HelpCenter() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [myQuestionCount, setMyQuestionCount] = useState(0);
 
   const loadList = useCallback(async () => {
     setLoading(true);
     try {
-      const [listRes, statsRes] = await Promise.all([
+      const [listRes, statsRes, myRes] = await Promise.all([
         getQuestions({
           page,
           page_size: PAGE_SIZE,
           search: query || undefined,
-          status: statusFilter === "all" ? undefined : statusFilter,
+          status:
+            statusFilter === "all" || statusFilter === "mine"
+              ? undefined
+              : statusFilter,
+          mine: statusFilter === "mine" ? true : undefined,
         }),
         getHelpStats(),
+        getQuestions({
+          page: 1,
+          page_size: 1,
+          mine: true,
+        }),
       ]);
 
       const { results, count } = toListPayload(listRes);
+      const { count: myCount } = toListPayload(myRes);
       setQuestions(results);
       setTotal(count);
       setStats({
@@ -88,6 +99,7 @@ export default function HelpCenter() {
         answered: Number(statsRes?.data?.answered || 0),
         pending: Number(statsRes?.data?.pending || 0),
       });
+      setMyQuestionCount(Number(myCount || 0));
     } catch (err) {
       console.error(err);
     } finally {
@@ -109,12 +121,19 @@ export default function HelpCenter() {
     loadList();
   }, [loadList]);
 
+  useEffect(() => {
+    if (user?.is_superuser && statusFilter === "mine") {
+      setStatusFilter("all");
+    }
+  }, [user?.is_superuser, statusFilter]);
+
   const onSearch = () => {
     setPage(1);
     setQuery(searchInput.trim());
   };
 
   const handleStatusFilter = (nextFilter) => {
+    setView("list");
     setPage(1);
     setStatusFilter(nextFilter);
   };
@@ -145,44 +164,56 @@ export default function HelpCenter() {
   }, [selectedQuestion, user]);
 
   return (
-    <div className="min-h-screen bg-gray-50/50 p-6 pb-24">
+    <div className="bg-gray-50/50 p-6 pb-8">
       <PageHeader>Q&A</PageHeader>
 
-      {user?.is_superuser && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+      <div className={`grid grid-cols-1 ${user?.is_superuser ? "md:grid-cols-3" : "md:grid-cols-2"} gap-4 mb-8`}>
+        <SummaryCard
+          icon={<MessageCircle size={22} />}
+          label="전체 질문"
+          value={stats.total}
+          active={statusFilter === "all"}
+          onClick={() => handleStatusFilter("all")}
+        />
+        {!user?.is_superuser && (
           <SummaryCard
-            icon={<MessageCircle size={22} />}
-            label="전체 질문"
-            value={stats.total}
-            active={statusFilter === "all"}
-            onClick={() => handleStatusFilter("all")}
+            icon={<PenTool size={22} />}
+            label="내 질문"
+            value={myQuestionCount}
+            color="blue"
+            active={statusFilter === "mine"}
+            onClick={() => handleStatusFilter("mine")}
           />
-          <SummaryCard
-            icon={<CheckCircle size={22} />}
-            label="답변 완료"
-            value={stats.answered}
-            color="green"
-            active={statusFilter === "answered"}
-            onClick={() => handleStatusFilter("answered")}
-          />
-          <SummaryCard
-            icon={<HelpCircle size={22} />}
-            label="답변 대기"
-            value={stats.pending}
-            color="orange"
-            active={statusFilter === "pending"}
-            onClick={() => handleStatusFilter("pending")}
-          />
-        </div>
-      )}
+        )}
+        {user?.is_superuser && (
+          <>
+            <SummaryCard
+              icon={<CheckCircle size={22} />}
+              label="답변 완료"
+              value={stats.answered}
+              color="green"
+              active={statusFilter === "answered"}
+              onClick={() => handleStatusFilter("answered")}
+            />
+            <SummaryCard
+              icon={<HelpCircle size={22} />}
+              label="답변 대기"
+              value={stats.pending}
+              color="orange"
+              active={statusFilter === "pending"}
+              onClick={() => handleStatusFilter("pending")}
+            />
+          </>
+        )}
+      </div>
 
-      <div className="page-box min-h-[680px] flex flex-col">
+      <div className="page-box flex flex-col">
         <div className="flex-1">
           {view === "list" && (
             <>
               <BoardToolbar
                 left={
-                  <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-0">
                     <input
                       className="input-base w-64"
                       placeholder="질문 검색"
@@ -304,9 +335,9 @@ function FAQListView({
             onClick={() => onSelect(question)}
             className="p-4 cursor-pointer hover:bg-gray-50"
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-0">
               {!question.is_public && <Lock size={12} />}
-              <span className="font-medium">{question.title}</span>
+              <span className="font-medium truncate">{question.title}</span>
               {Array.isArray(question.answers) &&
               question.answers.length > 0 ? (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-green-50 text-green-700">
@@ -317,10 +348,10 @@ function FAQListView({
                   답변 대기
                 </span>
               )}
-            </div>
-            <div className="text-xs text-gray-400 mt-1">
+              <div className="ml-auto text-xs text-gray-400 text-right whitespace-nowrap">
               {question.created_by_username || question.author_name} ·{" "}
               {toDateTime(question.created_at)}
+              </div>
             </div>
           </div>
         ))}
