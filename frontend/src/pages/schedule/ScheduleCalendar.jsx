@@ -394,6 +394,7 @@ export default function ScheduleCalendar({ scope, category }) {
               <Calendar
                 className="schedule-calendar-grid-lines w-full"
                 value={selectedDate}
+                activeStartDate={startOfMonth(currentDate)}
                 onChange={setSelectedDate}
                 tileItemsByDate={tileItemsByDate}
                 showTileItems={true}

@@ -638,6 +638,7 @@ export async function getKRHolidayMap(year, { forceRefresh = false } = {}) {
 export default function ReusableCalendar({
   value,
   onChange,
+  activeStartDate,
   countsByDate = {},
   tileItemsByDate = {},
   onMonthChange,
@@ -707,6 +708,7 @@ export default function ReusableCalendar({
     <Calendar
       className={`pmis-calendar ${className}`}
       value={selected}
+      activeStartDate={activeStartDate}
       onChange={handleChange}
       locale={locale}
       formatShortWeekday={(l, d) =>
