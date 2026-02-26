@@ -65,6 +65,7 @@ export default function HelpCenter() {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const loadList = useCallback(async () => {
     setLoading(true);
@@ -74,6 +75,7 @@ export default function HelpCenter() {
           page,
           page_size: PAGE_SIZE,
           search: query || undefined,
+          status: statusFilter === "all" ? undefined : statusFilter,
         }),
         getHelpStats(),
       ]);
@@ -91,7 +93,7 @@ export default function HelpCenter() {
     } finally {
       setLoading(false);
     }
-  }, [page, query]);
+  }, [page, query, statusFilter]);
 
   const loadDetail = useCallback(async (questionId) => {
     try {
@@ -110,6 +112,11 @@ export default function HelpCenter() {
   const onSearch = () => {
     setPage(1);
     setQuery(searchInput.trim());
+  };
+
+  const handleStatusFilter = (nextFilter) => {
+    setPage(1);
+    setStatusFilter(nextFilter);
   };
 
   const openDetail = async (question) => {
@@ -147,18 +154,24 @@ export default function HelpCenter() {
             icon={<MessageCircle size={22} />}
             label="전체 질문"
             value={stats.total}
+            active={statusFilter === "all"}
+            onClick={() => handleStatusFilter("all")}
           />
           <SummaryCard
             icon={<CheckCircle size={22} />}
             label="답변 완료"
             value={stats.answered}
             color="green"
+            active={statusFilter === "answered"}
+            onClick={() => handleStatusFilter("answered")}
           />
           <SummaryCard
             icon={<HelpCircle size={22} />}
             label="답변 대기"
             value={stats.pending}
             color="orange"
+            active={statusFilter === "pending"}
+            onClick={() => handleStatusFilter("pending")}
           />
         </div>
       )}
@@ -229,21 +242,42 @@ export default function HelpCenter() {
   );
 }
 
-const SummaryCard = ({ icon, label, value, color = "blue" }) => {
+const SummaryCard = ({
+  icon,
+  label,
+  value,
+  color = "blue",
+  active = false,
+  onClick,
+}) => {
   const colors = {
     blue: "bg-blue-50 text-blue-600",
     green: "bg-green-50 text-green-600",
     orange: "bg-orange-50 text-orange-600",
   };
 
+  const activeStyles = {
+    blue: "ring-blue-300 border-blue-300",
+    green: "ring-green-300 border-green-300",
+    orange: "ring-orange-300 border-orange-300",
+  };
+
   return (
-    <div className="bg-white p-5 rounded-xl border flex items-center gap-4">
+    <button
+      type="button"
+      onClick={onClick}
+      className={[
+        "w-full text-left bg-white p-5 rounded-xl border flex items-center gap-4 transition",
+        onClick ? "cursor-pointer hover:shadow-sm" : "",
+        active ? `ring-2 ${activeStyles[color] || activeStyles.blue}` : "",
+      ].join(" ")}
+    >
       <div className={`p-3 rounded-lg ${colors[color]}`}>{icon}</div>
       <div>
         <p className="text-xs text-gray-500 font-semibold">{label}</p>
         <p className="text-xl font-bold">{value}</p>
       </div>
-    </div>
+    </button>
   );
 };
 
@@ -286,7 +320,7 @@ function FAQListView({
             </div>
             <div className="text-xs text-gray-400 mt-1">
               {question.created_by_username || question.author_name} ·{" "}
-              {toDate(question.created_at)}
+              {toDateTime(question.created_at)}
             </div>
           </div>
         ))}
