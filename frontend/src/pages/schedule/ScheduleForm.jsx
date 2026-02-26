@@ -35,6 +35,7 @@ export default function ScheduleForm({
   initialDate = new Date(),
   companyId = null,
   defaultScope = "personal",
+  preferredCalendarId = null,
   onSaved,
   onClose,
   onEdit,
@@ -63,7 +64,11 @@ export default function ScheduleForm({
     end_time: initial?.end?.slice(11, 16) || "",
     is_all_day: initial?.is_all_day || false,
     memo: initial?.memo || "",
-    calendar: initial?.calendar ? String(initial.calendar) : "",
+    calendar: initial?.calendar
+      ? String(initial.calendar)
+      : preferredCalendarId
+      ? String(preferredCalendarId)
+      : "",
   });
 
   const loadUsers = useCallback(async () => {
@@ -171,7 +176,15 @@ export default function ScheduleForm({
         setForm((prev) => {
           if (initial?.calendar)
             return { ...prev, calendar: String(initial.calendar) };
-          if (prev.calendar) return prev;
+          if (preferredCalendarId) {
+            const preferredId = String(preferredCalendarId);
+            if (options.some((opt) => opt.id === preferredId)) {
+              return { ...prev, calendar: preferredId };
+            }
+          }
+          if (prev.calendar && options.some((opt) => opt.id === String(prev.calendar))) {
+            return prev;
+          }
           return { ...prev, calendar: headquartersOptionId };
         });
       } catch (err) {
@@ -181,12 +194,15 @@ export default function ScheduleForm({
         ]);
         setForm((prev) => {
           if (initial?.calendar) return prev;
+          if (preferredCalendarId) {
+            return { ...prev, calendar: String(preferredCalendarId) };
+          }
           if (prev.calendar) return prev;
           return { ...prev, calendar: HEADQUARTERS_FALLBACK_VALUE };
         });
       }
     })();
-  }, [initial?.calendar]);
+  }, [initial?.calendar, preferredCalendarId]);
 
   // 기존 참여자 설정 (수정 모드)
   useEffect(() => {

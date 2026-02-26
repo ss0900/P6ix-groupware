@@ -3,7 +3,11 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { Plus, Printer, Search, X } from "lucide-react";
-import { scheduleApi, calendarApi, getMyUserIdFromToken } from "../../api/schedule";
+import {
+  scheduleApi,
+  calendarApi,
+  getMyUserIdFromToken,
+} from "../../api/schedule";
 import api from "../../api/axios";
 import PageHeader from "../../components/common/ui/PageHeader";
 import Calendar, {
@@ -325,7 +329,7 @@ export default function ScheduleCalendar({ scope, category }) {
               className="flex items-center gap-2 px-3 py-1.5 bg-sky-500 text-white rounded hover:bg-sky-600"
             >
               <Plus size={16} />
-              일정 쓰기
+              일정 추가
             </button>
             <button
               onClick={goToThisWeek}
@@ -400,7 +404,9 @@ export default function ScheduleCalendar({ scope, category }) {
                     : "";
                   const startDate = item?.start ? new Date(item.start) : null;
                   const timePrefix =
-                    startDate && !Number.isNaN(startDate.getTime()) && item?.is_all_day !== true
+                    startDate &&
+                    !Number.isNaN(startDate.getTime()) &&
+                    item?.is_all_day !== true
                       ? `${format(startDate, "HH:mm")} `
                       : "";
                   const title = item?.title || "(제목 없음)";
@@ -408,7 +414,10 @@ export default function ScheduleCalendar({ scope, category }) {
                 }}
                 onTileItemClick={(item) => openView(item)}
                 formatDayLabel={(date, dayLabel, holidayLabels = []) => {
-                  if (!Array.isArray(holidayLabels) || holidayLabels.length === 0) {
+                  if (
+                    !Array.isArray(holidayLabels) ||
+                    holidayLabels.length === 0
+                  ) {
                     return dayLabel;
                   }
                   const dayHolidayGap = String.fromCharCode(160).repeat(3);
@@ -430,7 +439,9 @@ export default function ScheduleCalendar({ scope, category }) {
             className="absolute inset-0 bg-black bg-opacity-30"
             onClick={closePanel}
           />
-          <div className={`relative w-full ${panelWidthClass} bg-white shadow-xl overflow-y-auto`}>
+          <div
+            className={`relative w-full ${panelWidthClass} bg-white shadow-xl overflow-y-auto`}
+          >
             <div className="p-6">
               {panelMode === "create" && (
                 <ScheduleForm
@@ -438,6 +449,9 @@ export default function ScheduleCalendar({ scope, category }) {
                   initialDate={selectedDate}
                   companyId={companyId}
                   defaultScope={defaultScope}
+                  preferredCalendarId={
+                    calendarId && calendarId !== "custom" ? calendarId : null
+                  }
                   onSaved={() => {
                     fetchSchedules();
                     closePanel();
@@ -451,8 +465,12 @@ export default function ScheduleCalendar({ scope, category }) {
                   initial={activeItem}
                   companyId={companyId}
                   onClose={closePanel}
-                  onEdit={canManageActiveItem ? () => openEdit(activeItem) : undefined}
-                  onDelete={canManageActiveItem ? handleDeleteFromView : undefined}
+                  onEdit={
+                    canManageActiveItem ? () => openEdit(activeItem) : undefined
+                  }
+                  onDelete={
+                    canManageActiveItem ? handleDeleteFromView : undefined
+                  }
                   deleting={deleting}
                 />
               )}
