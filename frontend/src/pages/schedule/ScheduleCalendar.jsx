@@ -163,8 +163,8 @@ const CALENDAR_DAY_DIVIDER_CSS = `
 }
 
 .pmis-calendar.schedule-week-calendar-view .react-calendar__tile {
-  min-height: 180px;
-  height: 180px;
+  min-height: 140px;
+  height: 530px;
 }
 
 .pmis-calendar.schedule-week-calendar {
