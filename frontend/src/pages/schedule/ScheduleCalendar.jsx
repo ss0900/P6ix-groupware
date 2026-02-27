@@ -366,13 +366,13 @@ export default function ScheduleCalendar({ scope, category }) {
     try {
       const start = format(
         dateRangeMode === "thisWeek"
-          ? startOfWeek(currentDate, { weekStartsOn: 1 })
+          ? startOfWeek(currentDate, { weekStartsOn: 0 })
           : startOfMonth(currentDate),
         "yyyy-MM-dd",
       );
       const end = format(
         dateRangeMode === "thisWeek"
-          ? endOfWeek(currentDate, { weekStartsOn: 1 })
+          ? endOfWeek(currentDate, { weekStartsOn: 0 })
           : endOfMonth(currentDate),
         "yyyy-MM-dd",
       );
@@ -429,11 +429,11 @@ export default function ScheduleCalendar({ scope, category }) {
   }, [schedules]);
 
   const weekStartDate = useMemo(
-    () => startOfWeek(currentDate, { weekStartsOn: 1 }),
+    () => startOfWeek(currentDate, { weekStartsOn: 0 }),
     [currentDate],
   );
   const weekEndDate = useMemo(
-    () => endOfWeek(currentDate, { weekStartsOn: 1 }),
+    () => endOfWeek(currentDate, { weekStartsOn: 0 }),
     [currentDate],
   );
   const weekDates = useMemo(
