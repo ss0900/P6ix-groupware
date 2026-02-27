@@ -233,7 +233,9 @@ const CALENDAR_DAY_DIVIDER_CSS = `
 }
 
 .pmis-calendar.schedule-week-calendar .schedule-week-cell.is-today:not(.is-selected) {
+  background: transparent !important;
   border: 1.5px solid #3b82f6;
+  border-radius: 8px;
   position: relative;
   z-index: 2;
 }
@@ -606,7 +608,7 @@ export default function ScheduleCalendar({ scope, category }) {
               }
               className="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50"
             >
-              {dateRangeMode === "thisWeek" ? "전체달력" : "금주일정"}
+              {dateRangeMode === "thisWeek" ? "전체일정" : "금주일정"}
             </button>
             <button
               onClick={goToToday}
