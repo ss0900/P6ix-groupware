@@ -213,21 +213,6 @@ const CALENDAR_DAY_DIVIDER_CSS = `
   height: auto;
 }
 
-.pmis-calendar.schedule-today-calendar-view .react-calendar__tile--active {
-  background: transparent !important;
-  color: inherit !important;
-  border: 1.5px solid #3b82f6 !important;
-  border-radius: 8px;
-  box-shadow: none !important;
-}
-
-.pmis-calendar.schedule-today-calendar-view .react-calendar__tile--active .pmis-tile-item,
-.pmis-calendar.schedule-today-calendar-view .react-calendar__tile--active .pmis-tile-item .pmis-tile-item__label {
-  background: #f8fafc;
-  border-color: #dbe3f0;
-  color: #111827 !important;
-}
-
 .pmis-calendar.schedule-week-calendar {
   background-color: #ffffff !important;
 }
