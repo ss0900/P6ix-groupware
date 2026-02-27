@@ -725,7 +725,7 @@ export default function ScheduleCalendar({ scope, category }) {
                   onChange={setSelectedDate}
                   tileItemsByDate={tileItemsByDate}
                   showTileItems={true}
-                  maxTileItems={3}
+                  maxTileItems={4}
                   getTileItemLabel={getScheduleLabel}
                   onTileItemClick={(item) => openView(item)}
                   getTileClassName={({ date, view }) => {
@@ -750,7 +750,7 @@ export default function ScheduleCalendar({ scope, category }) {
                   onChange={setSelectedDate}
                   tileItemsByDate={tileItemsByDate}
                   showTileItems={true}
-                  maxTileItems={3}
+                  maxTileItems={4}
                   getTileItemLabel={getScheduleLabel}
                   onTileItemClick={(item) => openView(item)}
                   formatDayLabel={(date, dayLabel, holidayLabels = []) => {
