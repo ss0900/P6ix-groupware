@@ -423,7 +423,7 @@ const CALENDAR_DAY_DIVIDER_CSS = `
 .schedule-today-layout {
   display: flex;
   gap: 16px;
-  align-items: flex-start;
+  align-items: center;
 }
 
 .schedule-today-calendar-pane {
@@ -440,6 +440,7 @@ const CALENDAR_DAY_DIVIDER_CSS = `
 @media (max-width: 1024px) {
   .schedule-today-layout {
     flex-direction: column;
+    align-items: stretch;
   }
 
   .schedule-today-calendar-pane {
