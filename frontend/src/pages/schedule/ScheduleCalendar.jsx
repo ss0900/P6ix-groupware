@@ -804,7 +804,12 @@ export default function ScheduleCalendar({ scope, category }) {
                 />
               </div>
             ) : dateRangeMode === "today" ? (
-              <div className="w-full">
+              <div className="pmis-calendar schedule-week-calendar w-full">
+                <div className="react-calendar__navigation">
+                  <div className="react-calendar__navigation__label text-sm font-semibold text-gray-700">
+                    {format(currentDate, "yyyy년 M월 d일")}
+                  </div>
+                </div>
                 <Calendar
                   className={`schedule-calendar-grid-lines schedule-today-calendar-view schedule-today-dow-${currentDate.getDay()} w-full`}
                   calendarType="gregory"
