@@ -234,6 +234,10 @@ const CALENDAR_DAY_DIVIDER_CSS = `
 }
 
 .pmis-calendar.schedule-week-calendar .schedule-week-cell:hover:not(.is-selected) {
+  background-color: #e6e6e6;
+}
+
+.pmis-calendar.schedule-week-calendar .schedule-week-cell.is-today:not(.is-selected):hover {
   background: rgba(59, 130, 246, 0.05);
 }
 
