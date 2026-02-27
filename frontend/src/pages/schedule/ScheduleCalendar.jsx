@@ -230,6 +230,11 @@ const CALENDAR_DAY_DIVIDER_CSS = `
   box-sizing: border-box;
   padding: 4px 2px;
   cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.pmis-calendar.schedule-week-calendar .schedule-week-cell:hover:not(.is-selected) {
+  background: rgba(59, 130, 246, 0.05);
 }
 
 .pmis-calendar.schedule-week-calendar .schedule-week-cell.is-today:not(.is-selected) {
@@ -247,6 +252,10 @@ const CALENDAR_DAY_DIVIDER_CSS = `
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.pmis-calendar.schedule-week-calendar .schedule-week-cell.is-selected:hover {
+  background: #1d4ed8;
 }
 
 .pmis-calendar.schedule-week-calendar .schedule-week-cell.is-selected .schedule-week-day-button,
