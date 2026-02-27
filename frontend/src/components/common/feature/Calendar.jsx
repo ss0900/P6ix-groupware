@@ -650,6 +650,7 @@ export default function ReusableCalendar({
   maxTileItems = 3,
   getTileItemLabel = (item) => item?.title || "",
   onTileItemClick,
+  getTileClassName,
   formatDayLabel,
   showHolidayLabels = true,
   holidayMap: holidayMapProp,
@@ -742,6 +743,10 @@ export default function ReusableCalendar({
         const dow = date.getDay();
         if (dow === 0) cls.push("is-sunday");
         if (dow === 6) cls.push("is-saturday");
+        if (typeof getTileClassName === "function") {
+          const extra = getTileClassName({ date, view });
+          if (extra) cls.push(extra);
+        }
         return cls.join(" ");
       }}
       tileContent={({ date, view }) => {

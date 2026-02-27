@@ -154,6 +154,19 @@ const CALENDAR_DAY_DIVIDER_CSS = `
   min-height: 0;
 }
 
+.pmis-calendar.schedule-week-calendar-view .react-calendar__navigation {
+  display: none;
+}
+
+.pmis-calendar.schedule-week-calendar-view .react-calendar__month-view__days__day.is-outside-week {
+  display: none;
+}
+
+.pmis-calendar.schedule-week-calendar-view .react-calendar__tile {
+  min-height: 180px;
+  height: 180px;
+}
+
 .pmis-calendar.schedule-week-calendar {
   background-color: #ffffff !important;
 }
@@ -495,6 +508,10 @@ export default function ScheduleCalendar({ scope, category }) {
     () => eachDayOfInterval({ start: weekStartDate, end: weekEndDate }),
     [weekStartDate, weekEndDate],
   );
+  const weekDateSet = useMemo(
+    () => new Set(weekDates.map((date) => format(date, "yyyy-MM-dd"))),
+    [weekDates],
+  );
 
   const getScheduleLabel = useCallback((item) => {
     const calendarPrefix = item?.calendar_name
@@ -595,13 +612,6 @@ export default function ScheduleCalendar({ scope, category }) {
       (ownerId) => ownerId != null && String(ownerId) === String(myUserId),
     );
   }, [activeItem, myUserId]);
-
-  const selectedDateYmd = format(selectedDate, "yyyy-MM-dd");
-  const todayYmd = format(new Date(), "yyyy-MM-dd");
-  const weekdayFormatter = useMemo(
-    () => new Intl.DateTimeFormat("ko-KR", { weekday: "short" }),
-    [],
-  );
 
   return (
     <div className="flex-1 flex flex-col h-full">
@@ -707,86 +717,26 @@ export default function ScheduleCalendar({ scope, category }) {
                   </button>
                 </div>
 
-                <div className="schedule-week-board">
-                  <div className="schedule-week-weekdays">
-                    {weekDates.map((date) => {
-                      const ymd = format(date, "yyyy-MM-dd");
-                      const dow = date.getDay();
-                      const dayStyleClass =
-                        dow === 0
-                          ? "is-sunday"
-                          : dow === 6
-                            ? "is-saturday"
-                            : "";
-
-                      return (
-                        <div
-                          key={`weekday-${ymd}`}
-                          className={`schedule-week-weekday ${dayStyleClass}`}
-                        >
-                          {weekdayFormatter.format(date)}
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  <div className="schedule-week-grid">
-                    {weekDates.map((date) => {
-                      const ymd = format(date, "yyyy-MM-dd");
-                      const dayItems = tileItemsByDate[ymd] || [];
-                      const dow = date.getDay();
-                      const isSelected = ymd === selectedDateYmd;
-                      const isToday = ymd === todayYmd;
-                      const isNeighboringMonth =
-                        date.getMonth() !== currentDate.getMonth();
-                      const dayStyleClass =
-                        dow === 0
-                          ? "is-sunday"
-                          : dow === 6
-                            ? "is-saturday"
-                            : "text-gray-800";
-
-                      return (
-                        <div
-                          key={ymd}
-                          className={`schedule-week-cell${isToday ? " is-today" : ""}${isSelected ? " is-selected" : ""}`}
-                          onClick={() => setSelectedDate(date)}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => setSelectedDate(date)}
-                            className={`schedule-week-day-button ${dayStyleClass}${isNeighboringMonth ? " is-neighboring-month" : ""}${isSelected ? " is-selected" : ""}`}
-                          >
-                            {format(date, "d")}
-                          </button>
-                          <div className="pmis-tile-items">
-                            {dayItems.slice(0, 5).map((item, idx) => (
-                              <button
-                                type="button"
-                                key={item?.id || `${ymd}-item-${idx}`}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  openView(item);
-                                }}
-                                className="pmis-tile-item is-clickable"
-                                title={getScheduleLabel(item)}
-                              >
-                                <span className="pmis-tile-item__label">
-                                  {getScheduleLabel(item)}
-                                </span>
-                              </button>
-                            ))}
-                            {dayItems.length > 5 && (
-                              <div className="schedule-week-overflow-count">
-                                +{dayItems.length - 5}개 더 있음
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
+                <Calendar
+                  className="schedule-calendar-grid-lines schedule-week-calendar-view w-full"
+                  calendarType="gregory"
+                  value={selectedDate}
+                  activeStartDate={startOfMonth(currentDate)}
+                  onChange={setSelectedDate}
+                  tileItemsByDate={tileItemsByDate}
+                  showTileItems={true}
+                  maxTileItems={3}
+                  getTileItemLabel={getScheduleLabel}
+                  onTileItemClick={(item) => openView(item)}
+                  getTileClassName={({ date, view }) => {
+                    if (view !== "month") return "";
+                    const ymd = format(date, "yyyy-MM-dd");
+                    return weekDateSet.has(ymd) ? "is-current-week" : "is-outside-week";
+                  }}
+                  holidayMap={holidayMap}
+                  showCounts={false}
+                  showHolidayLabels={false}
+                />
               </div>
             ) : (
               <div className="w-full">
