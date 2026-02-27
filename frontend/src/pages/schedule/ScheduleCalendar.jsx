@@ -167,6 +167,49 @@ const CALENDAR_DAY_DIVIDER_CSS = `
   height: auto;
 }
 
+.pmis-calendar.schedule-today-calendar-view .react-calendar__navigation {
+  display: none !important;
+}
+
+.pmis-calendar.schedule-today-calendar-view .react-calendar__month-view__weekdays {
+  display: none;
+}
+
+.pmis-calendar.schedule-today-calendar-view .react-calendar__month-view__days {
+  display: block;
+  border: none;
+}
+
+.pmis-calendar.schedule-today-calendar-view .react-calendar__month-view__days__day.is-outside-today {
+  display: none;
+}
+
+.pmis-calendar.schedule-today-calendar-view .react-calendar__month-view__days__day.is-today-only {
+  width: 100% !important;
+  max-width: none !important;
+  flex: 1 0 100% !important;
+}
+
+.pmis-calendar.schedule-today-calendar-view .react-calendar__tile {
+  min-height: 180px;
+  height: auto;
+}
+
+.pmis-calendar.schedule-today-calendar-view .react-calendar__tile--active {
+  background: transparent !important;
+  color: inherit !important;
+  border: 1.5px solid #3b82f6 !important;
+  border-radius: 8px;
+  box-shadow: none !important;
+}
+
+.pmis-calendar.schedule-today-calendar-view .react-calendar__tile--active .pmis-tile-item,
+.pmis-calendar.schedule-today-calendar-view .react-calendar__tile--active .pmis-tile-item .pmis-tile-item__label {
+  background: #f8fafc;
+  border-color: #dbe3f0;
+  color: #111827 !important;
+}
+
 .pmis-calendar.schedule-week-calendar {
   background-color: #ffffff !important;
 }
@@ -432,16 +475,25 @@ export default function ScheduleCalendar({ scope, category }) {
   const fetchSchedules = useCallback(async () => {
     setLoading(true);
     try {
-      const start = format(
+      const rangeStartDate =
         dateRangeMode === "thisWeek"
           ? startOfWeek(currentDate, { weekStartsOn: 0 })
-          : startOfMonth(currentDate),
+          : dateRangeMode === "today"
+            ? currentDate
+            : startOfMonth(currentDate);
+      const rangeEndDate =
+        dateRangeMode === "thisWeek"
+          ? endOfWeek(currentDate, { weekStartsOn: 0 })
+          : dateRangeMode === "today"
+            ? currentDate
+            : endOfMonth(currentDate);
+
+      const start = format(
+        rangeStartDate,
         "yyyy-MM-dd",
       );
       const end = format(
-        dateRangeMode === "thisWeek"
-          ? endOfWeek(currentDate, { weekStartsOn: 0 })
-          : endOfMonth(currentDate),
+        rangeEndDate,
         "yyyy-MM-dd",
       );
 
@@ -530,7 +582,7 @@ export default function ScheduleCalendar({ scope, category }) {
 
   const goToToday = () => {
     const today = new Date();
-    setDateRangeMode("month");
+    setDateRangeMode("today");
     setSelectedDate(today);
     setCurrentDate(today);
   };
@@ -734,6 +786,30 @@ export default function ScheduleCalendar({ scope, category }) {
                     return weekDateSet.has(ymd)
                       ? "is-current-week"
                       : "is-outside-week";
+                  }}
+                  holidayMap={holidayMap}
+                  showCounts={false}
+                  showHolidayLabels={false}
+                />
+              </div>
+            ) : dateRangeMode === "today" ? (
+              <div className="w-full">
+                <Calendar
+                  className="schedule-calendar-grid-lines schedule-today-calendar-view w-full"
+                  calendarType="gregory"
+                  value={selectedDate}
+                  activeStartDate={startOfMonth(currentDate)}
+                  onChange={setSelectedDate}
+                  tileItemsByDate={tileItemsByDate}
+                  showTileItems={true}
+                  maxTileItems={Number.MAX_SAFE_INTEGER}
+                  getTileItemLabel={getScheduleLabel}
+                  onTileItemClick={(item) => openView(item)}
+                  getTileClassName={({ date, view }) => {
+                    if (view !== "month") return "";
+                    const ymd = format(date, "yyyy-MM-dd");
+                    const todayYmd = format(currentDate, "yyyy-MM-dd");
+                    return ymd === todayYmd ? "is-today-only" : "is-outside-today";
                   }}
                   holidayMap={holidayMap}
                   showCounts={false}
