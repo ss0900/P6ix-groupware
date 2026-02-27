@@ -157,13 +157,42 @@ const CALENDAR_DAY_DIVIDER_CSS = `
   text-align: center;
 }
 
-.pmis-calendar.schedule-week-calendar .schedule-week-grid {
+.pmis-calendar.schedule-week-calendar .schedule-week-board {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.pmis-calendar.schedule-week-calendar .schedule-week-weekdays {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   border-top: 1px solid #e5e7eb;
   border-left: 1px solid #e5e7eb;
-  border-radius: 8px;
-  overflow: hidden;
+}
+
+.pmis-calendar.schedule-week-calendar .schedule-week-weekday {
+  padding: 8px 0;
+  text-align: center;
+  border-right: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e5e7eb;
+  box-sizing: border-box;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.pmis-calendar.schedule-week-calendar .schedule-week-weekday.is-sunday,
+.pmis-calendar.schedule-week-calendar .schedule-week-weekday.is-sunday * {
+  color: #ef4444;
+}
+
+.pmis-calendar.schedule-week-calendar .schedule-week-weekday.is-saturday,
+.pmis-calendar.schedule-week-calendar .schedule-week-weekday.is-saturday * {
+  color: #3b82f6;
+}
+
+.pmis-calendar.schedule-week-calendar .schedule-week-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  border-left: 1px solid #e5e7eb;
 }
 
 .pmis-calendar.schedule-week-calendar .schedule-week-cell {
@@ -200,6 +229,20 @@ const CALENDAR_DAY_DIVIDER_CSS = `
 .pmis-calendar.schedule-week-calendar .schedule-week-day-button.is-saturday,
 .pmis-calendar.schedule-week-calendar .schedule-week-day-button.is-saturday * {
   color: #3b82f6;
+}
+
+.pmis-calendar.schedule-week-calendar .schedule-week-day-button.is-neighboring-month {
+  color: #9ca3af;
+}
+
+.pmis-calendar.schedule-week-calendar .schedule-week-day-button.is-neighboring-month.is-sunday,
+.pmis-calendar.schedule-week-calendar .schedule-week-day-button.is-neighboring-month.is-sunday * {
+  color: #fca5a5;
+}
+
+.pmis-calendar.schedule-week-calendar .schedule-week-day-button.is-neighboring-month.is-saturday,
+.pmis-calendar.schedule-week-calendar .schedule-week-day-button.is-neighboring-month.is-saturday * {
+  color: #bfdbfe;
 }
 
 .pmis-calendar.schedule-week-calendar .schedule-week-day-button.is-selected {
@@ -468,6 +511,10 @@ export default function ScheduleCalendar({ scope, category }) {
 
   const selectedDateYmd = format(selectedDate, "yyyy-MM-dd");
   const todayYmd = format(new Date(), "yyyy-MM-dd");
+  const weekdayFormatter = useMemo(
+    () => new Intl.DateTimeFormat("ko-KR", { weekday: "short" }),
+    [],
+  );
 
   return (
     <div className="flex-1 flex flex-col h-full">
@@ -570,20 +617,40 @@ export default function ScheduleCalendar({ scope, category }) {
                   </button>
                 </div>
 
-                <div className="schedule-week-grid">
-                  {weekDates.map((date) => {
+                <div className="schedule-week-board">
+                  <div className="schedule-week-weekdays">
+                    {weekDates.map((date) => {
+                      const ymd = format(date, "yyyy-MM-dd");
+                      const dow = date.getDay();
+                      const dayStyleClass =
+                        dow === 0 ? "is-sunday" : dow === 6 ? "is-saturday" : "";
+
+                      return (
+                        <div
+                          key={`weekday-${ymd}`}
+                          className={`schedule-week-weekday ${dayStyleClass}`}
+                        >
+                          {weekdayFormatter.format(date)}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="schedule-week-grid">
+                    {weekDates.map((date) => {
                     const ymd = format(date, "yyyy-MM-dd");
                     const dayItems = tileItemsByDate[ymd] || [];
                     const dow = date.getDay();
                     const isSelected = ymd === selectedDateYmd;
                     const isToday = ymd === todayYmd;
+                    const isNeighboringMonth =
+                      date.getMonth() !== currentDate.getMonth();
                     const dayStyleClass =
                       dow === 0
                         ? "is-sunday"
                         : dow === 6
                           ? "is-saturday"
                           : "text-gray-800";
-                    const dayLabel = ["일", "월", "화", "수", "목", "금", "토"][dow];
 
                     return (
                       <div
@@ -593,9 +660,9 @@ export default function ScheduleCalendar({ scope, category }) {
                         <button
                           type="button"
                           onClick={() => setSelectedDate(date)}
-                          className={`schedule-week-day-button ${dayStyleClass}${isSelected ? " is-selected" : ""}`}
+                          className={`schedule-week-day-button ${dayStyleClass}${isNeighboringMonth ? " is-neighboring-month" : ""}${isSelected ? " is-selected" : ""}`}
                         >
-                          {dayLabel} {format(date, "d")}
+                          {format(date, "d")}
                         </button>
                         <div className="pmis-tile-items">
                           {dayItems.slice(0, 5).map((item, idx) => (
@@ -621,6 +688,7 @@ export default function ScheduleCalendar({ scope, category }) {
                     );
                   })}
                 </div>
+              </div>
               </div>
             ) : (
               <div className="w-full">
