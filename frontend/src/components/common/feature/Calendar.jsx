@@ -644,6 +644,7 @@ export default function ReusableCalendar({
   onMonthChange,
   className = "",
   locale = "ko-KR",
+  calendarType = "iso8601",
   showCounts = true,
   showTileItems = false,
   maxTileItems = 3,
@@ -711,6 +712,7 @@ export default function ReusableCalendar({
       activeStartDate={activeStartDate}
       onChange={handleChange}
       locale={locale}
+      calendarType={calendarType}
       formatShortWeekday={(l, d) =>
         ["일", "월", "화", "수", "목", "금", "토"][d.getDay()]
       }

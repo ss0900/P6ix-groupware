@@ -414,10 +414,14 @@ export default function ScheduleCalendar({ scope, category }) {
   );
 
   const getScheduleLabel = useCallback((item) => {
-    const calendarPrefix = item?.calendar_name ? `[${item.calendar_name}] ` : "";
+    const calendarPrefix = item?.calendar_name
+      ? `[${item.calendar_name}] `
+      : "";
     const startDate = item?.start ? new Date(item.start) : null;
     const timePrefix =
-      startDate && !Number.isNaN(startDate.getTime()) && item?.is_all_day !== true
+      startDate &&
+      !Number.isNaN(startDate.getTime()) &&
+      item?.is_all_day !== true
         ? `${format(startDate, "HH:mm")} `
         : "";
     const title = item?.title || "(제목 없음)";
@@ -529,7 +533,9 @@ export default function ScheduleCalendar({ scope, category }) {
               일정 추가
             </button>
             <button
-              onClick={dateRangeMode === "thisWeek" ? goToMonthCalendar : goToThisWeek}
+              onClick={
+                dateRangeMode === "thisWeek" ? goToMonthCalendar : goToThisWeek
+              }
               className="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50"
             >
               {dateRangeMode === "thisWeek" ? "전체달력" : "금주일정"}
@@ -602,7 +608,8 @@ export default function ScheduleCalendar({ scope, category }) {
                     ‹
                   </button>
                   <div className="react-calendar__navigation__label text-sm font-semibold text-gray-700">
-                    {format(weekStartDate, "yyyy년 M월 d일")} ~ {format(weekEndDate, "M월 d일")}
+                    {format(weekStartDate, "yyyy년 M월 d일")} ~{" "}
+                    {format(weekEndDate, "M월 d일")}
                   </div>
                   <button
                     type="button"
@@ -623,7 +630,11 @@ export default function ScheduleCalendar({ scope, category }) {
                       const ymd = format(date, "yyyy-MM-dd");
                       const dow = date.getDay();
                       const dayStyleClass =
-                        dow === 0 ? "is-sunday" : dow === 6 ? "is-saturday" : "";
+                        dow === 0
+                          ? "is-sunday"
+                          : dow === 6
+                            ? "is-saturday"
+                            : "";
 
                       return (
                         <div
@@ -638,62 +649,63 @@ export default function ScheduleCalendar({ scope, category }) {
 
                   <div className="schedule-week-grid">
                     {weekDates.map((date) => {
-                    const ymd = format(date, "yyyy-MM-dd");
-                    const dayItems = tileItemsByDate[ymd] || [];
-                    const dow = date.getDay();
-                    const isSelected = ymd === selectedDateYmd;
-                    const isToday = ymd === todayYmd;
-                    const isNeighboringMonth =
-                      date.getMonth() !== currentDate.getMonth();
-                    const dayStyleClass =
-                      dow === 0
-                        ? "is-sunday"
-                        : dow === 6
-                          ? "is-saturday"
-                          : "text-gray-800";
+                      const ymd = format(date, "yyyy-MM-dd");
+                      const dayItems = tileItemsByDate[ymd] || [];
+                      const dow = date.getDay();
+                      const isSelected = ymd === selectedDateYmd;
+                      const isToday = ymd === todayYmd;
+                      const isNeighboringMonth =
+                        date.getMonth() !== currentDate.getMonth();
+                      const dayStyleClass =
+                        dow === 0
+                          ? "is-sunday"
+                          : dow === 6
+                            ? "is-saturday"
+                            : "text-gray-800";
 
-                    return (
-                      <div
-                        key={ymd}
-                        className={`schedule-week-cell${isToday ? " is-today" : ""}`}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => setSelectedDate(date)}
-                          className={`schedule-week-day-button ${dayStyleClass}${isNeighboringMonth ? " is-neighboring-month" : ""}${isSelected ? " is-selected" : ""}`}
+                      return (
+                        <div
+                          key={ymd}
+                          className={`schedule-week-cell${isToday ? " is-today" : ""}`}
                         >
-                          {format(date, "d")}
-                        </button>
-                        <div className="pmis-tile-items">
-                          {dayItems.slice(0, 5).map((item, idx) => (
-                            <button
-                              type="button"
-                              key={item?.id || `${ymd}-item-${idx}`}
-                              onClick={() => openView(item)}
-                              className="pmis-tile-item is-clickable"
-                              title={getScheduleLabel(item)}
-                            >
-                              <span className="pmis-tile-item__label">
-                                {getScheduleLabel(item)}
-                              </span>
-                            </button>
-                          ))}
-                          {dayItems.length > 5 && (
-                            <div className="schedule-week-overflow-count">
-                              +{dayItems.length - 5}개 더 있음
-                            </div>
-                          )}
+                          <button
+                            type="button"
+                            onClick={() => setSelectedDate(date)}
+                            className={`schedule-week-day-button ${dayStyleClass}${isNeighboringMonth ? " is-neighboring-month" : ""}${isSelected ? " is-selected" : ""}`}
+                          >
+                            {format(date, "d")}
+                          </button>
+                          <div className="pmis-tile-items">
+                            {dayItems.slice(0, 5).map((item, idx) => (
+                              <button
+                                type="button"
+                                key={item?.id || `${ymd}-item-${idx}`}
+                                onClick={() => openView(item)}
+                                className="pmis-tile-item is-clickable"
+                                title={getScheduleLabel(item)}
+                              >
+                                <span className="pmis-tile-item__label">
+                                  {getScheduleLabel(item)}
+                                </span>
+                              </button>
+                            ))}
+                            {dayItems.length > 5 && (
+                              <div className="schedule-week-overflow-count">
+                                +{dayItems.length - 5}개 더 있음
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
               </div>
             ) : (
               <div className="w-full">
                 <Calendar
                   className="schedule-calendar-grid-lines w-full"
+                  calendarType="gregory"
                   value={selectedDate}
                   activeStartDate={startOfMonth(currentDate)}
                   onChange={setSelectedDate}
