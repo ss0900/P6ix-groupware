@@ -131,6 +131,33 @@ class ScheduleCreateSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id"]
 
+    def _ensure_owner_participant_ids(self, participant_ids, owner_id=None):
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+
+        normalized_ids = []
+        seen = set()
+
+        for user_id in participant_ids or []:
+            if user_id is None:
+                continue
+            key = str(user_id)
+            if key in seen:
+                continue
+            seen.add(key)
+            normalized_ids.append(user_id)
+
+        resolved_owner_id = owner_id
+        if resolved_owner_id is None and user is not None and getattr(user, "is_authenticated", False):
+            resolved_owner_id = user.id
+
+        if resolved_owner_id is not None:
+            owner_key = str(resolved_owner_id)
+            if owner_key not in seen:
+                normalized_ids.append(resolved_owner_id)
+
+        return normalized_ids
+
     def _get_default_headquarters_calendar(self, validated_data, instance=None):
         if validated_data.get("calendar"):
             return validated_data.get("calendar")
@@ -165,7 +192,12 @@ class ScheduleCreateSerializer(serializers.ModelSerializer):
         return qs.order_by("order", "id").first()
 
     def create(self, validated_data):
-        participant_ids = validated_data.pop("participant_ids", [])
+        owner = validated_data.get("owner")
+        owner_id = getattr(owner, "id", owner)
+        participant_ids = self._ensure_owner_participant_ids(
+            validated_data.pop("participant_ids", []),
+            owner_id=owner_id,
+        )
         if not validated_data.get("calendar"):
             default_calendar = self._get_default_headquarters_calendar(validated_data)
             if default_calendar:
@@ -173,13 +205,12 @@ class ScheduleCreateSerializer(serializers.ModelSerializer):
         schedule = Schedule.objects.create(**validated_data)
 
         # 참여자 추가
-        if participant_ids:
-            schedule.participants.set(participant_ids)
-            # 참석 응답 레코드 생성
-            for user_id in participant_ids:
-                ScheduleAttendee.objects.get_or_create(
-                    schedule=schedule, user_id=user_id
-                )
+        schedule.participants.set(participant_ids)
+        # 참석 응답 레코드 생성
+        for user_id in participant_ids:
+            ScheduleAttendee.objects.get_or_create(
+                schedule=schedule, user_id=user_id
+            )
 
         return schedule
 
@@ -198,6 +229,10 @@ class ScheduleCreateSerializer(serializers.ModelSerializer):
 
         # 참여자 업데이트
         if participant_ids is not None:
+            participant_ids = self._ensure_owner_participant_ids(
+                participant_ids,
+                owner_id=getattr(getattr(instance, "owner", None), "id", None),
+            )
             instance.participants.set(participant_ids)
             # 기존 응답 중 제외된 참석자 삭제
             instance.attendee_responses.exclude(user_id__in=participant_ids).delete()

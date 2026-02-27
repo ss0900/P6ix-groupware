@@ -71,6 +71,28 @@ export default function ScheduleForm({
       : "",
   });
 
+  const ensureSelfParticipant = useCallback(
+    (ids = []) => {
+      const normalizedIds = Array.isArray(ids) ? ids : [];
+      const nextIds = [];
+      const seen = new Set();
+
+      const pushId = (idValue) => {
+        if (idValue == null || idValue === "") return;
+        const key = String(idValue);
+        if (seen.has(key)) return;
+        seen.add(key);
+        nextIds.push(idValue);
+      };
+
+      normalizedIds.forEach(pushId);
+      if (user?.id != null) pushId(user.id);
+
+      return nextIds;
+    },
+    [user?.id],
+  );
+
   const loadUsers = useCallback(async () => {
     try {
       const res = await api.get("core/users/", {
@@ -207,9 +229,11 @@ export default function ScheduleForm({
   // 기존 참여자 설정 (수정 모드)
   useEffect(() => {
     if (initial?.participants) {
-      setParticipantIds(initial.participants.map((p) => p.id));
+      setParticipantIds(
+        ensureSelfParticipant(initial.participants.map((p) => p.id)),
+      );
     }
-  }, [initial]);
+  }, [initial, ensureSelfParticipant]);
 
   const onChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -220,26 +244,24 @@ export default function ScheduleForm({
   };
 
   useEffect(() => {
-    if (!user) return;
-    setParticipantIds((prev) =>
-      prev.filter((idValue) => {
-        const targetUser = users.find((u) => String(u.id) === String(idValue));
-        const isCurrentById =
-          user.id != null && String(idValue) === String(user.id);
-        const isCurrentByUsername =
-          Boolean(user.username) && targetUser?.username === user.username;
-        return !(isCurrentById || isCurrentByUsername);
-      }),
-    );
-  }, [user, users]);
+    if (form.scope !== "company") return;
+    if (user?.id == null) return;
+    setParticipantIds((prev) => ensureSelfParticipant(prev));
+  }, [form.scope, user?.id, ensureSelfParticipant]);
 
   const removeParticipant = (userId) => {
+    if (user?.id != null && String(userId) === String(user.id)) return;
     setParticipantIds((prev) => prev.filter((idValue) => idValue !== userId));
   };
 
   const getParticipantName = (userId) => {
     const targetUser = users.find((u) => String(u.id) === String(userId));
-    if (!targetUser) return `사용자 ${userId}`;
+    if (!targetUser) {
+      if (user?.id != null && String(userId) === String(user.id)) {
+        return getUserDisplayName(user);
+      }
+      return `사용자 ${userId}`;
+    }
     return getUserDisplayName(targetUser);
   };
 
@@ -278,7 +300,10 @@ export default function ScheduleForm({
           ? selectedCalendarId
           : null,
         company: form.scope === "company" && companyId ? companyId : null,
-        participant_ids: form.scope === "company" ? participantIds : [],
+        participant_ids:
+          form.scope === "company"
+            ? ensureSelfParticipant(participantIds)
+            : [],
       };
 
       if (mode === "create") {
@@ -368,7 +393,9 @@ export default function ScheduleForm({
                 onClick={() => {
                   if (isViewMode) return;
                   setForm((prev) => ({ ...prev, scope: opt.value }));
-                  setParticipantIds([]);
+                  setParticipantIds(
+                    opt.value === "company" ? ensureSelfParticipant([]) : [],
+                  );
                 }}
                 className={`
                   px-4 py-2 rounded-lg border text-sm
@@ -619,7 +646,7 @@ export default function ScheduleForm({
           currentUserId={user?.id}
           currentUsername={user?.username}
           onSave={(nextParticipantIds) => {
-            setParticipantIds(nextParticipantIds);
+            setParticipantIds(ensureSelfParticipant(nextParticipantIds));
             setShowParticipantModal(false);
           }}
           entityLabel="참여자"
