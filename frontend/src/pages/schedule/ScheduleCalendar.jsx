@@ -58,6 +58,34 @@ const CALENDAR_DAY_DIVIDER_CSS = `
   box-sizing: border-box;
 }
 
+.pmis-calendar.schedule-calendar-grid-lines .react-calendar__month-view__weekdays__weekday abbr {
+  font-size: 0;
+  position: relative;
+  display: inline-block;
+}
+
+.pmis-calendar.schedule-calendar-grid-lines .react-calendar__month-view__weekdays__weekday abbr::after {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.pmis-calendar.schedule-calendar-grid-lines .react-calendar__month-view__weekdays__weekday:nth-child(1) abbr::after {
+  content: "일";
+  color: #ef4444;
+}
+
+.pmis-calendar.schedule-calendar-grid-lines .react-calendar__month-view__weekdays__weekday:nth-child(2) abbr::after { content: "월"; }
+.pmis-calendar.schedule-calendar-grid-lines .react-calendar__month-view__weekdays__weekday:nth-child(3) abbr::after { content: "화"; }
+.pmis-calendar.schedule-calendar-grid-lines .react-calendar__month-view__weekdays__weekday:nth-child(4) abbr::after { content: "수"; }
+.pmis-calendar.schedule-calendar-grid-lines .react-calendar__month-view__weekdays__weekday:nth-child(5) abbr::after { content: "목"; }
+.pmis-calendar.schedule-calendar-grid-lines .react-calendar__month-view__weekdays__weekday:nth-child(6) abbr::after { content: "금"; }
+
+.pmis-calendar.schedule-calendar-grid-lines .react-calendar__month-view__weekdays__weekday:nth-child(7) abbr::after {
+  content: "토";
+  color: #3b82f6;
+}
+
 .pmis-calendar.schedule-calendar-grid-lines .react-calendar__month-view__days__day {
   border-right: 1px solid #e5e7eb !important;
   border-bottom: 1px solid #e5e7eb !important;
