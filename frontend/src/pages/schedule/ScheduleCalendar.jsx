@@ -177,6 +177,8 @@ const CALENDAR_DAY_DIVIDER_CSS = `
   grid-template-columns: 1fr;
   border-top: 1px solid #e5e7eb;
   border-left: 1px solid #e5e7eb;
+  width: calc((100% - 6px) / 7);
+  max-width: calc((100% - 6px) / 7);
 }
 
 .pmis-calendar.schedule-today-calendar-view .react-calendar__month-view__weekdays__weekday {
@@ -196,6 +198,8 @@ const CALENDAR_DAY_DIVIDER_CSS = `
 .pmis-calendar.schedule-today-calendar-view .react-calendar__month-view__days {
   display: block;
   border: none;
+  width: calc((100% - 6px) / 7);
+  max-width: calc((100% - 6px) / 7);
 }
 
 .pmis-calendar.schedule-today-calendar-view .react-calendar__month-view__days__day.is-outside-today {
