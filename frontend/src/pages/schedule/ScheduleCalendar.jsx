@@ -11,7 +11,7 @@ import {
   addWeeks,
   addDays,
 } from "date-fns";
-import { ChevronLeft, ChevronRight, Plus, Printer, Search, X } from "lucide-react";
+import { Plus, Printer, Search, X } from "lucide-react";
 import {
   scheduleApi,
   calendarApi,
@@ -814,10 +814,10 @@ export default function ScheduleCalendar({ scope, category }) {
                       setCurrentDate(nextDate);
                       setSelectedDate(nextDate);
                     }}
-                    className="react-calendar__navigation__arrow flex items-center justify-center"
+                    className="react-calendar__navigation__arrow"
                     aria-label="Previous day"
                   >
-                    <ChevronLeft size={16} />
+                    &lsaquo;
                   </button>
                   <div className="react-calendar__navigation__label text-sm font-semibold text-gray-700">
                     {format(currentDate, "yyyy년 M월 d일")}
@@ -829,10 +829,10 @@ export default function ScheduleCalendar({ scope, category }) {
                       setCurrentDate(nextDate);
                       setSelectedDate(nextDate);
                     }}
-                    className="react-calendar__navigation__arrow flex items-center justify-center"
+                    className="react-calendar__navigation__arrow"
                     aria-label="Next day"
                   >
-                    <ChevronRight size={16} />
+                    &rsaquo;
                   </button>
                 </div>
                 <Calendar
