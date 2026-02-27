@@ -229,6 +229,7 @@ const CALENDAR_DAY_DIVIDER_CSS = `
   border-bottom: 1px solid #e5e7eb;
   box-sizing: border-box;
   padding: 4px 2px;
+  cursor: pointer;
 }
 
 .pmis-calendar.schedule-week-calendar .schedule-week-cell.is-today:not(.is-selected) {
@@ -734,6 +735,7 @@ export default function ScheduleCalendar({ scope, category }) {
                         <div
                           key={ymd}
                           className={`schedule-week-cell${isToday ? " is-today" : ""}${isSelected ? " is-selected" : ""}`}
+                          onClick={() => setSelectedDate(date)}
                         >
                           <button
                             type="button"
@@ -747,7 +749,10 @@ export default function ScheduleCalendar({ scope, category }) {
                               <button
                                 type="button"
                                 key={item?.id || `${ymd}-item-${idx}`}
-                                onClick={() => openView(item)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openView(item);
+                                }}
                                 className="pmis-tile-item is-clickable"
                                 title={getScheduleLabel(item)}
                               >
