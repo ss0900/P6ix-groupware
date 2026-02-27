@@ -173,8 +173,7 @@ const CALENDAR_DAY_DIVIDER_CSS = `
 }
 
 .pmis-calendar.schedule-today-calendar-view .react-calendar__month-view__weekdays {
-  display: grid;
-  grid-template-columns: 1fr;
+  display: block;
   border-top: 1px solid #e5e7eb;
   border-left: 1px solid #e5e7eb;
   width: calc((100% - 6px) / 7);
@@ -183,6 +182,14 @@ const CALENDAR_DAY_DIVIDER_CSS = `
 
 .pmis-calendar.schedule-today-calendar-view .react-calendar__month-view__weekdays__weekday {
   display: none;
+  padding: 8px 0;
+  text-align: center;
+  border-right: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e5e7eb;
+  box-sizing: border-box;
+  width: 100% !important;
+  max-width: none !important;
+  flex: 1 0 100% !important;
 }
 
 .pmis-calendar.schedule-today-calendar-view.schedule-today-dow-0 .react-calendar__month-view__weekdays__weekday:nth-child(1),
@@ -197,7 +204,7 @@ const CALENDAR_DAY_DIVIDER_CSS = `
 
 .pmis-calendar.schedule-today-calendar-view .react-calendar__month-view__days {
   display: block;
-  border: none;
+  border-left: 1px solid #e5e7eb;
   width: calc((100% - 6px) / 7);
   max-width: calc((100% - 6px) / 7);
 }
