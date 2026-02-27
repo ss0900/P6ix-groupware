@@ -698,10 +698,12 @@ export default function ScheduleCalendar({ scope, category }) {
               {dateRangeMode === "thisWeek" ? "전체일정" : "금주일정"}
             </button>
             <button
-              onClick={goToToday}
+              onClick={
+                dateRangeMode === "today" ? goToMonthCalendar : goToToday
+              }
               className="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50"
             >
-              금일일정
+              {dateRangeMode === "today" ? "전체일정" : "금일일정"}
             </button>
             <button
               onClick={() => window.print()}
