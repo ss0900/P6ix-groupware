@@ -634,6 +634,13 @@ export default function ScheduleCalendar({ scope, category }) {
     return "-";
   }, []);
 
+  const truncateCellText = useCallback((text, maxLength = 36) => {
+    const normalized = String(text ?? "");
+    const chars = Array.from(normalized);
+    if (chars.length <= maxLength) return normalized;
+    return `${chars.slice(0, maxLength).join("")}...`;
+  }, []);
+
   const weekStartDate = useMemo(
     () => startOfWeek(currentDate, { weekStartsOn: 0 }),
     [currentDate],
@@ -967,6 +974,7 @@ export default function ScheduleCalendar({ scope, category }) {
                         ) : (
                           todaySchedules.map((item) => {
                             const title = item?.title || "(제목 없음)";
+                            const displayTitle = truncateCellText(title);
                             const locationText = getScheduleLocationText(item);
                             const timeText = getScheduleTimeText(item);
                             const participantsText =
@@ -981,7 +989,7 @@ export default function ScheduleCalendar({ scope, category }) {
                                   className="px-3 py-2 text-gray-900 truncate"
                                   title={title}
                                 >
-                                  {title}
+                                  {displayTitle}
                                 </td>
                                 <td
                                   className="px-3 py-2 text-gray-700 whitespace-nowrap"
