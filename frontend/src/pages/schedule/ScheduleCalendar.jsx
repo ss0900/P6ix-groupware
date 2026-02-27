@@ -132,7 +132,7 @@ const CALENDAR_DAY_DIVIDER_CSS = `
 }
 
 .pmis-calendar.schedule-calendar-grid-lines .react-calendar__tile {
-  height: 108px;
+  height: 130px;
   align-items: stretch;
   padding: 4px 2px;
 }
@@ -731,7 +731,9 @@ export default function ScheduleCalendar({ scope, category }) {
                   getTileClassName={({ date, view }) => {
                     if (view !== "month") return "";
                     const ymd = format(date, "yyyy-MM-dd");
-                    return weekDateSet.has(ymd) ? "is-current-week" : "is-outside-week";
+                    return weekDateSet.has(ymd)
+                      ? "is-current-week"
+                      : "is-outside-week";
                   }}
                   holidayMap={holidayMap}
                   showCounts={false}
