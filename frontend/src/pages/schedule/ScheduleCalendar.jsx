@@ -155,7 +155,7 @@ const CALENDAR_DAY_DIVIDER_CSS = `
 }
 
 .pmis-calendar.schedule-week-calendar-view .react-calendar__navigation {
-  display: none;
+  display: none !important;
 }
 
 .pmis-calendar.schedule-week-calendar-view .react-calendar__month-view__days__day.is-outside-week {
