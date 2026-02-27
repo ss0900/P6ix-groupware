@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 from pathlib import Path
 import os
 import environ
+import dj_database_url
 
 AUTH_USER_MODEL = "core.CustomUser"
 
@@ -23,7 +24,7 @@ env = environ.Env(
     DJANGO_DEBUG=(bool, False),
 )
 
-# ✅ .env 로드: backend/config/.env 우선, 없으면 backend/.env
+# Load .env from backend/config/.env first, then backend/.env.
 _env_path_candidates = [
     os.path.join(BASE_DIR, "config", ".env"),
     os.path.join(BASE_DIR, ".env"),
@@ -33,16 +34,16 @@ for _p in _env_path_candidates:
         environ.Env.read_env(_p)
         break
 
-# ✅ .env 값 사용(없으면 기본값)
+# Use .env values when available (with safe defaults).
 SECRET_KEY = env("SECRET_KEY", default="dev-secret-key")
 DEBUG = env("DJANGO_DEBUG", default=False)
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
-# ✅ 아래 하드코딩된 SECRET_KEY/DEBUG는 .env 값을 덮어쓰므로 제거
+# Removed hardcoded SECRET_KEY/DEBUG override to keep .env authoritative.
 
-# 개발 기본 호스트 허용(운영은 .env에서 지정)
+# Default local hosts; configure production hosts via .env.
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["127.0.0.1", "localhost"])
 
 # Application definition
@@ -75,6 +76,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -104,7 +106,7 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
-# Channels (개발용: InMemory. 운영은 Redis로 전환 권장)
+# Channels: InMemory layer for single-instance setup.
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels.layers.InMemoryChannelLayer",
@@ -114,23 +116,28 @@ CHANNEL_LAYERS = {
 
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
+DATABASE_URL = env("DATABASE_URL", default="")
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': env("DB_NAME"),
-        'USER': env("DB_USER"),
-        'PASSWORD': env("DB_PASSWORD"),
-        'HOST': env("DB_HOST"),
-        # DB_PORT가 있으면 우선 사용, 없으면 LOCAL_PORT(SSH 터널용 등) fallback
-        'PORT': env("DB_PORT", default=env("LOCAL_PORT", default="5432")),
-        'CONN_MAX_AGE': 5,
-        "OPTIONS": {
-            "options": "-c lc_messages=C -c client_encoding=UTF8",
-        },
+if DATABASE_URL:
+    DATABASES = {
+        "default": dj_database_url.parse(DATABASE_URL, conn_max_age=5),
     }
-}
-
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': env("DB_NAME"),
+            'USER': env("DB_USER"),
+            'PASSWORD': env("DB_PASSWORD"),
+            'HOST': env("DB_HOST"),
+            # DB_PORT preferred; fallback to LOCAL_PORT for SSH tunnel setups.
+            'PORT': env("DB_PORT", default=env("LOCAL_PORT", default="5432")),
+            'CONN_MAX_AGE': 5,
+            "OPTIONS": {
+                "options": "-c lc_messages=C -c client_encoding=UTF8",
+            },
+        }
+    }
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
@@ -167,12 +174,14 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
-# Media (개발용: 로컬 저장소, NAS는 운영에서 전환)
+# Media: local path by default. Move to external storage in production if needed.
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
-# (선택) 업로드 용량 제한(필요 시)
+# Optional upload size limit (enable if needed).
 # DATA_UPLOAD_MAX_MEMORY_SIZE = 20 * 1024 * 1024  # 20MB
 
 # -----------------------------
@@ -190,10 +199,10 @@ DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="noreply@p6ix.com")
 # DRF / JWT (SimpleJWT)
 # -----------------------------
 REST_FRAMEWORK = {
-    # API는 기본적으로 JWT로 보호
+    # Protect API with JWT by default.
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
-        # admin(세션 로그인)도 같이 쓰고 싶으면 아래 줄 유지
+        # Keep SessionAuthentication if Django admin/session login is also used.
         "rest_framework.authentication.SessionAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": (
@@ -201,8 +210,8 @@ REST_FRAMEWORK = {
     ),
 }
 
-# (선택) 토큰 유효기간 기본값 그대로 써도 되지만,
-# 나중에 운영 정책에 맞게 조절할 수 있도록 블록만 만들어둠
+# JWT lifetime defaults; tune later for your production policy.
+# Kept explicit block to make token policy changes straightforward.
 from datetime import timedelta
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
@@ -211,16 +220,20 @@ SIMPLE_JWT = {
 }
 
 # -----------------------------
-# CORS (프론트 개발 서버 허용)
+# CORS
 # -----------------------------
-# .env에서 콤마로 구분해서 넣으면 됨:
+# Set comma-separated origins in .env.
 # CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 CORS_ALLOWED_ORIGINS = env.list(
     "CORS_ALLOWED_ORIGINS",
     default=["http://localhost:3000", "http://127.0.0.1:3000"],
 )
+CORS_ALLOW_CREDENTIALS = env.bool("CORS_ALLOW_CREDENTIALS", default=True)
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = True
 
-# (선택) 프론트에서 Authorization 헤더를 확실히 쓰기 위해
+# Optional explicit CORS headers for Authorization support.
 CORS_ALLOW_HEADERS = list(default_headers := (
     "accept", "accept-encoding", "authorization", "content-type",
     "dnt", "origin", "user-agent", "x-csrftoken", "x-requested-with",
