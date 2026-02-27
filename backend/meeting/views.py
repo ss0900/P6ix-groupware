@@ -41,9 +41,9 @@ class ScheduleViewSet(viewsets.ModelViewSet):
         date_from = self.request.query_params.get("date_from")
         date_to = self.request.query_params.get("date_to")
         if date_from:
-            qs = qs.filter(start__gte=date_from)
+            qs = qs.filter(start__date__gte=date_from)
         if date_to:
-            qs = qs.filter(start__lte=date_to)
+            qs = qs.filter(start__date__lte=date_to)
 
         # 필터: year, month (캘린더 월간 뷰)
         year = self.request.query_params.get("year")
