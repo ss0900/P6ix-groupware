@@ -164,7 +164,7 @@ const CALENDAR_DAY_DIVIDER_CSS = `
 
 .pmis-calendar.schedule-week-calendar-view .react-calendar__tile {
   min-height: 140px;
-  height: 530px;
+  height: auto;
 }
 
 .pmis-calendar.schedule-week-calendar {
@@ -725,7 +725,7 @@ export default function ScheduleCalendar({ scope, category }) {
                   onChange={setSelectedDate}
                   tileItemsByDate={tileItemsByDate}
                   showTileItems={true}
-                  maxTileItems={4}
+                  maxTileItems={Number.MAX_SAFE_INTEGER}
                   getTileItemLabel={getScheduleLabel}
                   onTileItemClick={(item) => openView(item)}
                   getTileClassName={({ date, view }) => {
