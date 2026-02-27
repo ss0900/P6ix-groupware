@@ -9,8 +9,9 @@ import {
   endOfWeek,
   eachDayOfInterval,
   addWeeks,
+  addDays,
 } from "date-fns";
-import { Plus, Printer, Search, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Printer, Search, X } from "lucide-react";
 import {
   scheduleApi,
   calendarApi,
@@ -806,9 +807,33 @@ export default function ScheduleCalendar({ scope, category }) {
             ) : dateRangeMode === "today" ? (
               <div className="pmis-calendar schedule-week-calendar w-full">
                 <div className="react-calendar__navigation">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nextDate = addDays(currentDate, -1);
+                      setCurrentDate(nextDate);
+                      setSelectedDate(nextDate);
+                    }}
+                    className="react-calendar__navigation__arrow flex items-center justify-center"
+                    aria-label="Previous day"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
                   <div className="react-calendar__navigation__label text-sm font-semibold text-gray-700">
                     {format(currentDate, "yyyy년 M월 d일")}
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nextDate = addDays(currentDate, 1);
+                      setCurrentDate(nextDate);
+                      setSelectedDate(nextDate);
+                    }}
+                    className="react-calendar__navigation__arrow flex items-center justify-center"
+                    aria-label="Next day"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
                 </div>
                 <Calendar
                   className={`schedule-calendar-grid-lines schedule-today-calendar-view schedule-today-dow-${currentDate.getDay()} w-full`}
