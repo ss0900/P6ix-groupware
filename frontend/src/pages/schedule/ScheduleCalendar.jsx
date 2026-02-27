@@ -432,18 +432,25 @@ export default function ScheduleCalendar({ scope, category }) {
   const fetchSchedules = useCallback(async () => {
     setLoading(true);
     try {
-      const start = format(
-        dateRangeMode === "thisWeek"
-          ? startOfWeek(currentDate, { weekStartsOn: 0 })
-          : startOfMonth(currentDate),
-        "yyyy-MM-dd",
-      );
-      const end = format(
-        dateRangeMode === "thisWeek"
-          ? endOfWeek(currentDate, { weekStartsOn: 0 })
-          : endOfMonth(currentDate),
-        "yyyy-MM-dd",
-      );
+      const todayYmd = format(new Date(), "yyyy-MM-dd");
+      const start =
+        dateRangeMode === "today"
+          ? todayYmd
+          : format(
+              dateRangeMode === "thisWeek"
+                ? startOfWeek(currentDate, { weekStartsOn: 0 })
+                : startOfMonth(currentDate),
+              "yyyy-MM-dd",
+            );
+      const end =
+        dateRangeMode === "today"
+          ? todayYmd
+          : format(
+              dateRangeMode === "thisWeek"
+                ? endOfWeek(currentDate, { weekStartsOn: 0 })
+                : endOfMonth(currentDate),
+              "yyyy-MM-dd",
+            );
 
       const params = {
         date_from: start,
@@ -530,7 +537,7 @@ export default function ScheduleCalendar({ scope, category }) {
 
   const goToToday = () => {
     const today = new Date();
-    setDateRangeMode("month");
+    setDateRangeMode("today");
     setSelectedDate(today);
     setCurrentDate(today);
   };
