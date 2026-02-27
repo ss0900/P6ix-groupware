@@ -172,7 +172,24 @@ const CALENDAR_DAY_DIVIDER_CSS = `
 }
 
 .pmis-calendar.schedule-today-calendar-view .react-calendar__month-view__weekdays {
+  display: grid;
+  grid-template-columns: 1fr;
+  border-top: 1px solid #e5e7eb;
+  border-left: 1px solid #e5e7eb;
+}
+
+.pmis-calendar.schedule-today-calendar-view .react-calendar__month-view__weekdays__weekday {
   display: none;
+}
+
+.pmis-calendar.schedule-today-calendar-view.schedule-today-dow-0 .react-calendar__month-view__weekdays__weekday:nth-child(1),
+.pmis-calendar.schedule-today-calendar-view.schedule-today-dow-1 .react-calendar__month-view__weekdays__weekday:nth-child(2),
+.pmis-calendar.schedule-today-calendar-view.schedule-today-dow-2 .react-calendar__month-view__weekdays__weekday:nth-child(3),
+.pmis-calendar.schedule-today-calendar-view.schedule-today-dow-3 .react-calendar__month-view__weekdays__weekday:nth-child(4),
+.pmis-calendar.schedule-today-calendar-view.schedule-today-dow-4 .react-calendar__month-view__weekdays__weekday:nth-child(5),
+.pmis-calendar.schedule-today-calendar-view.schedule-today-dow-5 .react-calendar__month-view__weekdays__weekday:nth-child(6),
+.pmis-calendar.schedule-today-calendar-view.schedule-today-dow-6 .react-calendar__month-view__weekdays__weekday:nth-child(7) {
+  display: block;
 }
 
 .pmis-calendar.schedule-today-calendar-view .react-calendar__month-view__days {
@@ -488,14 +505,8 @@ export default function ScheduleCalendar({ scope, category }) {
             ? currentDate
             : endOfMonth(currentDate);
 
-      const start = format(
-        rangeStartDate,
-        "yyyy-MM-dd",
-      );
-      const end = format(
-        rangeEndDate,
-        "yyyy-MM-dd",
-      );
+      const start = format(rangeStartDate, "yyyy-MM-dd");
+      const end = format(rangeEndDate, "yyyy-MM-dd");
 
       const params = {
         date_from: start,
@@ -689,7 +700,7 @@ export default function ScheduleCalendar({ scope, category }) {
               onClick={goToToday}
               className="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50"
             >
-              오늘일정
+              금일일정
             </button>
             <button
               onClick={() => window.print()}
@@ -795,7 +806,7 @@ export default function ScheduleCalendar({ scope, category }) {
             ) : dateRangeMode === "today" ? (
               <div className="w-full">
                 <Calendar
-                  className="schedule-calendar-grid-lines schedule-today-calendar-view w-full"
+                  className={`schedule-calendar-grid-lines schedule-today-calendar-view schedule-today-dow-${currentDate.getDay()} w-full`}
                   calendarType="gregory"
                   value={selectedDate}
                   activeStartDate={startOfMonth(currentDate)}
@@ -809,7 +820,9 @@ export default function ScheduleCalendar({ scope, category }) {
                     if (view !== "month") return "";
                     const ymd = format(date, "yyyy-MM-dd");
                     const todayYmd = format(currentDate, "yyyy-MM-dd");
-                    return ymd === todayYmd ? "is-today-only" : "is-outside-today";
+                    return ymd === todayYmd
+                      ? "is-today-only"
+                      : "is-outside-today";
                   }}
                   holidayMap={holidayMap}
                   showCounts={false}
