@@ -176,8 +176,8 @@ const CALENDAR_DAY_DIVIDER_CSS = `
   display: block;
   border-top: 1px solid #e5e7eb;
   border-left: 1px solid #e5e7eb;
-  width: calc((100% - 6px) / 7);
-  max-width: calc((100% - 6px) / 7);
+  width: 100%;
+  max-width: none;
 }
 
 .pmis-calendar.schedule-today-calendar-view .react-calendar__month-view__weekdays__weekday {
@@ -205,8 +205,8 @@ const CALENDAR_DAY_DIVIDER_CSS = `
 .pmis-calendar.schedule-today-calendar-view .react-calendar__month-view__days {
   display: block;
   border-left: 1px solid #e5e7eb;
-  width: calc((100% - 6px) / 7);
-  max-width: calc((100% - 6px) / 7);
+  width: 100%;
+  max-width: none;
 }
 
 .pmis-calendar.schedule-today-calendar-view .react-calendar__month-view__days__day.is-outside-today {
@@ -419,6 +419,34 @@ const CALENDAR_DAY_DIVIDER_CSS = `
   font-weight: 600;
   color: #475569;
 }
+
+.schedule-today-layout {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.schedule-today-calendar-pane {
+  flex: 0 0 240px;
+  width: 240px;
+  max-width: 100%;
+}
+
+.schedule-today-list-pane {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+@media (max-width: 1024px) {
+  .schedule-today-layout {
+    flex-direction: column;
+  }
+
+  .schedule-today-calendar-pane {
+    width: 100%;
+    flex: 0 0 auto;
+  }
+}
 `;
 
 export default function ScheduleCalendar({ scope, category }) {
@@ -555,6 +583,55 @@ export default function ScheduleCalendar({ scope, category }) {
 
     return grouped;
   }, [schedules]);
+
+  const todayYmd = useMemo(
+    () => format(currentDate, "yyyy-MM-dd"),
+    [currentDate],
+  );
+  const todaySchedules = useMemo(
+    () => tileItemsByDate[todayYmd] || [],
+    [tileItemsByDate, todayYmd],
+  );
+
+  const getScheduleTimeText = useCallback((item) => {
+    if (item?.is_all_day) return "종일";
+    const startDate = item?.start ? new Date(item.start) : null;
+    if (!startDate || Number.isNaN(startDate.getTime())) return "-";
+    const startText = format(startDate, "HH:mm");
+    const endDate = item?.end ? new Date(item.end) : null;
+    if (!endDate || Number.isNaN(endDate.getTime())) return startText;
+    return `${startText} ~ ${format(endDate, "HH:mm")}`;
+  }, []);
+
+  const getScheduleLocationText = useCallback((item) => {
+    if (item?.location && String(item.location).trim()) {
+      return String(item.location).trim();
+    }
+    if (item?.resource_name && String(item.resource_name).trim()) {
+      return String(item.resource_name).trim();
+    }
+    if (item?.meet_url && String(item.meet_url).trim()) {
+      return "온라인";
+    }
+    return "-";
+  }, []);
+
+  const getScheduleParticipantsText = useCallback((item) => {
+    const participants = Array.isArray(item?.participants)
+      ? item.participants
+      : [];
+    const names = participants
+      .map((participant) =>
+        participant?.name && String(participant.name).trim()
+          ? String(participant.name).trim()
+          : "",
+      )
+      .filter(Boolean);
+
+    if (names.length > 0) return names.join(", ");
+    if (item?.participant_count > 0) return `${item.participant_count}명`;
+    return "-";
+  }, []);
 
   const weekStartDate = useMemo(
     () => startOfWeek(currentDate, { weekStartsOn: 0 }),
@@ -803,59 +880,134 @@ export default function ScheduleCalendar({ scope, category }) {
                 />
               </div>
             ) : dateRangeMode === "today" ? (
-              <div className="pmis-calendar schedule-week-calendar w-full">
-                <div className="react-calendar__navigation">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const nextDate = addDays(currentDate, -1);
-                      setCurrentDate(nextDate);
-                      setSelectedDate(nextDate);
-                    }}
-                    className="react-calendar__navigation__arrow"
-                    aria-label="Previous day"
-                  >
-                    &lsaquo;
-                  </button>
-                  <div className="react-calendar__navigation__label text-sm font-semibold text-gray-700">
-                    {format(currentDate, "yyyy년 M월 d일")}
+              <div className="schedule-today-layout">
+                <div className="pmis-calendar schedule-week-calendar schedule-today-calendar-pane">
+                  <div className="react-calendar__navigation">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nextDate = addDays(currentDate, -1);
+                        setCurrentDate(nextDate);
+                        setSelectedDate(nextDate);
+                      }}
+                      className="react-calendar__navigation__arrow"
+                      aria-label="Previous day"
+                    >
+                      &lsaquo;
+                    </button>
+                    <div className="react-calendar__navigation__label text-sm font-semibold text-gray-700">
+                      {format(currentDate, "yyyy년 M월 d일")}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nextDate = addDays(currentDate, 1);
+                        setCurrentDate(nextDate);
+                        setSelectedDate(nextDate);
+                      }}
+                      className="react-calendar__navigation__arrow"
+                      aria-label="Next day"
+                    >
+                      &rsaquo;
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const nextDate = addDays(currentDate, 1);
-                      setCurrentDate(nextDate);
-                      setSelectedDate(nextDate);
+                  <Calendar
+                    className={`schedule-calendar-grid-lines schedule-today-calendar-view schedule-today-dow-${currentDate.getDay()} w-full`}
+                    calendarType="gregory"
+                    value={selectedDate}
+                    activeStartDate={startOfMonth(currentDate)}
+                    onChange={setSelectedDate}
+                    tileItemsByDate={tileItemsByDate}
+                    showTileItems={true}
+                    maxTileItems={Number.MAX_SAFE_INTEGER}
+                    getTileItemLabel={getScheduleLabel}
+                    onTileItemClick={(item) => openView(item)}
+                    getTileClassName={({ date, view }) => {
+                      if (view !== "month") return "";
+                      const ymd = format(date, "yyyy-MM-dd");
+                      return ymd === todayYmd
+                        ? "is-today-only"
+                        : "is-outside-today";
                     }}
-                    className="react-calendar__navigation__arrow"
-                    aria-label="Next day"
-                  >
-                    &rsaquo;
-                  </button>
+                    holidayMap={holidayMap}
+                    showCounts={false}
+                    showHolidayLabels={false}
+                  />
                 </div>
-                <Calendar
-                  className={`schedule-calendar-grid-lines schedule-today-calendar-view schedule-today-dow-${currentDate.getDay()} w-full`}
-                  calendarType="gregory"
-                  value={selectedDate}
-                  activeStartDate={startOfMonth(currentDate)}
-                  onChange={setSelectedDate}
-                  tileItemsByDate={tileItemsByDate}
-                  showTileItems={true}
-                  maxTileItems={Number.MAX_SAFE_INTEGER}
-                  getTileItemLabel={getScheduleLabel}
-                  onTileItemClick={(item) => openView(item)}
-                  getTileClassName={({ date, view }) => {
-                    if (view !== "month") return "";
-                    const ymd = format(date, "yyyy-MM-dd");
-                    const todayYmd = format(currentDate, "yyyy-MM-dd");
-                    return ymd === todayYmd
-                      ? "is-today-only"
-                      : "is-outside-today";
-                  }}
-                  holidayMap={holidayMap}
-                  showCounts={false}
-                  showHolidayLabels={false}
-                />
+                <div className="schedule-today-list-pane border border-gray-200 rounded-lg overflow-hidden bg-white">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full table-fixed text-sm">
+                      <thead className="bg-gray-50 text-gray-700">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-semibold w-[34%]">
+                            제목
+                          </th>
+                          <th className="px-3 py-2 text-left font-semibold w-[24%]">
+                            장소
+                          </th>
+                          <th className="px-3 py-2 text-left font-semibold w-[18%]">
+                            시간
+                          </th>
+                          <th className="px-3 py-2 text-left font-semibold w-[24%]">
+                            참석자
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {todaySchedules.length === 0 ? (
+                          <tr>
+                            <td
+                              colSpan={4}
+                              className="px-3 py-6 text-center text-gray-500"
+                            >
+                              금일 일정이 없습니다.
+                            </td>
+                          </tr>
+                        ) : (
+                          todaySchedules.map((item) => {
+                            const title = item?.title || "(제목 없음)";
+                            const locationText = getScheduleLocationText(item);
+                            const timeText = getScheduleTimeText(item);
+                            const participantsText =
+                              getScheduleParticipantsText(item);
+                            return (
+                              <tr
+                                key={item?.id || `${todayYmd}-${title}`}
+                                className="border-t border-gray-100 hover:bg-blue-50 cursor-pointer"
+                                onClick={() => openView(item)}
+                              >
+                                <td
+                                  className="px-3 py-2 text-gray-900 truncate"
+                                  title={title}
+                                >
+                                  {title}
+                                </td>
+                                <td
+                                  className="px-3 py-2 text-gray-700 truncate"
+                                  title={locationText}
+                                >
+                                  {locationText}
+                                </td>
+                                <td
+                                  className="px-3 py-2 text-gray-700 whitespace-nowrap"
+                                  title={timeText}
+                                >
+                                  {timeText}
+                                </td>
+                                <td
+                                  className="px-3 py-2 text-gray-700 truncate"
+                                  title={participantsText}
+                                >
+                                  {participantsText}
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="w-full">
