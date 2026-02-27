@@ -942,14 +942,14 @@ export default function ScheduleCalendar({ scope, category }) {
                           <th className="px-3 py-2 text-left font-semibold w-[34%]">
                             제목
                           </th>
-                          <th className="px-3 py-2 text-left font-semibold w-[24%]">
-                            장소
-                          </th>
                           <th className="px-3 py-2 text-left font-semibold w-[18%]">
                             시간
                           </th>
                           <th className="px-3 py-2 text-left font-semibold w-[24%]">
                             참석자
+                          </th>
+                          <th className="px-3 py-2 text-left font-semibold w-[24%]">
+                            장소
                           </th>
                         </tr>
                       </thead>
@@ -983,12 +983,6 @@ export default function ScheduleCalendar({ scope, category }) {
                                   {title}
                                 </td>
                                 <td
-                                  className="px-3 py-2 text-gray-700 truncate"
-                                  title={locationText}
-                                >
-                                  {locationText}
-                                </td>
-                                <td
                                   className="px-3 py-2 text-gray-700 whitespace-nowrap"
                                   title={timeText}
                                 >
@@ -999,6 +993,12 @@ export default function ScheduleCalendar({ scope, category }) {
                                   title={participantsText}
                                 >
                                   {participantsText}
+                                </td>
+                                <td
+                                  className="px-3 py-2 text-gray-700 truncate"
+                                  title={locationText}
+                                >
+                                  {locationText}
                                 </td>
                               </tr>
                             );
