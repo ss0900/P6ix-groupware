@@ -231,10 +231,49 @@ const CALENDAR_DAY_DIVIDER_CSS = `
   padding: 4px 2px;
 }
 
-.pmis-calendar.schedule-week-calendar .schedule-week-cell.is-today {
+.pmis-calendar.schedule-week-calendar .schedule-week-cell.is-today:not(.is-selected) {
   border: 1.5px solid #3b82f6;
   position: relative;
   z-index: 2;
+}
+
+.pmis-calendar.schedule-week-calendar .schedule-week-cell.is-selected {
+  background: #2563eb;
+  color: #ffffff;
+  border-color: transparent;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.pmis-calendar.schedule-week-calendar .schedule-week-cell.is-selected .schedule-week-day-button,
+.pmis-calendar.schedule-week-calendar .schedule-week-cell.is-selected .schedule-week-day-button.is-sunday,
+.pmis-calendar.schedule-week-calendar .schedule-week-cell.is-selected .schedule-week-day-button.is-saturday,
+.pmis-calendar.schedule-week-calendar .schedule-week-cell.is-selected .schedule-week-day-button.is-neighboring-month,
+.pmis-calendar.schedule-week-calendar .schedule-week-cell.is-selected .schedule-week-day-button.is-neighboring-month.is-sunday,
+.pmis-calendar.schedule-week-calendar .schedule-week-cell.is-selected .schedule-week-day-button.is-neighboring-month.is-saturday,
+.pmis-calendar.schedule-week-calendar .schedule-week-cell.is-selected .schedule-week-day-button.is-selected {
+  color: #ffffff !important;
+}
+
+.pmis-calendar.schedule-week-calendar .schedule-week-cell.is-selected .pmis-tile-item {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.45);
+}
+
+.pmis-calendar.schedule-week-calendar .schedule-week-cell.is-selected .pmis-tile-item,
+.pmis-calendar.schedule-week-calendar .schedule-week-cell.is-selected .pmis-tile-item .pmis-tile-item__label {
+  color: #ffffff !important;
+}
+
+.pmis-calendar.schedule-week-calendar .schedule-week-cell.is-selected .pmis-tile-item.is-clickable:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.pmis-calendar.schedule-week-calendar .schedule-week-cell.is-selected .schedule-week-overflow-count {
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.16);
 }
 
 .pmis-calendar.schedule-week-calendar .schedule-week-day-button {
@@ -694,7 +733,7 @@ export default function ScheduleCalendar({ scope, category }) {
                       return (
                         <div
                           key={ymd}
-                          className={`schedule-week-cell${isToday ? " is-today" : ""}`}
+                          className={`schedule-week-cell${isToday ? " is-today" : ""}${isSelected ? " is-selected" : ""}`}
                         >
                           <button
                             type="button"
