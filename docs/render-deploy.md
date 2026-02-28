@@ -40,3 +40,7 @@
 - 로그인/토큰 갱신 API 확인
 - WebSocket 채팅 연결 확인 (`/ws/chat/`)
 - 정적 리소스 및 업로드 파일(media) 확인
+
+## External DB 사용 시
+- 기존 사내/외부 DB를 Render에서 사용하려면 공인 접근, 방화벽 allowlist, SSL 강제가 필요하다.
+- 상세 절차: `docs/render-external-db-access.md`
