@@ -122,13 +122,15 @@ DB_SSLMODE = env("DB_SSLMODE", default="")
 DB_SSLROOTCERT = env("DB_SSLROOTCERT", default="")
 DB_SSLCERT = env("DB_SSLCERT", default="")
 DB_SSLKEY = env("DB_SSLKEY", default="")
+DB_PG_OPTIONS = env("DB_PG_OPTIONS", default="")
 
 
 def _database_options():
     options = {
-        "options": "-c lc_messages=C -c client_encoding=UTF8",
         "connect_timeout": DB_CONNECT_TIMEOUT,
     }
+    if DB_PG_OPTIONS:
+        options["options"] = DB_PG_OPTIONS
     if DB_SSLMODE:
         options["sslmode"] = DB_SSLMODE
     if DB_SSLROOTCERT:
