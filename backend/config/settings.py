@@ -117,10 +117,35 @@ CHANNEL_LAYERS = {
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 DATABASE_URL = env("DATABASE_URL", default="")
+DB_CONNECT_TIMEOUT = env.int("DB_CONNECT_TIMEOUT", default=10)
+DB_SSLMODE = env("DB_SSLMODE", default="")
+DB_SSLROOTCERT = env("DB_SSLROOTCERT", default="")
+DB_SSLCERT = env("DB_SSLCERT", default="")
+DB_SSLKEY = env("DB_SSLKEY", default="")
+
+
+def _database_options():
+    options = {
+        "options": "-c lc_messages=C -c client_encoding=UTF8",
+        "connect_timeout": DB_CONNECT_TIMEOUT,
+    }
+    if DB_SSLMODE:
+        options["sslmode"] = DB_SSLMODE
+    if DB_SSLROOTCERT:
+        options["sslrootcert"] = DB_SSLROOTCERT
+    if DB_SSLCERT:
+        options["sslcert"] = DB_SSLCERT
+    if DB_SSLKEY:
+        options["sslkey"] = DB_SSLKEY
+    return options
 
 if DATABASE_URL:
+    _db = dj_database_url.parse(DATABASE_URL, conn_max_age=5)
+    _db_options = _db.get("OPTIONS", {})
+    _db_options.update(_database_options())
+    _db["OPTIONS"] = _db_options
     DATABASES = {
-        "default": dj_database_url.parse(DATABASE_URL, conn_max_age=5),
+        "default": _db,
     }
 else:
     DATABASES = {
@@ -133,9 +158,7 @@ else:
             # DB_PORT preferred; fallback to LOCAL_PORT for SSH tunnel setups.
             'PORT': env("DB_PORT", default=env("LOCAL_PORT", default="5432")),
             'CONN_MAX_AGE': 5,
-            "OPTIONS": {
-                "options": "-c lc_messages=C -c client_encoding=UTF8",
-            },
+            "OPTIONS": _database_options(),
         }
     }
 
